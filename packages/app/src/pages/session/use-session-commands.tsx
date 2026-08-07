@@ -14,12 +14,14 @@ import { useTerminal } from "@/context/terminal"
 import { showToast } from "@/utils/toast"
 import { downloadSessionExport, fetchSessionExport, sessionExportFilename } from "@/utils/session-export"
 import { findLast } from "@opencode-ai/core/util/array"
-import { createSessionTabs } from "@/pages/session/helpers"
+import { SESSION_ARCHITECTURE_TAB, createSessionTabs } from "@/pages/session/helpers"
 import { extractPromptFromParts } from "@/utils/prompt"
 import { Message, Part, UserMessage } from "@opencode-ai/sdk/v2"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionOwnership } from "./session-ownership"
 import { useLocal } from "@/context/local"
+import { useServerArchitectureAvailable } from "@/context/server-sdk"
+import { dispatchArchitectureCommand } from "@/features/architecture/commands"
 
 export type SessionCommandContext = {
   navigateMessageByOffset: (offset: number) => void
@@ -27,6 +29,7 @@ export type SessionCommandContext = {
   focusInput: () => void
   review?: () => boolean
   fileBrowser?: () => boolean
+  architecture?: () => void
 }
 
 const withCategory = (category: string) => {
@@ -49,6 +52,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const terminal = useTerminal()
   const layout = useLayout()
   const local = useLocal()
+  const architectureAvailable = useServerArchitectureAvailable()
   const navigate = useNavigate()
   const { params, sessionKey, tabs, view } = useSessionLayout()
   const sessionOwnership = createSessionOwnership(sessionKey)
@@ -84,6 +88,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     pathFromTab: file.pathFromTab,
     normalizeTab,
     review: actions.review,
+    architecture: () => architectureAvailable() === true,
     hasReview,
     fileBrowser: actions.fileBrowser,
   })
@@ -269,6 +274,12 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     const tab = closableTab()
     if (!tab) return
     tabs().close(tab)
+  }
+
+  const openArchitecture = () => {
+    actions.architecture?.()
+    view().reviewPanel.open()
+    tabs().open(SESSION_ARCHITECTURE_TAB)
   }
 
   const addSelection = () => {
@@ -560,6 +571,35 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
             title: language.t("command.fileTree.toggle"),
             keybind: "mod+\\",
             onSelect: () => layout.fileTree.toggle(),
+          }),
+        ]
+      : []),
+    ...(architectureAvailable() === true
+      ? [
+          viewCommand({
+            id: "architecture.open",
+            title: language.t("command.architecture.open"),
+            onSelect: openArchitecture,
+          }),
+          viewCommand({
+            id: "architecture.save",
+            title: language.t("command.architecture.save"),
+            onSelect: () => dispatchArchitectureCommand("save"),
+          }),
+          viewCommand({
+            id: "architecture.reload",
+            title: language.t("command.architecture.reload"),
+            onSelect: () => dispatchArchitectureCommand("reload"),
+          }),
+          viewCommand({
+            id: "architecture.fitView",
+            title: language.t("command.architecture.fitView"),
+            onSelect: () => dispatchArchitectureCommand("fitView"),
+          }),
+          viewCommand({
+            id: "architecture.addNode",
+            title: language.t("command.architecture.addNode"),
+            onSelect: () => dispatchArchitectureCommand("addNode"),
           }),
         ]
       : []),

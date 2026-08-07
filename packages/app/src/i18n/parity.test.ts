@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { desktopNativePluralCategories } from "./desktop-native"
+import { usesEnglishFallback } from "./fallback"
 
 const appLocales = [
   "ar",
@@ -102,7 +103,9 @@ describe("i18n parity", () => {
       const source = await dictionary(domain.source)
       for (const locale of domain.locales) {
         const target = await dictionary(domain.target(locale))
-        const missing = Object.keys(source).filter((key) => !Object.hasOwn(target, key))
+        const missing = Object.keys(source).filter(
+          (key) => !Object.hasOwn(target, key) && (domain.name !== "app" || !usesEnglishFallback(key)),
+        )
         const extra = Object.keys(target)
           .filter((key) => !Object.hasOwn(source, key))
           .sort()

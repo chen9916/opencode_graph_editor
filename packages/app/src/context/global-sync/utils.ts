@@ -42,8 +42,8 @@ export function normalizePermissionRequest(input: PermissionV2Request | Permissi
     id: input.id,
     sessionID: input.sessionID,
     permission: input.action,
-    patterns: input.resources,
-    always: input.save ?? [],
+    patterns: [...input.resources],
+    always: [...(input.save ?? [])],
     metadata: input.metadata ?? {},
     tool:
       input.source?.type === "tool" ? { messageID: input.source.messageID, callID: input.source.callID } : undefined,
@@ -166,6 +166,7 @@ export function sanitizeProject(project: Project) {
 export function normalizeProjectInfo(project: Project | CurrentProject): Project {
   return {
     ...project,
+    worktree: "worktree" in project ? project.worktree : (project as CurrentProject).directory,
     vcs: project.vcs === "git" ? "git" : undefined,
-  }
+  } as Project
 }

@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { Architecture } from "@opencode-ai/schema/architecture"
 
 export class InvalidRequestError extends Schema.TaggedErrorClass<InvalidRequestError>()(
   "InvalidRequestError",
@@ -108,4 +109,40 @@ export class PtyNotFoundError extends Schema.TaggedErrorClass<PtyNotFoundError>(
     message: Schema.String,
   },
   { httpApiStatus: 404 },
+) {}
+
+export class ArchitectureNotFoundError extends Schema.TaggedErrorClass<ArchitectureNotFoundError>()(
+  "ArchitectureNotFoundError",
+  {
+    entity: Schema.Literals(["resource", "node", "edge"]),
+    id: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
+export class ArchitectureConflictError extends Schema.TaggedErrorClass<ArchitectureConflictError>()(
+  "ArchitectureConflictError",
+  {
+    message: Schema.String,
+    operationIDs: Schema.Array(Architecture.OperationID),
+    currentRevision: Schema.optional(Schema.Int),
+    currentDigest: Schema.optional(Schema.String),
+  },
+  { httpApiStatus: 409 },
+) {}
+
+export class ArchitectureInvalidGraphError extends Schema.TaggedErrorClass<ArchitectureInvalidGraphError>()(
+  "ArchitectureInvalidGraphError",
+  {
+    message: Schema.String,
+    version: Schema.optional(Schema.String),
+  },
+  { httpApiStatus: 422 },
+) {}
+
+export class ArchitectureUnavailableError extends Schema.TaggedErrorClass<ArchitectureUnavailableError>()(
+  "ArchitectureUnavailableError",
+  { message: Schema.String },
+  { httpApiStatus: 503 },
 ) {}

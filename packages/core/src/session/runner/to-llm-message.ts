@@ -18,6 +18,20 @@ const media = (file: FileAttachment): ContentPart => ({
   metadata: file.description === undefined ? undefined : { description: file.description },
 })
 
+const isArchitectureResource = (file: FileAttachment) => {
+  const value = URL.canParse(file.uri) ? new URL(file.uri).pathname : file.uri
+  return value.replaceAll("\\", "/").includes(".opencode/architecture/resources/")
+}
+
+const architectureReference = (file: FileAttachment): ContentPart => {
+  const mention = file.source?.text.trim() || file.name?.replace(/\.json$/i, "") || "the referenced graph"
+  const resourceID = file.name?.replace(/\.json$/i, "")
+  return {
+    type: "text",
+    text: `Architecture graph reference: ${mention} identifies the managed Architecture resource${resourceID ? ` with ID ${resourceID}` : ""}. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.`,
+  }
+}
+
 const toolInput = (tool: SessionMessage.AssistantTool) => {
   if (tool.state.status !== "pending") return tool.state.input
   try {
@@ -122,7 +136,12 @@ function toLLMMessage(message: SessionMessage.Message, model: Model): Message[] 
         Message.make({
           id: message.id,
           role: "user",
-          content: [{ type: "text", text: message.text }, ...(message.files ?? []).map(media)],
+          content: [
+            { type: "text", text: message.text },
+            ...(message.files ?? []).map((file) =>
+              isArchitectureResource(file) ? architectureReference(file) : media(file),
+            ),
+          ],
           metadata: {
             ...message.metadata,
             ...(message.agents?.length ? { agents: message.agents } : {}),

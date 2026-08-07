@@ -12,6 +12,7 @@ import { SkillGroup } from "./groups/skill"
 import { EventGroup, makeEventGroup } from "./groups/event"
 import type { Definition } from "@opencode-ai/schema/event"
 import { AgentGroup } from "./groups/agent"
+import { ArchitectureGroup } from "./groups/architecture"
 import { HealthGroup } from "./groups/health"
 import { PtyGroup } from "./groups/pty"
 import { makeQuestionGroup } from "./groups/question"
@@ -38,6 +39,7 @@ const makeApiFromGroup = <
     .add(HealthGroup)
     .add(LocationGroup.middleware(locationMiddleware))
     .add(AgentGroup.middleware(locationMiddleware))
+    .add(ArchitectureGroup.middleware(locationMiddleware))
     .add(makeSessionGroup(sessionLocationMiddleware))
     .add(MessageGroup.middleware(sessionLocationMiddleware))
     .add(ModelGroup.middleware(locationMiddleware))

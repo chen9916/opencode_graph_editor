@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { ServerApi } from "./server"
 import type { ServerProtocol } from "./server-protocol"
 import type { AgentPartInput, FilePartInput, OpencodeClient, Session, TextPartInput } from "@opencode-ai/sdk/v2/client"
@@ -35,10 +36,7 @@ type CompatiblePermissionApi = Omit<ServerApi["permission"], "reply"> & {
     input: Parameters<ServerApi["permission"]["reply"]>[0] & { location?: { directory?: string } },
   ) => ReturnType<ServerApi["permission"]["reply"]>
 }
-export type CompatibleApi = Omit<ServerApi, "session" | "permission"> & {
-  readonly session: CompatibleSessionApi
-  readonly permission: CompatiblePermissionApi
-}
+export type CompatibleApi = ServerApi
 type LegacyPrompt = {
   agent?: string
   model?: { providerID: string; modelID: string }

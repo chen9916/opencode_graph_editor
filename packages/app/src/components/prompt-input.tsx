@@ -82,6 +82,8 @@ import { createPromptInputTransientState } from "./prompt-input/transient-state"
 import { showToast } from "@/utils/toast"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
+import { architectureResourceMention, architectureResourcePath } from "@/features/architecture/mention"
+import { useArchitectureResourceMentions } from "@/features/architecture/mentions"
 
 export { createPromptInputHistory }
 export type { PromptInputControls, PromptInputHistory, PromptInputProps, PromptInputState, PromptInputSubmission }
@@ -127,6 +129,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
+  const architectureResources = useArchitectureResourceMentions()
   const tabs = () => props.controls.session.tabs
   let editorRef!: HTMLDivElement
   let fileInputRef: HTMLInputElement | undefined
@@ -599,6 +602,19 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     ),
   )
 
+  const architectureResourceList = createMemo(() =>
+    (architectureResources() ?? []).map(
+      (resource): AtOption => ({
+        type: "architecture",
+        id: resource.id,
+        name: resource.name,
+        path: architectureResourcePath(resource.id),
+        display: resource.name,
+        description: `Architecture graph · ${resource.id}`,
+      }),
+    ),
+  )
+
   const handleAtSelect = (option: AtOption | undefined) => {
     if (!option) return
     if (option.type === "agent") {
@@ -636,6 +652,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       })
       return
     }
+    if (option.type === "architecture") {
+      addPart(architectureResourceMention(option))
+      return
+    }
     addPart({ type: "file", path: option.path, content: "@" + option.path, start: 0, end: 0 })
   }
 
@@ -644,6 +664,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     if (x.type === "agent") return `agent:${x.name}`
     if (x.type === "reference") return `reference:${x.name}`
     if (x.type === "resource") return `resource:${x.client}:${x.uri}`
+    if (x.type === "architecture") return `architecture:${x.path}`
     return `file:${x.path}`
   }
 
@@ -658,15 +679,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       const references = referenceList()
       const agents = agentList()
       const mcpResources = mcpResourceList()
+      const architecture = architectureResourceList()
       const open = recent()
       const seen = new Set(open)
       const pinned: AtOption[] = open.map((path) => ({ type: "file", path, display: path, recent: true }))
-      if (!query.trim()) return [...references, ...agents, ...mcpResources, ...pinned]
+      if (!query.trim()) return [...references, ...agents, ...architecture, ...mcpResources, ...pinned]
       const paths = await files.searchFilesAndDirectories(query)
       const fileOptions: AtOption[] = paths
         .filter((path) => !seen.has(path))
         .map((path) => ({ type: "file", path, display: path }))
-      return [...references, ...agents, ...mcpResources, ...pinned, ...fileOptions]
+      return [...references, ...agents, ...architecture, ...mcpResources, ...pinned, ...fileOptions]
     },
     key: atKey,
     filterKeys: ["display"],
@@ -675,6 +697,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       if (item.type === "reference") return "reference"
       if (item.type === "agent") return "agent"
       if (item.type === "resource") return "resource"
+      if (item.type === "architecture") return "resource"
       if (item.recent) return "recent"
       return "file"
     },

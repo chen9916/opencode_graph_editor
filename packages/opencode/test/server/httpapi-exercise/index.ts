@@ -19,6 +19,8 @@
  */
 import { Effect } from "effect"
 import { OpenApi } from "effect/unstable/httpapi"
+import { ArchitecturePatch } from "@opencode-ai/core/architecture/patch"
+import { Architecture } from "@opencode-ai/schema/architecture"
 import { TestLLMServer } from "../../lib/llm-server"
 import path from "path"
 import { array, boolean, check, isRecord, message, object, stable } from "./assertions"
@@ -663,6 +665,141 @@ const scenarios: Scenario[] = [
     check(body.healthy === true, "v2 server should report healthy")
   }),
   http.protected.get("/api/location", "v2.location.get").json(200, object),
+  http.protected
+    .get("/api/architecture/resource", "v2.architecture.resource.list")
+    .inProject({ git: false })
+    .json(
+      200,
+      locationData((value) => {
+        array(value)
+        check(value.length === 0, "architecture resources should start empty")
+      }),
+    ),
+  http.protected
+    .post("/api/architecture/resource", "v2.architecture.resource.create")
+    .inProject({ git: false })
+    .mutating()
+    .at((ctx) => ({
+      path: "/api/architecture/resource",
+      headers: ctx.headers(),
+      body: { id: "product", name: "Product intent" },
+    }))
+    .jsonEffect(200, (body, ctx) =>
+      Effect.gen(function* () {
+        locationData((value) => {
+          object(value)
+          object(value.resource)
+          check(value.resource.id === "product", "architecture create should return the resource ID")
+          check(value.resource.name === "Product intent", "architecture create should return its name")
+          array(value.resource.nodes)
+        })(body)
+        if (!ctx.directory) throw new Error("architecture create scenario needs a project directory")
+        const saved = yield* Effect.promise(() =>
+          Bun.file(path.join(ctx.directory!, ".opencode", "architecture", "resources", "product.json")).json(),
+        )
+        object(saved)
+        check(saved.version === 2, "architecture create should persist a version-two resource")
+      }),
+    ),
+  http.protected
+    .get("/api/architecture/resource/{resourceID}", "v2.architecture.resource.get")
+    .inProject({ git: false })
+    .at((ctx) => ({
+      path: route("/api/architecture/resource/{resourceID}", { resourceID: "missing" }),
+      headers: ctx.headers(),
+    }))
+    .json(404, object, "status"),
+  http.protected
+    .patch("/api/architecture/resource/{resourceID}", "v2.architecture.resource.patch")
+    .inProject({ git: false })
+    .mutating()
+    .seeded((ctx) => {
+      const resource = ArchitecturePatch.empty({ id: Architecture.ResourceID.make("design"), name: "Design" })
+      return ctx
+        .file(".opencode/architecture/resources/design.json", JSON.stringify(resource, null, 2) + "\n")
+        .pipe(Effect.as({ resource, digest: ArchitecturePatch.digest(resource) }))
+    })
+    .at((ctx) => ({
+      path: route("/api/architecture/resource/{resourceID}", { resourceID: "design" }),
+      headers: ctx.headers(),
+      body: {
+        revision: ctx.state.resource.revision,
+        digest: ctx.state.digest,
+        operations: [
+          {
+            id: "httpapi-create-node",
+            type: "node.create",
+            node: {
+              id: "httpapi-root",
+              text: "HTTP API Root",
+              tags: ["request boundary"],
+              layout: { position: { x: 40, y: 80 } },
+            },
+          },
+        ],
+      },
+    }))
+    .jsonEffect(200, (body, ctx) =>
+      Effect.gen(function* () {
+        locationData((value) => {
+          object(value)
+          object(value.resource)
+          array(value.resource.nodes)
+          check(value.resource.revision === 1, "architecture patch should advance the resource revision")
+          check(
+            isRecord(value.resource.nodes[0]) && Array.isArray(value.resource.nodes[0].tags),
+            "architecture patch should preserve node tags",
+          )
+          check(
+            typeof value.digest === "string" && value.digest !== ctx.state.digest,
+            "architecture patch should update the digest",
+          )
+        })(body)
+      }),
+    ),
+  http.protected
+    .delete("/api/architecture/resource/{resourceID}", "v2.architecture.resource.remove")
+    .inProject({ git: false })
+    .mutating()
+    .seeded((ctx) => {
+      const resource = ArchitecturePatch.empty({ id: Architecture.ResourceID.make("remove-me"), name: "Remove me" })
+      return ctx
+        .file(".opencode/architecture/resources/remove-me.json", JSON.stringify(resource, null, 2) + "\n")
+        .pipe(Effect.as({ resource, digest: ArchitecturePatch.digest(resource) }))
+    })
+    .at((ctx) => ({
+      path: route("/api/architecture/resource/{resourceID}", { resourceID: "remove-me" }),
+      headers: ctx.headers(),
+      body: { revision: ctx.state.resource.revision, digest: ctx.state.digest },
+    }))
+    .jsonEffect(200, (_body, ctx) =>
+      Effect.gen(function* () {
+        if (!ctx.directory) throw new Error("architecture remove scenario needs a project directory")
+        const exists = yield* Effect.promise(() =>
+          Bun.file(path.join(ctx.directory!, ".opencode", "architecture", "resources", "remove-me.json")).exists(),
+        )
+        check(!exists, "architecture remove should delete the resource file")
+      }),
+    ),
+  http.protected
+    .post("/api/architecture/resource/{resourceID}/reset", "v2.architecture.resource.reset")
+    .inProject({ git: false })
+    .mutating()
+    .seeded((ctx) => ctx.file(".opencode/architecture/resources/broken.json", "{ invalid"))
+    .at((ctx) => ({
+      path: route("/api/architecture/resource/{resourceID}/reset", { resourceID: "broken" }),
+      headers: ctx.headers(),
+    }))
+    .json(
+      200,
+      locationData((value) => {
+        object(value)
+        object(value.resource)
+        array(value.resource.nodes)
+        check(value.resource.id === "broken", "architecture reset should preserve the requested resource ID")
+        check(value.resource.nodes.length === 0, "architecture reset should create an empty resource")
+      }),
+    ),
   http.protected.get("/api/agent", "v2.agent.list").json(200, locationData(array)),
   http.protected.get("/api/model", "v2.model.list").json(200, locationData(array)),
   http.protected.get("/api/provider", "v2.provider.list").json(200, locationData(array)),

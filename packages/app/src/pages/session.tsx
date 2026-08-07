@@ -14,6 +14,7 @@ import {
   createEffect,
   createComputed,
   createSignal,
+  lazy,
   on,
   onMount,
   type ParentProps,
@@ -52,7 +53,7 @@ import { useNotification } from "@/context/notification"
 import { PromptProvider, usePrompt } from "@/context/prompt"
 import { usePlatform } from "@/context/platform"
 import { SDKProvider, useSDK } from "@/context/sdk"
-import { useServerSDK } from "@/context/server-sdk"
+import { useServerArchitectureAvailable, useServerSDK } from "@/context/server-sdk"
 import { ServerConnection, serverName, useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
@@ -70,7 +71,13 @@ import {
   createSessionComposerRegionController,
   SessionComposerRegion,
 } from "@/pages/session/composer"
-import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTree } from "@/pages/session/helpers"
+import {
+  SESSION_ARCHITECTURE_TAB,
+  createOpenReviewFile,
+  createSessionTabs,
+  createSizing,
+  shouldShowFileTree,
+} from "@/pages/session/helpers"
 import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
 import { createTimelineModel } from "@/pages/session/timeline/model"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
@@ -113,8 +120,10 @@ type VcsMode = "git" | "branch"
 
 const sessionViewState = () => ({
   messageId: undefined as string | undefined,
-  mobileTab: "session" as "session" | "changes",
+  mobileTab: "session" as "session" | "changes" | "architecture",
 })
+
+const ArchitecturePanel = lazy(() => import("@/features/architecture/architecture-panel"))
 
 function isCurrentSessionNotFoundError(error: unknown, sessionID: string | undefined) {
   if (!sessionID) return false
@@ -446,13 +455,18 @@ export default function Page() {
   )
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
+  const architectureAvailable = useServerArchitectureAvailable()
   const size = createSizing()
   const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
+  const desktopArchitectureOpen = createMemo(
+    () => isDesktop() && architectureAvailable() === true && tabs().active() === SESSION_ARCHITECTURE_TAB,
+  )
+  const desktopDetailOpen = createMemo(() => desktopReviewOpen() || desktopArchitectureOpen())
   const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen() && !!params.id)
   const terminalOpen = createMemo(() => view().terminal.opened())
   const desktopTerminalOpen = createMemo(() => isDesktop() && terminalOpen())
   const desktopInlineTerminalOnlyOpen = createMemo(
-    () => newSessionDesign() && desktopTerminalOpen() && !desktopV2ReviewOpen(),
+    () => newSessionDesign() && desktopTerminalOpen() && !desktopV2ReviewOpen() && !desktopArchitectureOpen(),
   )
   const desktopFileTreeOpen = createMemo(
     () =>
@@ -463,7 +477,7 @@ export default function Page() {
       }),
   )
   const desktopSessionResizeOpen = createMemo(() =>
-    newSessionDesign() ? desktopV2ReviewOpen() || desktopTerminalOpen() : desktopReviewOpen(),
+    newSessionDesign() ? desktopV2ReviewOpen() || desktopArchitectureOpen() || desktopTerminalOpen() : desktopDetailOpen(),
   )
   const desktopSidePanelOpen = createMemo(() => desktopSessionResizeOpen() || desktopFileTreeOpen())
   let panelRow: HTMLDivElement | undefined
@@ -501,10 +515,10 @@ export default function Page() {
     if (desktopSessionResizeOpen()) return `${sessionPanelResizedWidth()}px`
     return `calc(100% - ${layout.fileTree.width()}px)`
   })
-  const centered = createMemo(() => isDesktop() && (newSessionDesign() || !desktopReviewOpen()))
+  const centered = createMemo(() => isDesktop() && (newSessionDesign() || !desktopDetailOpen()))
   const desktopV2PanelLayout = createMemo(() =>
     sessionPanelLayout({
-      review: desktopV2ReviewOpen(),
+      review: desktopV2ReviewOpen() || desktopArchitectureOpen(),
       terminal: desktopTerminalOpen(),
       files: desktopFileTreeOpen(),
     }),
@@ -540,6 +554,7 @@ export default function Page() {
     pathFromTab: file.pathFromTab,
     normalizeTab,
     review: reviewTab,
+    architecture: () => architectureAvailable() === true,
     hasReview: canReview,
   })
   const activeTab = tabState.activeTab
@@ -666,6 +681,7 @@ export default function Page() {
     return list
   })
   const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
+  const mobileArchitecture = createMemo(() => !isDesktop() && store.mobileTab === "architecture")
   const wantsReview = createMemo(() =>
     isDesktop()
       ? desktopFileTreeOpen() ||
@@ -1143,6 +1159,7 @@ export default function Page() {
     focusInput,
     review: reviewTab,
     fileBrowser: () => newSessionDesign() && isDesktop() && !!params.id,
+    architecture: () => setStore("mobileTab", "architecture"),
   })
   command.register("session-palette", () => [
     {
@@ -2025,7 +2042,8 @@ export default function Page() {
         <Tabs.Trigger
           value="session"
           classList={{
-            "!w-1/2 !max-w-none": true,
+            "!w-1/3 !max-w-none": architectureAvailable() === true,
+            "!w-1/2 !max-w-none": architectureAvailable() !== true,
             "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
           }}
           classes={{ button: compact ? "w-full !py-2" : "w-full" }}
@@ -2036,7 +2054,8 @@ export default function Page() {
         <Tabs.Trigger
           value="changes"
           classList={{
-            "!w-1/2 !max-w-none !border-r-0": true,
+            "!w-1/3 !max-w-none": architectureAvailable() === true,
+            "!w-1/2 !max-w-none !border-r-0": architectureAvailable() !== true,
             "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
           }}
           classes={{ button: compact ? "w-full !py-2" : "w-full" }}
@@ -2046,6 +2065,19 @@ export default function Page() {
             ? language.t("session.review.filesChanged", { count: reviewCount() })
             : language.t("session.review.change.other")}
         </Tabs.Trigger>
+        <Show when={architectureAvailable() === true}>
+          <Tabs.Trigger
+            value="architecture"
+            class="!w-1/3 !max-w-none !border-r-0"
+            classList={{
+              "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
+            }}
+            classes={{ button: compact ? "w-full !py-2" : "w-full" }}
+            onClick={() => setStore("mobileTab", "architecture")}
+          >
+            {language.t("session.tab.architecture")}
+          </Tabs.Trigger>
+        </Show>
       </Tabs.List>
     </Tabs>
   )
@@ -2066,6 +2098,11 @@ export default function Page() {
       </Show>
       <div class="flex-1 min-h-0 overflow-hidden">
         <Switch>
+          <Match when={params.id && mobileArchitecture()}>
+            <div class="relative h-full overflow-hidden">
+              <ArchitecturePanel />
+            </div>
+          </Match>
           <Match when={params.id && mobileChanges()}>
             <div class="relative h-full overflow-hidden">
               {reviewContent({
@@ -2128,7 +2165,7 @@ export default function Page() {
         </Switch>
       </div>
 
-      <Show when={(params.id || !newSessionDesign()) && !mobileChanges()}>
+      <Show when={(params.id || !newSessionDesign()) && !mobileChanges() && !mobileArchitecture()}>
         {(_) => {
           const controller = createSessionComposerRegionController({
             state: composer,

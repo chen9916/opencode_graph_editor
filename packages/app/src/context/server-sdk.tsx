@@ -11,7 +11,7 @@ import { ServerConnection, useServer } from "./server"
 import { createRefCountMap } from "@/utils/refcount"
 import { useGlobal } from "./global"
 import { ServerScope } from "@/utils/server-scope"
-import { detectServerProtocol, type ServerProtocol } from "@/utils/server-protocol"
+import { detectServerArchitecture, detectServerProtocol, type ServerProtocol } from "@/utils/server-protocol"
 import { createCompatibleApi, type CompatibleApi } from "@/utils/server-compat"
 
 const isAbortError = (error: unknown) =>
@@ -170,6 +170,8 @@ type ServerSDKBase = {
   scope: ServerScope
   protocol: Promise<ServerProtocol>
   protocolKind: Accessor<ServerProtocol | undefined>
+  architecture: Promise<boolean>
+  architectureAvailable: Accessor<boolean | undefined>
   url: string
   client: ReturnType<typeof createSdkForServer>
   api: CompatibleApi
@@ -208,6 +210,11 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
   const protocol = detectServerProtocol(server.http, platform.fetch ?? globalThis.fetch)
   const [protocolKind] = createResource(
     () => protocol,
+    (value) => value,
+  )
+  const architecture = detectServerArchitecture(server.http, platform.fetch ?? globalThis.fetch)
+  const [architectureAvailable] = createResource(
+    () => architecture,
     (value) => value,
   )
   const emitter = createGlobalEmitter<{
@@ -353,6 +360,8 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     scope,
     protocol,
     protocolKind,
+    architecture,
+    architectureAvailable,
     url: server.http.url,
     client: sdk,
     api,
@@ -403,6 +412,11 @@ export const { use: useServerSDK, provider: ServerSDKProvider } = createSimpleCo
 export function useServerProtocol() {
   const serverSDK = useServerSDK()
   return createMemo(() => serverSDK().protocolKind())
+}
+
+export function useServerArchitectureAvailable() {
+  const serverSDK = useServerSDK()
+  return createMemo(() => serverSDK().architectureAvailable())
 }
 
 type SDKEventMap = {

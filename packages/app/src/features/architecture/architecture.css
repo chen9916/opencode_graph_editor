@@ -1,0 +1,424 @@
+.architecture-island {
+  block-size: 100%;
+  min-block-size: 0;
+}
+
+.architecture-editor {
+  block-size: 100%;
+  min-block-size: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--color-v2-background-bg-base, var(--color-background-base));
+  color: var(--color-v2-text-primary, var(--color-text-base));
+}
+
+.architecture-editor__toolbar {
+  padding-block: 10px;
+  padding-inline: 14px;
+  border-block-end: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+}
+
+.architecture-editor__heading,
+.architecture-editor__actions,
+.architecture-editor__filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.architecture-editor__heading {
+  justify-content: space-between;
+}
+
+.architecture-editor__actions,
+.architecture-editor__filters {
+  flex-wrap: wrap;
+}
+
+.architecture-editor__filters {
+  margin-block-start: 8px;
+}
+
+.architecture-editor button,
+.architecture-editor input,
+.architecture-editor select,
+.architecture-editor textarea {
+  min-inline-size: 0;
+  border: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+  border-radius: 6px;
+  background: var(--color-v2-background-bg-raised, var(--color-background-stronger));
+  color: var(--color-v2-text-primary, var(--color-text-base));
+  font: inherit;
+}
+
+.architecture-editor button {
+  padding-block: 5px;
+  padding-inline: 8px;
+  cursor: pointer;
+}
+
+.architecture-editor button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.architecture-editor input,
+.architecture-editor select,
+.architecture-editor textarea {
+  padding-block: 6px;
+  padding-inline: 8px;
+}
+
+.architecture-editor__filters input {
+  flex: 1 1 160px;
+}
+
+.architecture-editor__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.architecture-editor__summary {
+  margin-block-start: 2px;
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  font-size: 12px;
+}
+
+.architecture-editor__body {
+  min-block-size: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  position: relative;
+}
+
+.architecture-editor__canvas {
+  block-size: 100%;
+  min-block-size: 0;
+  min-inline-size: 0;
+  position: relative;
+}
+
+.architecture-editor__inspector {
+  inline-size: clamp(220px, 24vw, 320px);
+  min-block-size: 0;
+  overflow: auto;
+  padding-block: 16px;
+  padding-inline: 16px;
+  border-left: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+}
+
+.architecture-editor__empty {
+  block-size: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  text-align: center;
+}
+
+.architecture-editor__detail {
+  display: grid;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+}
+
+.architecture-editor__form {
+  display: grid;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.architecture-editor__form label {
+  display: grid;
+  gap: 5px;
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+}
+
+.architecture-editor__form textarea {
+  min-block-size: 68px;
+  resize: vertical;
+}
+
+.architecture-editor__form .architecture-editor__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.architecture-editor__form-error,
+.architecture-editor__conflicts {
+  color: var(--color-v2-text-critical, #dc2626);
+}
+
+.architecture-editor__detail h3,
+.architecture-editor__detail h4,
+.architecture-editor__detail p {
+  margin: 0;
+}
+
+.architecture-editor__detail h3 {
+  color: var(--color-v2-text-primary, var(--color-text-base));
+  font-size: 15px;
+}
+
+.architecture-editor__detail h4 {
+  color: var(--color-v2-text-primary, var(--color-text-base));
+  font-size: 12px;
+}
+
+.architecture-editor__detail-kicker {
+  color: var(--color-v2-text-accent, var(--color-primary));
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.architecture-editor__outline {
+  inline-size: clamp(180px, 20vw, 280px);
+  min-block-size: 0;
+  overflow: auto;
+  padding-block: 12px;
+  padding-inline: 10px;
+  border-right: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+}
+
+.architecture-editor__panel-heading {
+  min-block-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-block-end: 8px;
+  font-size: 12px;
+}
+
+.architecture-editor__panel-heading button {
+  inline-size: 26px;
+  block-size: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.architecture-editor__outline ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.architecture-editor__outline li {
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  font-size: 12px;
+}
+
+.architecture-editor__outline li button {
+  inline-size: 100%;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  text-align: start;
+}
+
+.architecture-editor__outline li button:hover,
+.architecture-editor__outline li button.is-selected {
+  background: color-mix(in srgb, var(--color-v2-text-accent, var(--color-primary)) 12%, transparent);
+  color: var(--color-v2-text-primary, var(--color-text-base));
+}
+
+.architecture-editor__outline li button.is-selected {
+  box-shadow: inset 3px 0 0 var(--color-v2-text-accent, var(--color-primary));
+}
+
+.architecture-editor__context-menu {
+  z-index: 20;
+  position: fixed;
+  inline-size: 200px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+  border-radius: 9px;
+  background: var(--color-v2-background-bg-raised, var(--color-background-stronger));
+  box-shadow: 0 14px 38px rgb(0 0 0 / 30%);
+}
+
+.architecture-editor__context-menu > button {
+  inline-size: 100%;
+  border-color: transparent;
+  background: transparent;
+  text-align: start;
+}
+
+.architecture-editor__context-menu > button:hover {
+  background: color-mix(in srgb, var(--color-v2-text-accent, var(--color-primary)) 12%, transparent);
+}
+
+.architecture-editor__danger {
+  color: var(--color-v2-text-critical, #dc2626) !important;
+}
+
+.architecture-editor__edge-styles {
+  display: grid;
+  gap: 6px;
+  padding-block: 5px;
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  font-size: 11px;
+}
+
+.architecture-editor__edge-styles > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.architecture-editor__edge-styles button {
+  padding-inline: 4px;
+  font-size: 11px;
+}
+
+.architecture-editor__edge-styles button[aria-pressed="true"] {
+  border-color: var(--color-v2-text-accent, var(--color-primary));
+  background: color-mix(in srgb, var(--color-v2-text-accent, var(--color-primary)) 15%, transparent);
+  color: var(--color-v2-text-primary, var(--color-text-base));
+}
+
+.architecture-editor__conflicts {
+  margin-block-start: 18px;
+  padding-block-start: 14px;
+  border-block-start: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+  font-size: 12px;
+}
+
+.architecture-editor__conflicts h3 {
+  margin: 0;
+}
+
+.architecture-node {
+  --architecture-node-accent: var(--color-v2-text-accent, var(--color-primary));
+  min-inline-size: 148px;
+  padding-block: 10px;
+  padding-inline: 12px;
+  border: 1px solid color-mix(in srgb, var(--architecture-node-accent) 55%, transparent);
+  border-radius: 12px;
+  background: color-mix(
+    in srgb,
+    var(--architecture-node-accent) 12%,
+    var(--color-v2-background-bg-raised, var(--color-background-stronger))
+  );
+  box-shadow: 0 10px 28px rgb(0 0 0 / 18%);
+}
+
+.architecture-editor .react-flow__node.selected .architecture-node {
+  border-color: var(--color-v2-text-accent, var(--color-primary));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--color-v2-text-accent, var(--color-primary)) 28%, transparent),
+    0 12px 32px rgb(0 0 0 / 24%);
+}
+
+.architecture-editor .react-flow__edge .react-flow__edge-path {
+  stroke: color-mix(
+    in srgb,
+    var(--color-v2-text-accent, var(--color-primary)) 62%,
+    var(--color-v2-text-muted, var(--color-text-weak))
+  );
+  stroke-width: 2;
+}
+
+.architecture-editor .react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--color-v2-text-accent, var(--color-primary));
+  stroke-width: 4;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-v2-text-accent, var(--color-primary)) 70%, transparent));
+}
+
+.architecture-node .react-flow__handle {
+  inline-size: 9px;
+  block-size: 9px;
+  border: 2px solid var(--color-v2-background-bg-raised, var(--color-background-stronger));
+  background: var(--architecture-node-accent);
+  opacity: 0.72;
+  transition:
+    opacity 120ms ease,
+    scale 120ms ease;
+}
+
+.architecture-node:hover .react-flow__handle,
+.architecture-editor .react-flow__node.selected .architecture-node .react-flow__handle {
+  opacity: 1;
+  scale: 1.2;
+}
+
+.architecture-node__text {
+  max-inline-size: 260px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--color-v2-text-primary, var(--color-text-base));
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.architecture-node__text-input {
+  inline-size: 240px;
+  min-block-size: 64px;
+  resize: both;
+}
+
+.architecture-node__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block-start: 8px;
+}
+
+.architecture-node__tags span {
+  padding-block: 2px;
+  padding-inline: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--architecture-node-accent) 18%, transparent);
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .architecture-editor__body {
+    display: block;
+  }
+
+  .architecture-editor__canvas {
+    block-size: 100%;
+  }
+
+  .architecture-editor__outline,
+  .architecture-editor__inspector {
+    z-index: 10;
+    position: absolute;
+    inset-block: 0;
+    background: var(--color-v2-background-bg-base, var(--color-background-base));
+    box-shadow: 0 12px 28px rgb(0 0 0 / 24%);
+  }
+
+  .architecture-editor__outline {
+    left: 0;
+  }
+
+  .architecture-editor__inspector {
+    right: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .architecture-editor__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .architecture-editor__outline,
+  .architecture-editor__inspector {
+    inline-size: min(82vw, 280px);
+  }
+}

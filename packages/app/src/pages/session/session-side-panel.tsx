@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, createMemo, onCleanup, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createEffect, createMemo, lazy, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { DragDropProvider as DndKitProvider, PointerSensor } from "@dnd-kit/solid"
@@ -43,10 +43,12 @@ import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
+import { useServerArchitectureAvailable } from "@/context/server-sdk"
 import { createFileTabListSync } from "@/pages/session/file-tab-scroll"
 import { FileTabContent } from "@/pages/session/file-tabs"
 import {
   SESSION_OPEN_FILE_TAB,
+  SESSION_ARCHITECTURE_TAB,
   createOpenSessionFileTab,
   createSessionTabs,
   getTabReorderIndex,
@@ -60,6 +62,9 @@ import { SessionFileBrowserTab, type SessionFileBrowserState } from "@/pages/ses
 type ReviewDiff = FileDiffInfo | SnapshotFileDiff | VcsFileDiff
 type RenderDiff = FileDiffInfo | (SnapshotFileDiff & { file: string }) | VcsFileDiff
 const FILE_TREE_WIDTH_MIN = 240
+const architectureTabID = "session-side-panel-architecture-tab"
+const architectureTabPanelID = "session-side-panel-architecture-tabpanel"
+const ArchitecturePanel = lazy(() => import("@/features/architecture/architecture-panel"))
 
 function renderDiff(value: ReviewDiff): value is RenderDiff {
   return typeof value.file === "string"
@@ -89,6 +94,7 @@ export function SessionSidePanel(props: {
   const command = useCommand()
   const dialog = useDialog()
   const sdk = useSDK()
+  const architectureAvailable = useServerArchitectureAvailable()
   const { sessionKey, tabs, view, params } = useSessionLayout()
   const projectDirectory = createMemo(() => sdk().directory)
 
@@ -104,12 +110,15 @@ export function SessionSidePanel(props: {
         opened: layout.fileTree.opened(),
       }),
   )
-  const open = createMemo(() => reviewOpen() || fileOpen())
   const fileTreeWidth = createMemo(() => Math.max(FILE_TREE_WIDTH_MIN, layout.fileTree.width()))
   const reviewTab = createMemo(() => isDesktop())
+  const architectureTab = createMemo(() => isDesktop() && architectureAvailable() === true)
+  const architectureOpen = createMemo(() => architectureTab() && tabs().active() === SESSION_ARCHITECTURE_TAB)
+  const detailOpen = createMemo(() => reviewOpen() || architectureOpen())
+  const open = createMemo(() => detailOpen() || fileOpen())
   const panelWidth = createMemo(() => {
     if (!open()) return "0px"
-    if (reviewOpen()) return "auto"
+    if (detailOpen()) return "auto"
     return `${fileTreeWidth()}px`
   })
   const treeWidth = createMemo(() => (fileOpen() ? `${fileTreeWidth()}px` : "0px"))
@@ -178,6 +187,7 @@ export function SessionSidePanel(props: {
     pathFromTab: file.pathFromTab,
     normalizeTab,
     review: reviewTab,
+    architecture: architectureTab,
     hasReview: props.canReview,
     fileBrowser: () => !!props.fileBrowserState,
   })
@@ -238,12 +248,17 @@ export function SessionSidePanel(props: {
   })
   const fileBrowserVisible = createMemo(() => {
     const active = activeTab()
-    return active !== "review" && active !== "context" && active !== "empty"
+    return active !== "review" && active !== "context" && active !== SESSION_ARCHITECTURE_TAB && active !== "empty"
   })
   const openFileKeybind = createMemo(() => command.keybindParts("file.open"))
   const closeTabKeybind = createMemo(() => command.keybindParts("tab.close"))
   const [store, setStore] = createStore({
     activeDraggable: undefined as string | undefined,
+    architectureMounted: false,
+  })
+
+  createEffect(() => {
+    if (architectureOpen()) setStore("architectureMounted", true)
   })
 
   const handleDragStart = (event: unknown) => {
@@ -291,7 +306,7 @@ export function SessionSidePanel(props: {
     <Show when={isDesktop() && !(settings.general.newLayoutDesigns() && !params.id)}>
       <aside
         id="review-panel"
-        aria-label={language.t("session.panel.reviewAndFiles")}
+        aria-label={language.t("session.panel.reviewFilesArchitecture")}
         aria-hidden={!open()}
         inert={!open()}
         class="relative min-w-0 flex overflow-hidden"
@@ -304,7 +319,7 @@ export function SessionSidePanel(props: {
           "transition-[width] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
             !props.size.active() && !props.reviewSnap,
           "rounded-[10px] shadow-[var(--v2-elevation-raised)] overflow-hidden": settings.general.newLayoutDesigns(),
-          "flex-1": reviewOpen(),
+          "flex-1": detailOpen(),
         }}
         style={{ width: panelWidth() }}
       >
@@ -315,7 +330,7 @@ export function SessionSidePanel(props: {
               "border-l border-border-weaker-base": !settings.general.newLayoutDesigns(),
             }}
           >
-            <Show when={reviewOpen()}>
+            <Show when={detailOpen()}>
               <div
                 class="relative min-w-0 h-full flex-1 overflow-hidden"
                 classList={{
@@ -389,6 +404,17 @@ export function SessionSidePanel(props: {
                                     <SessionContextUsage variant="indicator" />
                                     <div>{language.t("session.tab.context")}</div>
                                   </div>
+                                </Tabs.Trigger>
+                              </Show>
+                              <Show when={architectureTab()}>
+                                <Tabs.Trigger
+                                  value={SESSION_ARCHITECTURE_TAB}
+                                  id={architectureTabID}
+                                  aria-controls={
+                                    activeTab() === SESSION_ARCHITECTURE_TAB ? architectureTabPanelID : undefined
+                                  }
+                                >
+                                  <div>{language.t("session.tab.architecture")}</div>
                                 </Tabs.Trigger>
                               </Show>
                               <SortableProvider ids={openedTabs()}>
@@ -498,6 +524,20 @@ export function SessionSidePanel(props: {
                             </Tabs.Content>
                           </Show>
 
+                          <Show when={store.architectureMounted}>
+                            <Tabs.Content
+                              value={SESSION_ARCHITECTURE_TAB}
+                              forceMount
+                              id={architectureTabPanelID}
+                              aria-labelledby={architectureTabID}
+                              class="flex flex-col h-full overflow-hidden contain-strict"
+                              classList={{ hidden: activeTab() !== SESSION_ARCHITECTURE_TAB }}
+                              inert={activeTab() !== SESSION_ARCHITECTURE_TAB || undefined}
+                            >
+                              <ArchitecturePanel />
+                            </Tabs.Content>
+                          </Show>
+
                           <Show when={activeFileTab()} keyed>
                             {(tab) => <FileTabContent tab={tab} />}
                           </Show>
@@ -603,6 +643,17 @@ export function SessionSidePanel(props: {
                                   <SessionContextUsage variant="indicator" />
                                   <div>{language.t("session.tab.context")}</div>
                                 </div>
+                              </Tabs.Trigger>
+                            </Show>
+                            <Show when={architectureTab()}>
+                              <Tabs.Trigger
+                                value={SESSION_ARCHITECTURE_TAB}
+                                id={architectureTabID}
+                                aria-controls={
+                                  activeTab() === SESSION_ARCHITECTURE_TAB ? architectureTabPanelID : undefined
+                                }
+                              >
+                                <div>{language.t("session.tab.architecture")}</div>
                               </Tabs.Trigger>
                             </Show>
                             <For each={panelTabs()}>
@@ -726,6 +777,20 @@ export function SessionSidePanel(props: {
                           </Tabs.Content>
                         </Show>
 
+                        <Show when={store.architectureMounted}>
+                          <Tabs.Content
+                            value={SESSION_ARCHITECTURE_TAB}
+                            forceMount
+                            id={architectureTabPanelID}
+                            aria-labelledby={architectureTabID}
+                            class="flex flex-col h-full overflow-hidden contain-strict"
+                            classList={{ hidden: activeTab() !== SESSION_ARCHITECTURE_TAB }}
+                            inert={activeTab() !== SESSION_ARCHITECTURE_TAB || undefined}
+                          >
+                            <ArchitecturePanel />
+                          </Tabs.Content>
+                        </Show>
+
                         <Show when={fileBrowserMounted()}>
                           <div
                             id={fileBrowserTabPanelID}
@@ -768,7 +833,7 @@ export function SessionSidePanel(props: {
               >
                 <div
                   class="h-full flex flex-col overflow-hidden group/filetree"
-                  classList={{ "border-l border-border-weaker-base": reviewOpen() }}
+                  classList={{ "border-l border-border-weaker-base": detailOpen() }}
                 >
                   <Tabs
                     variant="pill"

@@ -17,6 +17,7 @@ export type AtOption =
       mime?: string
     }
   | { type: "reference"; name: string; path: string; display: string; description: string }
+  | { type: "architecture"; id: string; name: string; path: string; display: string; description: string }
   | { type: "file"; path: string; display: string; recent?: boolean }
 
 export interface SlashCommand {
@@ -117,7 +118,8 @@ export const PromptPopover: Component<PromptPopoverProps> = (props) => {
                     )
                   }
 
-                  if (item.type === "resource") {
+                  if (item.type === "resource" || item.type === "architecture") {
+                    const resourcePath = item.type === "resource" ? item.uri : item.path
                     return (
                       <button
                         class="w-full flex items-center gap-x-2 px-2 py-0.5"
@@ -130,7 +132,7 @@ export const PromptPopover: Component<PromptPopoverProps> = (props) => {
                         onClick={() => props.onAtSelect(item)}
                         onPointerMove={() => props.setAtActive(key)}
                       >
-                        <FileIcon node={{ path: item.uri, type: "file" }} class="shrink-0 size-4" />
+                        <FileIcon node={{ path: resourcePath, type: "file" }} class="shrink-0 size-4" />
                         <div
                           class="flex items-center min-w-0"
                           classList={{

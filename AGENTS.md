@@ -4,6 +4,32 @@
 - The default branch in this repo is `dev`.
 - Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
 
+## Repository Focus
+
+- This working repository is primarily for implementing and validating the interactive Architecture Graph approach.
+- The graph is a shared communication surface where people describe intended software designs, AI explains the current implementation, and both can compare, refine, and cross-reference designs across multiple architecture resources.
+- Treat this interaction model as the main product goal of the work in this repository. Do not turn it back into a hard-coded dependency scanner, a fixed taxonomy, or an automatically generated representation of the codebase.
+
+## Architecture Design Workspace Progress
+
+- Active plan: `.opencode/plans/1786094316021-playful-rocket.md`.
+- Architecture is a communication workspace for human-authored intent, AI explanations of the implementation, and comparisons between the two. It is not a deterministic project scanner or generated source-of-truth model.
+- Each project can store multiple independent named resources under `.opencode/architecture/resources/<resource-id>.json`. A legacy `.opencode/architecture/graph.json` is exposed as `overview` and migrates on its first edit.
+- Nodes contain only text, free-form tags, and positions. Connections contain only source and target node IDs. Status is not a special field; values such as `planned` and `implemented` are ordinary tags.
+- Graph documents do not store cross-resource references. When multiple designs belong in one conversation, the user explicitly mentions each resource with `@`.
+- Backend implementation includes the semantic schema in `packages/schema/src/architecture.ts`; atomic list/create/load/patch/remove/reset/query/context operations; process and cross-process locking; digest/revision conflict checks; recovery backups; and events under `packages/core/src/architecture/`.
+- AI access is provided by resource-oriented V2 tools and bounded dynamic System Context. The former `Analyze Project` button is now `Discuss with AI`: it saves pending edits and sends a visible prompt mentioning the selected resource without running a hard-coded scanner or attaching graph JSON as model media.
+- Architecture `@` mentions remain visible in the conversation, but managed graph files are omitted from provider request file/media parts. This filtering exists in the prompt builder, the V2 runner, and the legacy V1 message conversion. The legacy compatibility path must recognize both file URLs and `FilePart.source.path`, because older sessions can contain `data:application/json` URLs whose Architecture path exists only in `source.path`.
+- Deterministic workspace/Godot analyzers, analysis runs and proposals, analyzer ownership, and their SQLite artifacts are intentionally absent. AI explores implementation with its normal project tools when the user asks.
+- Current API implementation is in `packages/protocol/src/groups/architecture.ts` and `packages/server/src/handlers/architecture.ts`. The six public routes list, create, get, patch, remove, and reset resources. Promise and Effect clients were regenerated under `packages/client/src/generated*`; a second generation was byte-identical.
+- The lazy React Flow editor under `packages/app/src/features/architecture/` supports resource switching, creation and deletion; simple text nodes; free-form tags; double-click inline text editing; simple connections; drag-position persistence; filters; outline; inspector; undo/redo; persistent journal/viewport; conflict-aware rebase; export/save/reload; confirmation flows; and loading/error/empty states. It has no status workflow or graph-level cross-reference editor.
+- Architecture is wired into the desktop session side panel through `SESSION_ARCHITECTURE_TAB` and into a full-content mobile tab with the composer hidden. Commands cover open, save, reload, fit view, and element creation. Layout is RTL-aware, paths/IDs retain mixed-direction readability, and untranslated Architecture terminology uses the English runtime fallback policy.
+- Architecture visibility is capability-based rather than tied to the session protocol: `packages/app/src/utils/server-protocol.ts` probes the authenticated `/api/architecture/resource` route, and the shared server SDK accessor gates the session-header button, tabs, commands, and resource queries. Do not switch Dev builds to the separately downloaded V2 CLI for this feature.
+- Desktop renderer needs React island dependencies resolvable from `packages/desktop/package.json`; keep `react`, `react-dom`, and `@xyflow/react` there unless the bundling approach changes.
+- Verification completed: focused Schema, Core, Client, App, and all six Architecture HTTP route tests pass; typechecks pass in Schema, Core, Protocol, Server, Client, App, Desktop, and `packages/opencode`; migration drift, client generation idempotence, App production build, Electron desktop build and Windows packaging, and `git diff --check` pass.
+- Latest packaged validation (2026-08-08): `packages/desktop/dist/win-unpacked/OpenCode Dev.exe` was rebuilt after the historical Architecture attachment compatibility fix. The targeted App suite (16 tests), Core runner suite (7 tests), and legacy message suite (39 tests) pass; App, Core, and `packages/opencode` typechecks pass; and bundle inspection confirms the `source.path` guard is packaged. React/React DOM/React Flow remain outside the initial desktop main chunk and load through the `architecture-editor.react-*` chunk.
+- Known worktree caveat: `build-desktop.bat` is currently untracked.
+
 ## Branch Names
 
 Use a short branch name of at most three words, separated by hyphens. Do not use slashes or type prefixes such as `feat/` or `fix/`.

@@ -286,6 +286,22 @@ describe("session.message-v2.toModelMessage", () => {
             url: "https://example.com/dir",
           },
           {
+            ...basePart(messageID, "architecture"),
+            type: "file",
+            mime: "application/json",
+            filename: "design-1.json",
+            url: "data:application/json;base64,e30=",
+            source: {
+              type: "file",
+              path: "E:\\repo\\.opencode\\architecture\\resources\\design-1.json",
+              text: {
+                value: "@design-1",
+                start: 0,
+                end: 9,
+              },
+            },
+          },
+          {
             ...basePart(messageID, "p6"),
             type: "compaction",
             auto: true,
@@ -311,6 +327,10 @@ describe("session.message-v2.toModelMessage", () => {
             mediaType: "image/png",
             filename: "img.png",
             data: "https://example.com/img.png",
+          },
+          {
+            type: "text",
+            text: "Architecture graph reference: @design-1 identifies the managed Architecture resource with ID design-1. Resolve it through Architecture context or tools; do not search ordinary project files or scene/node names for this graph display name.",
           },
           { type: "text", text: "What did we do so far?" },
           { type: "text", text: "The following tool was executed by the user" },

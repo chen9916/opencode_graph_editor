@@ -26,6 +26,8 @@ import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { showToast } from "@/utils/toast"
+import { architectureResourceMention, architectureResourcePath } from "@/features/architecture/mention"
+import { useArchitectureResourceMentions } from "@/features/architecture/mentions"
 import { PromptInputV2, type PromptInputV2Suggestion } from "@opencode-ai/session-ui/v2/prompt-input"
 import {
   createPromptInputV2Controller,
@@ -89,6 +91,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
+  const architectureResources = useArchitectureResourceMentions()
   const prompt = props.state ?? usePrompt()
   let editor: HTMLDivElement | undefined
 
@@ -269,6 +272,16 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       resource,
     })),
   )
+  const architectureGraphs = createMemo<PromptInputV2Suggestion[]>(() =>
+    (architectureResources() ?? []).map((resource) => ({
+      id: `architecture:${resource.id}`,
+      kind: "resource",
+      label: `@${resource.name}`,
+      path: architectureResourcePath(resource.id),
+      description: `Architecture graph · ${resource.id}`,
+      mention: architectureResourceMention(resource),
+    })),
+  )
   const context = createMemo<PromptInputV2Suggestion[]>(() => [
     ...references(),
     ...props.controls.agents.available
@@ -279,6 +292,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
         label: `@${agent.name}`,
         mention: { type: "agent" as const, name: agent.name, content: `@${agent.name}`, start: 0, end: 0 },
       })),
+    ...architectureGraphs(),
     ...resources(),
     ...recent().map((path) => ({
       id: `file:${path}`,

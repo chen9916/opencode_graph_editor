@@ -33,3 +33,20 @@ export async function detectServerProtocol(
   if (current && "healthy" in current && current.healthy === true) return "v1"
   return "v2"
 }
+
+export async function detectServerArchitecture(
+  server: ServerConnection.HttpBase,
+  fetch: typeof globalThis.fetch,
+) {
+  const response = await fetch(new URL("/api/architecture/resource", server.url), {
+    headers: headers(server),
+    signal: AbortSignal.timeout(5_000),
+  }).catch(() => undefined)
+  if (!response?.headers.get("content-type")?.includes("application/json")) return false
+
+  const value: unknown = await response.json().catch(() => undefined)
+  if (!value || typeof value !== "object") return false
+  if ("_tag" in value && typeof value._tag === "string" && value._tag.startsWith("Architecture")) return true
+  if (!response.ok || !("data" in value)) return false
+  return Array.isArray(value.data)
+}

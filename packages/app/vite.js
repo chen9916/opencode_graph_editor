@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import solidPlugin from "vite-plugin-solid"
+import reactPlugin from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { fileURLToPath } from "url"
 
@@ -44,5 +45,6 @@ export default [
     },
   },
   tailwindcss(),
-  solidPlugin(),
+  solidPlugin({ exclude: [/\.react\.[mc]?[jt]sx$/] }),
+  reactPlugin({ include: [/\.react\.[mc]?[jt]sx$/] }),
 ]

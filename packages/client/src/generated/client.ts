@@ -4,6 +4,18 @@ import type {
   LocationGetOutput,
   AgentsListInput,
   AgentsListOutput,
+  ArchitectureListResourcesInput,
+  ArchitectureListResourcesOutput,
+  ArchitectureCreateResourceInput,
+  ArchitectureCreateResourceOutput,
+  ArchitectureGetResourceInput,
+  ArchitectureGetResourceOutput,
+  ArchitecturePatchResourceInput,
+  ArchitecturePatchResourceOutput,
+  ArchitectureRemoveResourceInput,
+  ArchitectureRemoveResourceOutput,
+  ArchitectureResetResourceInput,
+  ArchitectureResetResourceOutput,
   SessionsListInput,
   SessionsListOutput,
   SessionsCreateInput,
@@ -277,6 +289,83 @@ export function make(options: ClientOptions) {
             query: { location: input?.["location"] },
             successStatus: 200,
             declaredStatuses: [401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    architecture: {
+      listResources: (input?: ArchitectureListResourcesInput, requestOptions?: RequestOptions) =>
+        request<ArchitectureListResourcesOutput>(
+          {
+            method: "GET",
+            path: `/api/architecture/resource`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [409, 422, 404, 503, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      createResource: (input: ArchitectureCreateResourceInput, requestOptions?: RequestOptions) =>
+        request<ArchitectureCreateResourceOutput>(
+          {
+            method: "POST",
+            path: `/api/architecture/resource`,
+            query: { location: input["location"] },
+            body: { id: input["id"], name: input["name"] },
+            successStatus: 200,
+            declaredStatuses: [409, 422, 404, 503, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      getResource: (input: ArchitectureGetResourceInput, requestOptions?: RequestOptions) =>
+        request<ArchitectureGetResourceOutput>(
+          {
+            method: "GET",
+            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}`,
+            query: { location: input["location"] },
+            successStatus: 200,
+            declaredStatuses: [409, 422, 404, 503, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      patchResource: (input: ArchitecturePatchResourceInput, requestOptions?: RequestOptions) =>
+        request<ArchitecturePatchResourceOutput>(
+          {
+            method: "PATCH",
+            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}`,
+            query: { location: input["location"] },
+            body: { revision: input["revision"], digest: input["digest"], operations: input["operations"] },
+            successStatus: 200,
+            declaredStatuses: [409, 422, 404, 503, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      removeResource: (input: ArchitectureRemoveResourceInput, requestOptions?: RequestOptions) =>
+        request<ArchitectureRemoveResourceOutput>(
+          {
+            method: "DELETE",
+            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}`,
+            query: { location: input["location"] },
+            body: { revision: input["revision"], digest: input["digest"] },
+            successStatus: 200,
+            declaredStatuses: [409, 422, 404, 503, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      resetResource: (input: ArchitectureResetResourceInput, requestOptions?: RequestOptions) =>
+        request<ArchitectureResetResourceOutput>(
+          {
+            method: "POST",
+            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/reset`,
+            query: { location: input["location"] },
+            successStatus: 200,
+            declaredStatuses: [409, 422, 404, 503, 401, 400],
             empty: false,
           },
           requestOptions,

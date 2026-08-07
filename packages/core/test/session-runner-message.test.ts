@@ -14,6 +14,43 @@ const id = (value: string) => SessionMessage.ID.make(`msg_${value}`)
 const model = Model.make({ id: "model", provider: "provider", route: OpenAIChat.route })
 
 describe("toLLMMessages", () => {
+  test("keeps historical architecture mentions explicit without model media", () => {
+    const messages = toLLMMessages(
+      [
+        SessionMessage.User.make({
+          id: id("architecture"),
+          type: "user",
+          text: "Review @Design 1",
+          files: [
+            FileAttachment.make({
+              uri: "file:///repo/.opencode/architecture/resources/design-1.json",
+              mime: "application/json",
+              name: "design-1.json",
+              source: { text: "@Design 1", start: 7, end: 16 },
+            }),
+          ],
+          time: { created },
+        }),
+      ],
+      model,
+    )
+
+    expect(messages).toEqual([
+      Message.make({
+        id: id("architecture"),
+        role: "user",
+        content: [
+          { type: "text", text: "Review @Design 1" },
+          {
+            type: "text",
+            text: "Architecture graph reference: @Design 1 identifies the managed Architecture resource with ID design-1. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.",
+          },
+        ],
+        metadata: {},
+      }),
+    ])
+  })
+
   test("omits empty assistant turns", () => {
     const assistant = (value: string, content: SessionMessage.Assistant["content"]) =>
       SessionMessage.Assistant.make({

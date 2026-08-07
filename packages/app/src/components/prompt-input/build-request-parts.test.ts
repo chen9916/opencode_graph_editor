@@ -135,6 +135,31 @@ describe("buildRequestParts", () => {
     }
   })
 
+  test("keeps architecture graph mentions as text without model media", () => {
+    const result = buildRequestParts({
+      prompt: [
+        {
+          type: "file",
+          path: ".opencode/architecture/resources/design-1.json",
+          content: "@Design 1",
+          start: 0,
+          end: 9,
+          mime: "application/json",
+          filename: "design-1.json",
+        },
+      ],
+      context: [],
+      images: [],
+      text: "@Design 1",
+      messageID: "msg_architecture",
+      sessionID: "ses_architecture",
+      sessionDirectory: "/repo",
+    })
+
+    expect(result.requestParts).toHaveLength(1)
+    expect(result.requestParts[0]).toMatchObject({ type: "text", text: "@Design 1" })
+  })
+
   test("deduplicates context files when prompt already includes same path", () => {
     const prompt: Prompt = [{ type: "file", path: "src/foo.ts", content: "@src/foo.ts", start: 0, end: 11 }]
 

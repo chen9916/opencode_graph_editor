@@ -9,6 +9,7 @@ import { CommandHandler } from "./handlers/command"
 import { SkillHandler } from "./handlers/skill"
 import { EventHandler } from "./handlers/event"
 import { AgentHandler } from "./handlers/agent"
+import { ArchitectureHandler } from "./handlers/architecture"
 import { HealthHandler } from "./handlers/health"
 import { PtyHandler } from "./handlers/pty"
 import { QuestionHandler } from "./handlers/question"
@@ -22,6 +23,7 @@ export const handlers = Layer.mergeAll(
   HealthHandler,
   LocationHandler,
   AgentHandler,
+  ArchitectureHandler,
   SessionHandler,
   MessageHandler,
   ModelHandler,

@@ -33,6 +33,8 @@ import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { reviewTooltipKeybind } from "../command-tooltip-keybind"
 import { useTitlebarRightMount } from "../titlebar"
+import { SESSION_ARCHITECTURE_TAB } from "@/context/layout-tabs"
+import { useServerArchitectureAvailable } from "@/context/server-sdk"
 
 const OPEN_APPS = [
   "vscode",
@@ -146,7 +148,8 @@ export function SessionHeader() {
   const settings = useSettings()
   const sync = useSync()
   const terminal = useTerminal()
-  const { params, view } = useSessionLayout()
+  const { params, tabs, view } = useSessionLayout()
+  const architectureAvailable = useServerArchitectureAvailable()
 
   const projectDirectory = createMemo(() => decode64(params.dir) ?? "")
   const project = createMemo(() => {
@@ -242,6 +245,13 @@ export function SessionHeader() {
     reviewVisible: isDesktop(),
     reviewOpened: view().reviewPanel.opened(),
     onReviewToggle: () => view().reviewPanel.toggle(),
+    architectureLabel: language.t("command.architecture.open"),
+    architectureVisible: isDesktop() && architectureAvailable() === true,
+    architectureOpened: tabs().active() === SESSION_ARCHITECTURE_TAB,
+    onArchitectureOpen: () => {
+      view().reviewPanel.open()
+      tabs().open(SESSION_ARCHITECTURE_TAB)
+    },
   }))
 
   const selectApp = (app: OpenApp) => {
@@ -524,6 +534,10 @@ type SessionHeaderV2ActionsState = {
   reviewVisible: boolean
   reviewOpened: boolean
   onReviewToggle: () => void
+  architectureLabel: string
+  architectureVisible: boolean
+  architectureOpened: boolean
+  onArchitectureOpen: () => void
 }
 
 function SessionHeaderV2Actions(props: { state: SessionHeaderV2ActionsState }) {
@@ -560,6 +574,22 @@ function SessionHeaderV2Actions(props: { state: SessionHeaderV2ActionsState }) {
             aria-expanded={props.state.reviewOpened}
             aria-controls="review-panel"
             icon={<IconV2 name="sidebar-right" />}
+          />
+        </TooltipV2>
+      </Show>
+      <Show when={props.state.architectureVisible}>
+        <TooltipV2 class="shrink-0" placement="bottom" value={props.state.architectureLabel}>
+          <IconButtonV2
+            type="button"
+            variant="ghost-muted"
+            size="large"
+            class="!w-9 shrink-0"
+            state={props.state.architectureOpened ? "pressed" : undefined}
+            onClick={props.state.onArchitectureOpen}
+            aria-label={props.state.architectureLabel}
+            aria-expanded={props.state.architectureOpened}
+            aria-controls="session-side-panel-architecture-tabpanel"
+            icon={<IconV2 name="branch" />}
           />
         </TooltipV2>
       </Show>

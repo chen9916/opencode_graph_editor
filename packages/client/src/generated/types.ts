@@ -21,6 +21,37 @@ export type InvalidRequestError = {
 export const isInvalidRequestError = (value: unknown): value is InvalidRequestError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "InvalidRequestError"
 
+export type ArchitectureConflictError = {
+  readonly _tag: "ArchitectureConflictError"
+  readonly message: string
+  readonly operationIDs: ReadonlyArray<string>
+  readonly currentRevision?: number | undefined
+  readonly currentDigest?: string | undefined
+}
+export const isArchitectureConflictError = (value: unknown): value is ArchitectureConflictError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ArchitectureConflictError"
+
+export type ArchitectureInvalidGraphError = {
+  readonly _tag: "ArchitectureInvalidGraphError"
+  readonly message: string
+  readonly version?: string | undefined
+}
+export const isArchitectureInvalidGraphError = (value: unknown): value is ArchitectureInvalidGraphError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ArchitectureInvalidGraphError"
+
+export type ArchitectureNotFoundError = {
+  readonly _tag: "ArchitectureNotFoundError"
+  readonly entity: "resource" | "node" | "edge"
+  readonly id: string
+  readonly message: string
+}
+export const isArchitectureNotFoundError = (value: unknown): value is ArchitectureNotFoundError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ArchitectureNotFoundError"
+
+export type ArchitectureUnavailableError = { readonly _tag: "ArchitectureUnavailableError"; readonly message: string }
+export const isArchitectureUnavailableError = (value: unknown): value is ArchitectureUnavailableError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ArchitectureUnavailableError"
+
 export type InvalidCursorError = { readonly _tag: "InvalidCursorError"; readonly message: string }
 export const isInvalidCursorError = (value: unknown): value is InvalidCursorError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "InvalidCursorError"
@@ -146,6 +177,337 @@ export type AgentsListOutput = {
       readonly effect: "allow" | "deny" | "ask"
     }>
   }>
+}
+
+export type ArchitectureListResourcesInput = {
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type ArchitectureListResourcesOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: ReadonlyArray<{
+    readonly id: string
+    readonly name: string
+    readonly revision: number
+    readonly digest: string
+    readonly nodes: number
+    readonly edges: number
+  }>
+}
+
+export type ArchitectureCreateResourceInput = {
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+  readonly id?: { readonly id?: string; readonly name: string }["id"]
+  readonly name: { readonly id?: string; readonly name: string }["name"]
+}
+
+export type ArchitectureCreateResourceOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: {
+    readonly resource: {
+      readonly version: 2
+      readonly revision: number
+      readonly id: string
+      readonly name: string
+      readonly nodes: ReadonlyArray<{
+        readonly id: string
+        readonly text: string
+        readonly tags: ReadonlyArray<string>
+        readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+      }>
+      readonly edges: ReadonlyArray<{ readonly id: string; readonly source: string; readonly target: string }>
+    }
+    readonly digest: string
+    readonly storage: { readonly root: string; readonly path: string }
+  }
+}
+
+export type ArchitectureGetResourceInput = {
+  readonly resourceID: { readonly resourceID: string }["resourceID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type ArchitectureGetResourceOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: {
+    readonly resource: {
+      readonly version: 2
+      readonly revision: number
+      readonly id: string
+      readonly name: string
+      readonly nodes: ReadonlyArray<{
+        readonly id: string
+        readonly text: string
+        readonly tags: ReadonlyArray<string>
+        readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+      }>
+      readonly edges: ReadonlyArray<{ readonly id: string; readonly source: string; readonly target: string }>
+    }
+    readonly digest: string
+    readonly storage: { readonly root: string; readonly path: string }
+  }
+}
+
+export type ArchitecturePatchResourceInput = {
+  readonly resourceID: { readonly resourceID: string }["resourceID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+  readonly revision: {
+    readonly revision: number
+    readonly digest: string
+    readonly operations: ReadonlyArray<
+      | { readonly id: string; readonly type: "resource.update"; readonly name: string }
+      | {
+          readonly id: string
+          readonly type: "node.create"
+          readonly node: {
+            readonly id: string
+            readonly text: string
+            readonly tags: ReadonlyArray<string>
+            readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+          }
+        }
+      | {
+          readonly id: string
+          readonly type: "node.update"
+          readonly node: {
+            readonly id: string
+            readonly text: string
+            readonly tags: ReadonlyArray<string>
+            readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+          }
+          readonly expectedDigest?: string
+        }
+      | {
+          readonly id: string
+          readonly type: "node.position"
+          readonly nodeID: string
+          readonly position: { readonly x: number; readonly y: number }
+          readonly expectedDigest?: string
+        }
+      | {
+          readonly id: string
+          readonly type: "node.remove"
+          readonly nodeID: string
+          readonly cascade: boolean
+          readonly expectedDigest?: string
+        }
+      | {
+          readonly id: string
+          readonly type: "edge.create"
+          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+        }
+      | {
+          readonly id: string
+          readonly type: "edge.update"
+          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+          readonly expectedDigest?: string
+        }
+      | { readonly id: string; readonly type: "edge.remove"; readonly edgeID: string; readonly expectedDigest?: string }
+    >
+  }["revision"]
+  readonly digest: {
+    readonly revision: number
+    readonly digest: string
+    readonly operations: ReadonlyArray<
+      | { readonly id: string; readonly type: "resource.update"; readonly name: string }
+      | {
+          readonly id: string
+          readonly type: "node.create"
+          readonly node: {
+            readonly id: string
+            readonly text: string
+            readonly tags: ReadonlyArray<string>
+            readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+          }
+        }
+      | {
+          readonly id: string
+          readonly type: "node.update"
+          readonly node: {
+            readonly id: string
+            readonly text: string
+            readonly tags: ReadonlyArray<string>
+            readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+          }
+          readonly expectedDigest?: string
+        }
+      | {
+          readonly id: string
+          readonly type: "node.position"
+          readonly nodeID: string
+          readonly position: { readonly x: number; readonly y: number }
+          readonly expectedDigest?: string
+        }
+      | {
+          readonly id: string
+          readonly type: "node.remove"
+          readonly nodeID: string
+          readonly cascade: boolean
+          readonly expectedDigest?: string
+        }
+      | {
+          readonly id: string
+          readonly type: "edge.create"
+          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+        }
+      | {
+          readonly id: string
+          readonly type: "edge.update"
+          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+          readonly expectedDigest?: string
+        }
+      | { readonly id: string; readonly type: "edge.remove"; readonly edgeID: string; readonly expectedDigest?: string }
+    >
+  }["digest"]
+  readonly operations: {
+    readonly revision: number
+    readonly digest: string
+    readonly operations: ReadonlyArray<
+      | { readonly id: string; readonly type: "resource.update"; readonly name: string }
+      | {
+          readonly id: string
+          readonly type: "node.create"
+          readonly node: {
+            readonly id: string
+            readonly text: string
+            readonly tags: ReadonlyArray<string>
+            readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+          }
+        }
+      | {
+          readonly id: string
+          readonly type: "node.update"
+          readonly node: {
+            readonly id: string
+            readonly text: string
+            readonly tags: ReadonlyArray<string>
+            readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+          }
+          readonly expectedDigest?: string
+        }
+      | {
+          readonly id: string
+          readonly type: "node.position"
+          readonly nodeID: string
+          readonly position: { readonly x: number; readonly y: number }
+          readonly expectedDigest?: string
+        }
+      | {
+          readonly id: string
+          readonly type: "node.remove"
+          readonly nodeID: string
+          readonly cascade: boolean
+          readonly expectedDigest?: string
+        }
+      | {
+          readonly id: string
+          readonly type: "edge.create"
+          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+        }
+      | {
+          readonly id: string
+          readonly type: "edge.update"
+          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+          readonly expectedDigest?: string
+        }
+      | { readonly id: string; readonly type: "edge.remove"; readonly edgeID: string; readonly expectedDigest?: string }
+    >
+  }["operations"]
+}
+
+export type ArchitecturePatchResourceOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: {
+    readonly resource: {
+      readonly version: 2
+      readonly revision: number
+      readonly id: string
+      readonly name: string
+      readonly nodes: ReadonlyArray<{
+        readonly id: string
+        readonly text: string
+        readonly tags: ReadonlyArray<string>
+        readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+      }>
+      readonly edges: ReadonlyArray<{ readonly id: string; readonly source: string; readonly target: string }>
+    }
+    readonly digest: string
+    readonly storage: { readonly root: string; readonly path: string }
+  }
+}
+
+export type ArchitectureRemoveResourceInput = {
+  readonly resourceID: { readonly resourceID: string }["resourceID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+  readonly revision: { readonly revision: number; readonly digest: string }["revision"]
+  readonly digest: { readonly revision: number; readonly digest: string }["digest"]
+}
+
+export type ArchitectureRemoveResourceOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: null
+}
+
+export type ArchitectureResetResourceInput = {
+  readonly resourceID: { readonly resourceID: string }["resourceID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type ArchitectureResetResourceOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: {
+    readonly resource: {
+      readonly version: 2
+      readonly revision: number
+      readonly id: string
+      readonly name: string
+      readonly nodes: ReadonlyArray<{
+        readonly id: string
+        readonly text: string
+        readonly tags: ReadonlyArray<string>
+        readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+      }>
+      readonly edges: ReadonlyArray<{ readonly id: string; readonly source: string; readonly target: string }>
+    }
+    readonly digest: string
+    readonly storage: { readonly root: string; readonly path: string }
+  }
 }
 
 export type SessionsListInput = {

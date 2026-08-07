@@ -51,6 +51,8 @@ const parseCommentMentions = (comment: string) => {
 
 const isFileAttachment = (part: Prompt[number]): part is FileAttachmentPart => part.type === "file"
 const isAgentAttachment = (part: Prompt[number]): part is AgentPart => part.type === "agent"
+const isArchitectureResource = (part: FileAttachmentPart) =>
+  part.path.replaceAll("\\", "/").includes(".opencode/architecture/resources/")
 
 const toOptimisticPart = (part: PromptRequestPart, sessionID: string, messageID: string): Part => {
   if (part.type === "text") {
@@ -99,35 +101,38 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
       ]
     : []
 
-  const files = input.prompt.filter(isFileAttachment).map((attachment) => {
-    const path = absolute(input.sessionDirectory, attachment.path)
-    const source = attachment.source
-      ? {
-          ...attachment.source,
-          text: {
-            value: attachment.content,
-            start: attachment.start,
-            end: attachment.end,
-          },
-        }
-      : {
-          type: "file" as const,
-          text: {
-            value: attachment.content,
-            start: attachment.start,
-            end: attachment.end,
-          },
-          path,
-        }
-    return {
-      id: Identifier.ascending("part"),
-      type: "file",
-      mime: attachment.mime ?? "text/plain",
-      url: attachment.url ?? `file://${encodeFilePath(path)}${fileQuery(attachment.selection)}`,
-      filename: attachment.filename ?? getFilename(attachment.path),
-      source,
-    } satisfies PromptRequestPart
-  })
+  const files = input.prompt
+    .filter(isFileAttachment)
+    .filter((attachment) => !isArchitectureResource(attachment))
+    .map((attachment) => {
+      const path = absolute(input.sessionDirectory, attachment.path)
+      const source = attachment.source
+        ? {
+            ...attachment.source,
+            text: {
+              value: attachment.content,
+              start: attachment.start,
+              end: attachment.end,
+            },
+          }
+        : {
+            type: "file" as const,
+            text: {
+              value: attachment.content,
+              start: attachment.start,
+              end: attachment.end,
+            },
+            path,
+          }
+      return {
+        id: Identifier.ascending("part"),
+        type: "file",
+        mime: attachment.mime ?? "text/plain",
+        url: attachment.url ?? `file://${encodeFilePath(path)}${fileQuery(attachment.selection)}`,
+        filename: attachment.filename ?? getFilename(attachment.path),
+        source,
+      } satisfies PromptRequestPart
+    })
 
   const agents = input.prompt.filter(isAgentAttachment).map((attachment) => {
     return {

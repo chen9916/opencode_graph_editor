@@ -20,6 +20,7 @@ export const groupNames = {
   "server.health": "health",
   "server.location": "location",
   "server.agent": "agents",
+  "server.architecture": "architecture",
   "server.session": "sessions",
   "server.message": "messages",
   "server.model": "models",
@@ -38,6 +39,12 @@ export const groupNames = {
 } as const
 
 export const endpointNames = {
+  "architecture.resource.list": "listResources",
+  "architecture.resource.create": "createResource",
+  "architecture.resource.get": "getResource",
+  "architecture.resource.patch": "patchResource",
+  "architecture.resource.remove": "removeResource",
+  "architecture.resource.reset": "resetResource",
   "session.messages": "list",
   "integration.connect.key": "connectKey",
   "integration.connect.oauth": "connectOauth",

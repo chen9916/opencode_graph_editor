@@ -1,6 +1,9 @@
 import { Effect, Layer, LayerMap } from "effect"
 import { AgentV2 } from "./agent"
 import { AISDK } from "./aisdk"
+import { ArchitectureGraph } from "./architecture/graph"
+import { ArchitectureRoot } from "./architecture/root"
+import { ArchitectureContext } from "./architecture/context"
 import { Catalog } from "./catalog"
 import { CommandV2 } from "./command"
 import { Config } from "./config"
@@ -41,6 +44,8 @@ export { LocationServiceMap } from "./location-service-map"
 
 export const locationServices = LayerNode.group([
   Location.node,
+  ArchitectureRoot.node,
+  ArchitectureGraph.node,
   Policy.node,
   Config.node,
   AgentV2.node,
@@ -60,6 +65,7 @@ export const locationServices = LayerNode.group([
   SkillV2.node,
   SystemContextRegistry.node,
   SystemContextBuiltIns.node,
+  ArchitectureContext.node,
   LocationMutation.node,
   FileMutation.node,
   PermissionV2.node,

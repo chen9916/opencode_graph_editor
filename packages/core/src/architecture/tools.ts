@@ -1,0 +1,393 @@
+export * as ArchitectureTools from "./tools"
+
+import { ToolFailure } from "@opencode-ai/llm"
+import { Architecture } from "@opencode-ai/schema/architecture"
+import { Effect, Layer, Schema } from "effect"
+import { makeLocationNode } from "../effect/app-node"
+import { PermissionV2 } from "../permission"
+import { NonNegativeInt } from "../schema"
+import { ToolRegistry } from "../tool/registry"
+import { Tool } from "../tool/tool"
+import { Tools } from "../tool/tools"
+import { ArchitectureGraph } from "./graph"
+import { ArchitecturePatch } from "./patch"
+
+export const names = {
+  listResources: "graph_list_resources",
+  createResource: "graph_create_resource",
+  updateResource: "graph_update_resource",
+  deleteResource: "graph_delete_resource",
+  query: "graph_query",
+  createNode: "graph_create_node",
+  updateNode: "graph_update_node",
+  deleteNode: "graph_delete_node",
+  connectNodes: "graph_connect_nodes",
+  disconnectNodes: "graph_disconnect_nodes",
+  getContext: "graph_get_context",
+} as const
+
+const root = ".opencode/architecture/resources"
+
+const MutationOutput = Schema.Struct({
+  resourceID: Architecture.ResourceID,
+  revision: NonNegativeInt,
+  digest: Schema.String,
+})
+
+const ExpectedDigest = Schema.String.pipe(Schema.optional)
+
+const layer = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const tools = yield* Tools.Service
+    const graph = yield* ArchitectureGraph.Service
+    const permission = yield* PermissionV2.Service
+
+    const authorize = (action: "read" | "edit", context: Tool.Context, resourceID?: Architecture.ResourceID) => {
+      const resource = resourceID ? `${root}/${resourceID}.json` : root
+      return permission.assert({
+        action,
+        resources: [resource],
+        save: [resource],
+        sessionID: context.sessionID,
+        agent: context.agent,
+        source: { type: "tool", messageID: context.assistantMessageID, callID: context.toolCallID },
+      })
+    }
+
+    const register = {
+      [names.listResources]: Tool.withPermission(
+        Tool.make({
+          description: "List the project's saved architecture graphs available to people and agents.",
+          input: Schema.Struct({}),
+          output: Schema.Array(Architecture.ResourceSummary),
+          toModelOutput: ({ output }) => [{ type: "text", text: JSON.stringify(output) }],
+          execute: (_input, context) =>
+            authorize("read", context).pipe(
+              Effect.andThen(graph.list()),
+              Effect.mapError((error) => failure("Unable to list architecture graphs", error)),
+            ),
+        }),
+        "read",
+      ),
+      [names.createResource]: Tool.withPermission(
+        Tool.make({
+          description: "Create a named architecture graph as a lightweight shared communication artifact.",
+          input: Architecture.ResourceCreateInput,
+          output: Architecture.ResourceSnapshot,
+          toModelOutput: ({ output }) => [
+            { type: "text", text: `Created architecture graph ${output.resource.id}: ${output.resource.name}` },
+          ],
+          execute: (input, context) =>
+            authorize("edit", context, input.id).pipe(
+              Effect.andThen(graph.create(input)),
+              Effect.mapError((error) => failure(`Unable to create architecture graph ${input.name}`, error)),
+            ),
+        }),
+        "edit",
+      ),
+      [names.updateResource]: Tool.withPermission(
+        Tool.make({
+          description: "Rename one architecture graph.",
+          input: Schema.Struct({ resourceID: Architecture.ResourceID, name: Schema.NonEmptyString }),
+          output: Architecture.ResourceSnapshot,
+          toModelOutput: ({ output }) => [{ type: "text", text: `Renamed architecture graph ${output.resource.id}` }],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.load(input.resourceID)
+              return yield* graph.patch(input.resourceID, {
+                revision: current.resource.revision,
+                digest: current.digest,
+                operations: [
+                  {
+                    id: Architecture.OperationID.create(),
+                    type: "resource.update",
+                    name: input.name,
+                  },
+                ],
+              })
+            }).pipe(
+              Effect.mapError((error) => failure(`Unable to rename architecture graph ${input.resourceID}`, error)),
+            ),
+        }),
+        "edit",
+      ),
+      [names.deleteResource]: Tool.withPermission(
+        Tool.make({
+          description: "Delete an architecture graph only when explicitly requested.",
+          input: Schema.Struct({ resourceID: Architecture.ResourceID, expectedDigest: Schema.String }),
+          output: Schema.Void,
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.load(input.resourceID)
+              if (current.digest !== input.expectedDigest)
+                return yield* new ToolFailure({ message: `Architecture graph ${input.resourceID} changed` })
+              yield* graph.remove(input.resourceID, {
+                revision: current.resource.revision,
+                digest: current.digest,
+              })
+            }).pipe(
+              Effect.mapError((error) => failure(`Unable to delete architecture graph ${input.resourceID}`, error)),
+            ),
+        }),
+        "edit",
+      ),
+      [names.query]: Tool.withPermission(
+        Tool.make({
+          description: "Query saved architecture graphs by graph, node ID, text, or node tags.",
+          input: Architecture.QueryInput,
+          output: Architecture.QueryResult,
+          toModelOutput: ({ output }) => [{ type: "text", text: JSON.stringify(output) }],
+          execute: (input, context) =>
+            authorize("read", context).pipe(
+              Effect.andThen(graph.query(input)),
+              Effect.mapError((error) => failure("Unable to query architecture graphs", error)),
+            ),
+        }),
+        "read",
+      ),
+      [names.createNode]: Tool.withPermission(
+        Tool.make({
+          description: "Create a text node with optional free-form tags in a named architecture graph.",
+          input: Schema.Struct({
+            resourceID: Architecture.ResourceID,
+            id: Architecture.NodeID.pipe(Schema.optional),
+            text: Schema.NonEmptyString,
+            tags: Schema.Array(Architecture.Tag).pipe(Schema.optional),
+            position: Architecture.Position.pipe(Schema.optional),
+          }),
+          output: Schema.Struct({ ...MutationOutput.fields, node: Architecture.Node }),
+          toModelOutput: ({ output }) => [{ type: "text", text: `Created architecture node ${output.node.id}` }],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.load(input.resourceID)
+              const node: Architecture.Node = {
+                id: input.id ?? Architecture.NodeID.create(),
+                text: input.text,
+                tags: input.tags ?? [],
+                layout: { position: input.position ?? { x: 0, y: 0 } },
+              }
+              const saved = yield* graph.patch(input.resourceID, {
+                revision: current.resource.revision,
+                digest: current.digest,
+                operations: [{ id: Architecture.OperationID.create(), type: "node.create", node }],
+              })
+              return {
+                resourceID: input.resourceID,
+                revision: saved.resource.revision,
+                digest: saved.digest,
+                node,
+              }
+            }).pipe(
+              Effect.mapError((error) => failure(`Unable to create architecture node in ${input.resourceID}`, error)),
+            ),
+        }),
+        "edit",
+      ),
+      [names.updateNode]: Tool.withPermission(
+        Tool.make({
+          description: "Edit a node's text, tags, or position in an architecture graph.",
+          input: Schema.Struct({
+            resourceID: Architecture.ResourceID,
+            nodeID: Architecture.NodeID,
+            expectedDigest: ExpectedDigest,
+            text: Schema.NonEmptyString.pipe(Schema.optional),
+            tags: Schema.Array(Architecture.Tag).pipe(Schema.optional),
+            position: Architecture.Position.pipe(Schema.optional),
+          }),
+          output: Schema.Struct({ ...MutationOutput.fields, node: Architecture.Node }),
+          toModelOutput: ({ output }) => [{ type: "text", text: `Updated architecture node ${output.node.id}` }],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.load(input.resourceID)
+              const node = current.resource.nodes.find((candidate) => candidate.id === input.nodeID)
+              if (!node) return yield* new ArchitecturePatch.NotFoundError({ entity: "node", id: input.nodeID })
+              const updated: Architecture.Node = {
+                ...node,
+                text: input.text ?? node.text,
+                tags: input.tags ?? node.tags,
+                layout: input.position ? { position: input.position } : node.layout,
+              }
+              const operation: Architecture.Operation =
+                input.text !== undefined || input.tags !== undefined
+                  ? {
+                      id: Architecture.OperationID.create(),
+                      type: "node.update",
+                      node: updated,
+                      expectedDigest: input.expectedDigest,
+                    }
+                  : {
+                      id: Architecture.OperationID.create(),
+                      type: "node.position",
+                      nodeID: node.id,
+                      position: updated.layout.position,
+                      expectedDigest: input.expectedDigest,
+                    }
+              const saved = yield* graph.patch(input.resourceID, {
+                revision: current.resource.revision,
+                digest: current.digest,
+                operations: [operation],
+              })
+              return {
+                resourceID: input.resourceID,
+                revision: saved.resource.revision,
+                digest: saved.digest,
+                node: updated,
+              }
+            }).pipe(Effect.mapError((error) => failure(`Unable to update architecture node ${input.nodeID}`, error))),
+        }),
+        "edit",
+      ),
+      [names.deleteNode]: Tool.withPermission(
+        Tool.make({
+          description: "Delete one architecture node by ID. Cascade must be true when it has connections.",
+          input: Schema.Struct({
+            resourceID: Architecture.ResourceID,
+            nodeID: Architecture.NodeID,
+            expectedDigest: ExpectedDigest,
+            cascade: Schema.Boolean,
+          }),
+          output: Schema.Struct({
+            ...MutationOutput.fields,
+            nodeID: Architecture.NodeID,
+            removedEdgeIDs: Schema.Array(Architecture.EdgeID),
+          }),
+          toModelOutput: ({ output }) => [{ type: "text", text: `Deleted architecture node ${output.nodeID}` }],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.load(input.resourceID)
+              const removedEdgeIDs = current.resource.edges
+                .filter((edge) => edge.source === input.nodeID || edge.target === input.nodeID)
+                .map((edge) => edge.id)
+              const saved = yield* graph.patch(input.resourceID, {
+                revision: current.resource.revision,
+                digest: current.digest,
+                operations: [
+                  {
+                    id: Architecture.OperationID.create(),
+                    type: "node.remove",
+                    nodeID: input.nodeID,
+                    cascade: input.cascade,
+                    expectedDigest: input.expectedDigest,
+                  },
+                ],
+              })
+              return {
+                resourceID: input.resourceID,
+                revision: saved.resource.revision,
+                digest: saved.digest,
+                nodeID: input.nodeID,
+                removedEdgeIDs,
+              }
+            }).pipe(Effect.mapError((error) => failure(`Unable to delete architecture node ${input.nodeID}`, error))),
+        }),
+        "edit",
+      ),
+      [names.connectNodes]: Tool.withPermission(
+        Tool.make({
+          description: "Connect two nodes in the same architecture graph.",
+          input: Schema.Struct({
+            resourceID: Architecture.ResourceID,
+            id: Architecture.EdgeID.pipe(Schema.optional),
+            source: Architecture.NodeID,
+            target: Architecture.NodeID,
+          }),
+          output: Schema.Struct({ ...MutationOutput.fields, edge: Architecture.Edge }),
+          toModelOutput: ({ output }) => [
+            { type: "text", text: `Connected architecture nodes with ${output.edge.id}` },
+          ],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.load(input.resourceID)
+              const edge: Architecture.Edge = {
+                id: input.id ?? Architecture.EdgeID.create(),
+                source: input.source,
+                target: input.target,
+              }
+              const saved = yield* graph.patch(input.resourceID, {
+                revision: current.resource.revision,
+                digest: current.digest,
+                operations: [{ id: Architecture.OperationID.create(), type: "edge.create", edge }],
+              })
+              return {
+                resourceID: input.resourceID,
+                revision: saved.resource.revision,
+                digest: saved.digest,
+                edge,
+              }
+            }).pipe(Effect.mapError((error) => failure("Unable to connect architecture nodes", error))),
+        }),
+        "edit",
+      ),
+      [names.disconnectNodes]: Tool.withPermission(
+        Tool.make({
+          description: "Delete one connection by edge ID from a named architecture graph.",
+          input: Schema.Struct({
+            resourceID: Architecture.ResourceID,
+            edgeID: Architecture.EdgeID,
+            expectedDigest: ExpectedDigest,
+          }),
+          output: Schema.Struct({ ...MutationOutput.fields, edgeID: Architecture.EdgeID }),
+          toModelOutput: ({ output }) => [{ type: "text", text: `Deleted architecture connection ${output.edgeID}` }],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.load(input.resourceID)
+              const saved = yield* graph.patch(input.resourceID, {
+                revision: current.resource.revision,
+                digest: current.digest,
+                operations: [
+                  {
+                    id: Architecture.OperationID.create(),
+                    type: "edge.remove",
+                    edgeID: input.edgeID,
+                    expectedDigest: input.expectedDigest,
+                  },
+                ],
+              })
+              return {
+                resourceID: input.resourceID,
+                revision: saved.resource.revision,
+                digest: saved.digest,
+                edgeID: input.edgeID,
+              }
+            }).pipe(
+              Effect.mapError((error) => failure(`Unable to delete architecture connection ${input.edgeID}`, error)),
+            ),
+        }),
+        "edit",
+      ),
+      [names.getContext]: Tool.withPermission(
+        Tool.make({
+          description: "Return a bounded text summary of selected or all saved architecture graphs.",
+          input: Schema.Struct({ resourceIDs: Schema.Array(Architecture.ResourceID).pipe(Schema.optional) }),
+          output: Schema.String,
+          execute: (input, context) =>
+            authorize("read", context).pipe(
+              Effect.andThen(graph.context(input.resourceIDs)),
+              Effect.mapError((error) => failure("Unable to load architecture context", error)),
+            ),
+        }),
+        "read",
+      ),
+    }
+
+    yield* tools.register(register).pipe(Effect.orDie)
+  }),
+)
+
+export const node = makeLocationNode({
+  name: "architecture-tools",
+  layer,
+  deps: [ToolRegistry.node, ArchitectureGraph.node, PermissionV2.node],
+})
+
+function failure(message: string, error: unknown) {
+  if (error instanceof ToolFailure) return error
+  return new ToolFailure({ message: `${message}: ${error instanceof Error ? error.message : String(error)}` })
+}

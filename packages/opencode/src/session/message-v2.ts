@@ -52,6 +52,22 @@ function truncateToolOutput(text: string, maxChars?: number) {
   return `${text.slice(0, maxChars)}\n[Tool output truncated for compaction: omitted ${omitted} chars]`
 }
 
+function isArchitectureResource(part: SessionV1.FilePart) {
+  if (part.source && "path" in part.source && architectureResourcePath(part.source.path)) return true
+  return architectureResourcePath(part.url)
+}
+
+function architectureResourcePath(input: string) {
+  const value = URL.canParse(input) ? new URL(input).pathname : input
+  return value.replaceAll("\\", "/").includes(".opencode/architecture/resources/")
+}
+
+function architectureReference(part: SessionV1.FilePart) {
+  const mention = part.source && "text" in part.source ? part.source.text.value.trim() : ""
+  const resourceID = part.filename?.replace(/\.json$/i, "")
+  return `Architecture graph reference: ${mention || resourceID || "the referenced graph"} identifies the managed Architecture resource${resourceID ? ` with ID ${resourceID}` : ""}. Resolve it through Architecture context or tools; do not search ordinary project files or scene/node names for this graph display name.`
+}
+
 export const Event = {
   Updated: SessionV1.Event.MessageUpdated,
   Removed: SessionV1.Event.MessageRemoved,
@@ -208,8 +224,19 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
             type: "text",
             text: part.text,
           })
+        if (part.type === "file" && isArchitectureResource(part)) {
+          userMessage.parts.push({
+            type: "text",
+            text: architectureReference(part),
+          })
+        }
         // text/plain and directory files are converted into text parts, ignore them
-        if (part.type === "file" && part.mime !== "text/plain" && part.mime !== "application/x-directory") {
+        if (
+          part.type === "file" &&
+          part.mime !== "text/plain" &&
+          part.mime !== "application/x-directory" &&
+          !isArchitectureResource(part)
+        ) {
           if (options?.stripMedia && isMedia(part.mime)) {
             userMessage.parts.push({
               type: "text",

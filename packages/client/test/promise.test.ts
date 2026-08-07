@@ -8,6 +8,7 @@ test("exposes every standard HTTP API group", () => {
     "health",
     "location",
     "agents",
+    "architecture",
     "sessions",
     "messages",
     "models",
@@ -25,6 +26,14 @@ test("exposes every standard HTTP API group", () => {
     "projectCopies",
   ])
   expect(Object.keys(client.messages)).toEqual(["list"])
+  expect(Object.keys(client.architecture)).toEqual([
+    "listResources",
+    "createResource",
+    "getResource",
+    "patchResource",
+    "removeResource",
+    "resetResource",
+  ])
   expect(Object.keys(client.integrations)).toEqual([
     "list",
     "get",
