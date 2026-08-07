@@ -23,6 +23,7 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
   return (
     <div
       className={architectureNodeClass()}
+      data-selected={props.selected || undefined}
       onDoubleClick={() => {
         cancelled.current = false
         setText(node.text)

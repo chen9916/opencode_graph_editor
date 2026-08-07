@@ -151,12 +151,6 @@ export default function ArchitecturePanel() {
   })
 
   const dirty = () => (draft()?.operations.length ?? 0) > 0 || (draft()?.conflicts.length ?? 0) > 0
-  const beforeUnload = (event: BeforeUnloadEvent) => {
-    if (!Object.values(persistedState.drafts).some((item) => (item?.operations.length ?? 0) > 0)) return
-    event.preventDefault()
-  }
-  window.addEventListener("beforeunload", beforeUnload)
-  onCleanup(() => window.removeEventListener("beforeunload", beforeUnload))
 
   const command = (event: Event) => {
     const detail = (event as CustomEvent<ArchitectureCommand>).detail

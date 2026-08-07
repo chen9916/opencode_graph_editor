@@ -9,14 +9,26 @@ export type ArchitectureFlowNode = Node<
   "architecture"
 >
 
-export type ArchitectureFlowEdge = Edge<{
-  readonly edge: ArchitectureEdge
-}>
+export type ArchitectureFlowEdgeControls = {
+  readonly label: string
+  readonly styles: Readonly<Record<ArchitectureEdgeStyle, string>>
+  readonly onChange: (edgeID: string, style: ArchitectureEdgeStyle) => void
+}
+
+export type ArchitectureFlowEdge = Edge<
+  {
+    readonly edge: ArchitectureEdge
+    readonly style: ArchitectureEdgeStyle
+    readonly controls?: ArchitectureFlowEdgeControls
+  },
+  "architecture"
+>
 
 export function toReactFlow(
   resource: ArchitectureResource,
   onTextChange: (node: ArchitectureNode, text: string) => void,
   edgeStyles: Readonly<Record<string, ArchitectureEdgeStyle>> = {},
+  controls?: ArchitectureFlowEdgeControls,
 ) {
   return {
     nodes: resource.nodes.map(
@@ -34,8 +46,8 @@ export function toReactFlow(
         target: edge.target,
         sourceHandle: edge.sourceHandle ?? "right",
         targetHandle: edge.targetHandle ?? "left",
-        type: edgeStyles[edge.id] ?? "smoothstep",
-        data: { edge },
+        type: "architecture",
+        data: { edge, style: edgeStyles[edge.id] ?? "smoothstep", controls },
       }),
     ),
   }

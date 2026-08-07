@@ -38,7 +38,8 @@ describe("architecture flow model", () => {
   test("applies persisted visual wire styles without changing the graph edge", () => {
     const edges = toReactFlow(resource, () => {}, { vertical: "default", horizontal: "straight" }).edges
 
-    expect(edges.map((edge) => edge.type)).toEqual(["default", "straight"])
+    expect(edges.map((edge) => edge.type)).toEqual(["architecture", "architecture"])
+    expect(edges.map((edge) => edge.data?.style)).toEqual(["default", "straight"])
     expect(edges.map((edge) => edge.data?.edge)).toEqual([...resource.edges])
   })
 })
