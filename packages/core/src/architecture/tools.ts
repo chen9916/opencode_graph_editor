@@ -22,6 +22,7 @@ export const names = {
   updateNode: "graph_update_node",
   deleteNode: "graph_delete_node",
   connectNodes: "graph_connect_nodes",
+  updateConnection: "graph_update_connection",
   disconnectNodes: "graph_disconnect_nodes",
   getContext: "graph_get_context",
 } as const
@@ -289,12 +290,14 @@ const layer = Layer.effectDiscard(
       ),
       [names.connectNodes]: Tool.withPermission(
         Tool.make({
-          description: "Connect two nodes in the same architecture graph.",
+          description: "Connect two nodes from explicit source and target sides in the same architecture graph.",
           input: Schema.Struct({
             resourceID: Architecture.ResourceID,
             id: Architecture.EdgeID.pipe(Schema.optional),
             source: Architecture.NodeID,
             target: Architecture.NodeID,
+            sourceHandle: Architecture.ConnectionSide.pipe(Schema.optional),
+            targetHandle: Architecture.ConnectionSide.pipe(Schema.optional),
           }),
           output: Schema.Struct({ ...MutationOutput.fields, edge: Architecture.Edge }),
           toModelOutput: ({ output }) => [
@@ -308,6 +311,8 @@ const layer = Layer.effectDiscard(
                 id: input.id ?? Architecture.EdgeID.create(),
                 source: input.source,
                 target: input.target,
+                sourceHandle: input.sourceHandle ?? "right",
+                targetHandle: input.targetHandle ?? "left",
               }
               const saved = yield* graph.patch(input.resourceID, {
                 revision: current.resource.revision,
@@ -321,6 +326,62 @@ const layer = Layer.effectDiscard(
                 edge,
               }
             }).pipe(Effect.mapError((error) => failure("Unable to connect architecture nodes", error))),
+        }),
+        "edit",
+      ),
+      [names.updateConnection]: Tool.withPermission(
+        Tool.make({
+          description: "Change a connection's nodes or exact source and target sides in an architecture graph.",
+          input: Schema.Struct({
+            resourceID: Architecture.ResourceID,
+            edgeID: Architecture.EdgeID,
+            expectedDigest: ExpectedDigest,
+            source: Architecture.NodeID.pipe(Schema.optional),
+            target: Architecture.NodeID.pipe(Schema.optional),
+            sourceHandle: Architecture.ConnectionSide.pipe(Schema.optional),
+            targetHandle: Architecture.ConnectionSide.pipe(Schema.optional),
+          }),
+          output: Schema.Struct({ ...MutationOutput.fields, edge: Architecture.Edge }),
+          toModelOutput: ({ output }) => [
+            {
+              type: "text",
+              text: `Updated architecture connection ${output.edge.id} (${output.edge.sourceHandle} to ${output.edge.targetHandle})`,
+            },
+          ],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.load(input.resourceID)
+              const edge = current.resource.edges.find((candidate) => candidate.id === input.edgeID)
+              if (!edge) return yield* new ArchitecturePatch.NotFoundError({ entity: "edge", id: input.edgeID })
+              const updated: Architecture.Edge = {
+                ...edge,
+                source: input.source ?? edge.source,
+                target: input.target ?? edge.target,
+                sourceHandle: input.sourceHandle ?? edge.sourceHandle ?? "right",
+                targetHandle: input.targetHandle ?? edge.targetHandle ?? "left",
+              }
+              const saved = yield* graph.patch(input.resourceID, {
+                revision: current.resource.revision,
+                digest: current.digest,
+                operations: [
+                  {
+                    id: Architecture.OperationID.create(),
+                    type: "edge.update",
+                    edge: updated,
+                    expectedDigest: input.expectedDigest,
+                  },
+                ],
+              })
+              return {
+                resourceID: input.resourceID,
+                revision: saved.resource.revision,
+                digest: saved.digest,
+                edge: updated,
+              }
+            }).pipe(
+              Effect.mapError((error) => failure(`Unable to update architecture connection ${input.edgeID}`, error)),
+            ),
         }),
         "edit",
       ),

@@ -6,6 +6,7 @@ export type ArchitectureSnapshot = ArchitectureGetResourceOutput["data"]
 export type ArchitectureResource = ArchitectureSnapshot["resource"]
 export type ArchitectureNode = ArchitectureResource["nodes"][number]
 export type ArchitectureEdge = ArchitectureResource["edges"][number]
+export type ArchitectureConnectionSide = NonNullable<ArchitectureEdge["sourceHandle"]>
 export type ArchitectureOperation = ArchitecturePatchResourceInput["operations"][number]
 export type ArchitectureViewport = { readonly x: number; readonly y: number; readonly zoom: number }
 export type ArchitectureEdgeStyle = "smoothstep" | "default" | "straight"
@@ -25,6 +26,9 @@ export type ArchitectureLabels = {
   readonly inspectorTitle: string
   readonly properties: string
   readonly connectionStyle: string
+  readonly sourceSide: string
+  readonly targetSide: string
+  readonly sides: Record<ArchitectureConnectionSide, string>
   readonly rectangular: string
   readonly curved: string
   readonly straight: string

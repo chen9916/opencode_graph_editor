@@ -18,6 +18,7 @@ import {
 } from "@xyflow/react"
 import { useEffect, useId, useRef, useState, type FormEvent } from "react"
 import type {
+  ArchitectureConnectionSide,
   ArchitectureEdge,
   ArchitectureEdgeStyle,
   ArchitectureNode,
@@ -30,11 +31,13 @@ import { toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } fro
 import { ArchitectureNodeView } from "./architecture-node.react"
 
 const nodeTypes = { architecture: ArchitectureNodeView }
+const connectionSides = ["top", "right", "bottom", "left"] as const satisfies ReadonlyArray<ArchitectureConnectionSide>
 
 type Selection = { readonly type: "node" | "edge"; readonly id: string }
 type ContextMenu =
   | { readonly type: "pane"; readonly x: number; readonly y: number; readonly position: XYPosition }
   | { readonly type: "node" | "edge"; readonly id: string; readonly x: number; readonly y: number }
+type WireToolbar = { readonly edgeID: string; readonly x: number; readonly y: number }
 type EditorState = {
   readonly resource: ArchitectureResource
   readonly past: ReadonlyArray<ReadonlyArray<ArchitectureOperation>>
@@ -46,6 +49,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const initial = props.draft?.operations ?? []
   const initialKey = `${base.digest}:${initial.map((operation) => operation.id).join(":")}`
   const loaded = useRef(initialKey)
+  const canvas = useRef<HTMLDivElement>(null)
   const outlineID = useId()
   const inspectorID = useId()
   const [editor, setEditor] = useState<EditorState>(() => ({
@@ -59,6 +63,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [outlineOpen, setOutlineOpen] = useState(!props.mobile)
   const [inspectorOpen, setInspectorOpen] = useState(!props.mobile)
   const [contextMenu, setContextMenu] = useState<ContextMenu>()
+  const [wireToolbar, setWireToolbar] = useState<WireToolbar>()
   const operations = flattenJournal(editor.past)
   const dirty = operations.length > 0 || (props.draft?.conflicts.length ?? 0) > 0
   const tags = unique(editor.resource.nodes.flatMap((node) => node.tags))
@@ -85,13 +90,26 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(projected.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(projected.edges)
 
+  const select = (next: Selection | undefined) => {
+    setSelection((current) => (current?.type === next?.type && current?.id === next?.id ? current : next))
+    setNodes((current) => current.map((node) => ({ ...node, selected: next?.type === "node" && next.id === node.id })))
+    setEdges((current) => current.map((edge) => ({ ...edge, selected: next?.type === "edge" && next.id === edge.id })))
+  }
+
   useEffect(() => {
     const pointer = (event: PointerEvent) => {
-      if (event.target instanceof Element && event.target.closest(".architecture-editor__context-menu")) return
+      if (
+        event.target instanceof Element &&
+        event.target.closest(".architecture-editor__context-menu, .architecture-editor__wire-toolbar")
+      )
+        return
       setContextMenu(undefined)
+      setWireToolbar(undefined)
     }
     const keyboard = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setContextMenu(undefined)
+      if (event.key !== "Escape") return
+      setContextMenu(undefined)
+      setWireToolbar(undefined)
     }
     document.addEventListener("pointerdown", pointer)
     document.addEventListener("keydown", keyboard)
@@ -109,8 +127,9 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       past: initial.map((operation) => [operation]),
       future: [],
     })
-    setSelection(undefined)
+    select(undefined)
     setContextMenu(undefined)
+    setWireToolbar(undefined)
   }, [base.digest, initialKey])
 
   useEffect(() => {
@@ -138,7 +157,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         selected: selection?.type === "edge" && selection.id === edge.id,
       })),
     )
-  }, [editor.resource, filter.tag, filter.text, props.edgeStyles, selection?.id, selection?.type, setEdges, setNodes])
+  }, [editor.resource, filter.tag, filter.text, props.edgeStyles, setEdges, setNodes])
 
   const undo = () => {
     const batch = editor.past.at(-1)
@@ -178,7 +197,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       },
     }
     commit([{ id: operationID(), type: "node.create", node }])
-    setSelection({ type: "node", id })
+    select({ type: "node", id })
     setContextMenu(undefined)
   }
 
@@ -197,7 +216,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         },
       },
     ])
-    setSelection({ type: "node", id })
+    select({ type: "node", id })
     setContextMenu(undefined)
   }
 
@@ -206,14 +225,14 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     if (target.type === "node") {
       props.onConfirm(props.labels.deleteNodeConfirm, props.labels.delete, () => {
         commit([{ id: operationID(), type: "node.remove", nodeID: target.id, cascade: true }])
-        setSelection(undefined)
+        select(undefined)
         setContextMenu(undefined)
       })
       return
     }
     props.onConfirm(props.labels.deleteEdgeConfirm, props.labels.delete, () => {
       commit([{ id: operationID(), type: "edge.remove", edgeID: target.id }])
-      setSelection(undefined)
+      select(undefined)
       setContextMenu(undefined)
     })
   }
@@ -229,11 +248,16 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const onSelectionChange = (change: OnSelectionChangeParams) => {
     const node = change.nodes[0]
     if (node) {
-      setSelection({ type: "node", id: node.id })
+      setSelection((current) =>
+        current?.type === "node" && current.id === node.id ? current : { type: "node", id: node.id },
+      )
       return
     }
     const edge = change.edges[0]
-    setSelection(edge ? { type: "edge", id: edge.id } : undefined)
+    setSelection((current) => {
+      if (!edge) return current ? undefined : current
+      return current?.type === "edge" && current.id === edge.id ? current : { type: "edge", id: edge.id }
+    })
   }
 
   const onConnect = (connection: Connection) => {
@@ -242,14 +266,27 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       id: `edge_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
       source: connection.source,
       target: connection.target,
+      sourceHandle: connectionSide(connection.sourceHandle, "right"),
+      targetHandle: connectionSide(connection.targetHandle, "left"),
     }
     commit([{ id: operationID(), type: "edge.create", edge }])
-    setSelection({ type: "edge", id: edge.id })
+    select({ type: "edge", id: edge.id })
   }
 
   const menuPosition = (x: number, y: number) => ({
-    x: Math.max(8, Math.min(x, window.innerWidth - 208)),
-    y: Math.max(8, Math.min(y, window.innerHeight - 244)),
+    x: Math.max(
+      8,
+      Math.min(x - (canvas.current?.getBoundingClientRect().left ?? 0), (canvas.current?.clientWidth ?? 216) - 208),
+    ),
+    y: Math.max(
+      8,
+      Math.min(y - (canvas.current?.getBoundingClientRect().top ?? 0), (canvas.current?.clientHeight ?? 252) - 244),
+    ),
+  })
+
+  const wirePosition = (x: number, y: number) => ({
+    x: x - (canvas.current?.getBoundingClientRect().left ?? 0),
+    y: y - (canvas.current?.getBoundingClientRect().top ?? 0),
   })
 
   const reconnect = (edgeID: string, connection: Connection) => {
@@ -260,7 +297,13 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       {
         id: operationID(),
         type: "edge.update",
-        edge: { ...edge, source: connection.source, target: connection.target },
+        edge: {
+          ...edge,
+          source: connection.source,
+          target: connection.target,
+          sourceHandle: connectionSide(connection.sourceHandle, edge.sourceHandle ?? "right"),
+          targetHandle: connectionSide(connection.targetHandle, edge.targetHandle ?? "left"),
+        },
       },
     ])
   }
@@ -375,8 +418,9 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
                     type="button"
                     className={selection?.type === "node" && selection.id === node.id ? "is-selected" : undefined}
                     onClick={() => {
-                      setSelection({ type: "node", id: node.id })
+                      select({ type: "node", id: node.id })
                       setContextMenu(undefined)
+                      setWireToolbar(undefined)
                       void flow?.setCenter(node.layout.position.x, node.layout.position.y, {
                         zoom: 1,
                         duration: 200,
@@ -391,7 +435,23 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             </ul>
           </aside>
         )}
-        <div className="architecture-editor__canvas" dir="ltr">
+        <div
+          ref={canvas}
+          className="architecture-editor__canvas"
+          dir="ltr"
+          onContextMenu={(event) => {
+            if (event.defaultPrevented || !flow) return
+            event.preventDefault()
+            const at = menuPosition(event.clientX, event.clientY)
+            select(undefined)
+            setWireToolbar(undefined)
+            setContextMenu({
+              type: "pane",
+              ...at,
+              position: flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+            })
+          }}
+        >
           <ReactFlow<ArchitectureFlowNode, ArchitectureFlowEdge>
             nodes={nodes}
             edges={edges}
@@ -401,14 +461,16 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             onSelectionChange={onSelectionChange}
             onConnect={onConnect}
             onPaneClick={() => {
-              setSelection(undefined)
+              select(undefined)
               setContextMenu(undefined)
+              setWireToolbar(undefined)
             }}
             onPaneContextMenu={(event) => {
               event.preventDefault()
               if (!flow) return
               const at = menuPosition(event.clientX, event.clientY)
-              setSelection(undefined)
+              select(undefined)
+              setWireToolbar(undefined)
               setContextMenu({
                 type: "pane",
                 ...at,
@@ -418,19 +480,21 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             onNodeContextMenu={(event, node) => {
               event.preventDefault()
               const at = menuPosition(event.clientX, event.clientY)
-              setSelection({ type: "node", id: node.id })
+              select({ type: "node", id: node.id })
+              setWireToolbar(undefined)
               setContextMenu({ type: "node", id: node.id, ...at })
             }}
             onEdgeClick={(event, edge) => {
               event.stopPropagation()
-              const at = menuPosition(event.clientX, event.clientY)
-              setSelection({ type: "edge", id: edge.id })
-              setContextMenu({ type: "edge", id: edge.id, ...at })
+              select({ type: "edge", id: edge.id })
+              setContextMenu(undefined)
+              setWireToolbar({ edgeID: edge.id, ...wirePosition(event.clientX, event.clientY) })
             }}
             onEdgeContextMenu={(event, edge) => {
               event.preventDefault()
               const at = menuPosition(event.clientX, event.clientY)
-              setSelection({ type: "edge", id: edge.id })
+              select({ type: "edge", id: edge.id })
+              setWireToolbar(undefined)
               setContextMenu({ type: "edge", id: edge.id, ...at })
             }}
             onReconnect={(edge, connection) => reconnect(edge.id, connection)}
@@ -441,13 +505,15 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               commit(
                 removed.map((node) => ({ id: operationID(), type: "node.remove", nodeID: node.id, cascade: true })),
               )
-              setSelection(undefined)
+              select(undefined)
               setContextMenu(undefined)
+              setWireToolbar(undefined)
             }}
             onEdgesDelete={(removed) => {
               commit(removed.map((edge) => ({ id: operationID(), type: "edge.remove", edgeID: edge.id })))
-              setSelection(undefined)
+              select(undefined)
               setContextMenu(undefined)
+              setWireToolbar(undefined)
             }}
             onInit={setFlow}
             onMoveEnd={(_event, viewport) => props.onViewport(viewport)}
@@ -533,6 +599,34 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               )}
             </div>
           )}
+          {wireToolbar && (
+            <div
+              className="architecture-editor__wire-toolbar"
+              style={{ left: wireToolbar.x, top: wireToolbar.y }}
+              aria-label={props.labels.connectionStyle}
+              dir={props.direction}
+            >
+              {(
+                [
+                  ["smoothstep", props.labels.rectangular],
+                  ["default", props.labels.curved],
+                  ["straight", props.labels.straight],
+                ] as const
+              ).map(([style, label]) => (
+                <button
+                  key={style}
+                  type="button"
+                  title={label}
+                  aria-label={label}
+                  aria-pressed={(props.edgeStyles[wireToolbar.edgeID] ?? "smoothstep") === style}
+                  data-wire-style={style}
+                  onClick={() => props.onEdgeStyle(wireToolbar.edgeID, style)}
+                >
+                  <span aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {inspectorOpen && (
           <aside
@@ -595,11 +689,47 @@ function Inspector(props: {
     )
   if (props.selection.type === "edge") {
     const edge = props.selected as ArchitectureEdge
+    const updateSide = (field: "sourceHandle" | "targetHandle", side: ArchitectureConnectionSide) =>
+      props.onCommit([
+        {
+          id: operationID(),
+          type: "edge.update",
+          edge: { ...edge, [field]: side },
+        },
+      ])
     return (
       <div className="architecture-editor__detail">
         <h3 dir="auto">{edge.id}</h3>
         <div>
           <bdi>{edge.source}</bdi> → <bdi>{edge.target}</bdi>
+        </div>
+        <div className="architecture-editor__form">
+          <label>
+            {props.labels.sourceSide}
+            <select
+              value={edge.sourceHandle ?? "right"}
+              onChange={(event) => updateSide("sourceHandle", connectionSide(event.currentTarget.value, "right"))}
+            >
+              {connectionSides.map((side) => (
+                <option key={side} value={side}>
+                  {props.labels.sides[side]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {props.labels.targetSide}
+            <select
+              value={edge.targetHandle ?? "left"}
+              onChange={(event) => updateSide("targetHandle", connectionSide(event.currentTarget.value, "left"))}
+            >
+              {connectionSides.map((side) => (
+                <option key={side} value={side}>
+                  {props.labels.sides[side]}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <EdgeStyleControls
           labels={props.labels}
@@ -705,4 +835,8 @@ function NodeForm(props: {
 
 function unique(values: ReadonlyArray<string>) {
   return Array.from(new Set(values)).toSorted((left, right) => left.localeCompare(right))
+}
+
+function connectionSide(value: string | null | undefined, fallback: ArchitectureConnectionSide) {
+  return connectionSides.find((side) => side === value) ?? fallback
 }

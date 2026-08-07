@@ -13,17 +13,26 @@ const resource: ArchitectureResource = {
     { id: "left", text: "Left", tags: [], layout: { position: { x: -300, y: 20 } } },
   ],
   edges: [
-    { id: "vertical", source: "upper", target: "lower" },
-    { id: "horizontal", source: "upper", target: "left" },
+    { id: "vertical", source: "upper", target: "lower", sourceHandle: "top", targetHandle: "bottom" },
+    { id: "horizontal", source: "upper", target: "left", sourceHandle: "left", targetHandle: "right" },
   ],
 }
 
 describe("architecture flow model", () => {
-  test("routes connections through the closest of all four node sides", () => {
+  test("preserves explicitly authored connection sides regardless of layout", () => {
     const edges = toReactFlow(resource, () => {}).edges
 
-    expect(edges[0]).toMatchObject({ sourceHandle: "bottom", targetHandle: "top" })
+    expect(edges[0]).toMatchObject({ sourceHandle: "top", targetHandle: "bottom" })
     expect(edges[1]).toMatchObject({ sourceHandle: "left", targetHandle: "right" })
+  })
+
+  test("uses a stable right-to-left fallback for older connections", () => {
+    const edges = toReactFlow(
+      { ...resource, edges: [{ id: "legacy", source: "upper", target: "lower" }] },
+      () => {},
+    ).edges
+
+    expect(edges[0]).toMatchObject({ sourceHandle: "right", targetHandle: "left" })
   })
 
   test("applies persisted visual wire styles without changing the graph edge", () => {

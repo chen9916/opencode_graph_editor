@@ -514,7 +514,12 @@ const layer = Layer.effect(
               (node) =>
                 `- ${node.id}: ${node.text.replace(/\s+/g, " ")}${node.tags.length ? ` [${node.tags.join(", ")}]` : ""}`,
             )
-          const edges = resource.edges.slice(0, 75).map((edge) => `- ${edge.source} -> ${edge.target}`)
+          const edges = resource.edges
+            .slice(0, 75)
+            .map(
+              (edge) =>
+                `- ${edge.source}.${edge.sourceHandle ?? "right"} -> ${edge.target}.${edge.targetHandle ?? "left"}`,
+            )
           return [
             `Architecture resource @${resource.name} (resource ID: ${resource.id}; revision ${resource.revision}; digest ${ArchitecturePatch.digest(resource).slice(0, 12)})`,
             ...(nodes.length > 0 ? ["Elements:", ...nodes] : []),

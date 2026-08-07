@@ -27,30 +27,18 @@ export function toReactFlow(
         data: { node, onTextChange },
       }),
     ),
-    edges: resource.edges.map((edge): ArchitectureFlowEdge => {
-      const handles = connectionHandles(resource, edge)
-      return {
+    edges: resource.edges.map(
+      (edge): ArchitectureFlowEdge => ({
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        sourceHandle: handles.source,
-        targetHandle: handles.target,
+        sourceHandle: edge.sourceHandle ?? "right",
+        targetHandle: edge.targetHandle ?? "left",
         type: edgeStyles[edge.id] ?? "smoothstep",
         data: { edge },
-      }
-    }),
+      }),
+    ),
   }
-}
-
-function connectionHandles(resource: ArchitectureResource, edge: ArchitectureEdge) {
-  const source = resource.nodes.find((node) => node.id === edge.source)?.layout.position
-  const target = resource.nodes.find((node) => node.id === edge.target)?.layout.position
-  if (!source || !target) return { source: "right", target: "left" }
-  const x = target.x - source.x
-  const y = target.y - source.y
-  if (Math.abs(x) >= Math.abs(y))
-    return x >= 0 ? { source: "right", target: "left" } : { source: "left", target: "right" }
-  return y >= 0 ? { source: "bottom", target: "top" } : { source: "top", target: "bottom" }
 }
 
 export function architectureNodeClass() {

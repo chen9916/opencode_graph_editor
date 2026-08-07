@@ -46,6 +46,35 @@ describe("Architecture schema", () => {
     ).toThrow()
   })
 
+  test("decodes explicit connection sides while accepting legacy connections", () => {
+    const nodes = [
+      resource.nodes[0],
+      { ...resource.nodes[0], id: "memory", text: "Memory", layout: { position: { x: 200, y: 0 } } },
+    ]
+    expect(
+      Schema.decodeUnknownSync(Architecture.Resource)({
+        ...resource,
+        nodes,
+        edges: [
+          {
+            id: "conversation-memory",
+            source: "conversation",
+            target: "memory",
+            sourceHandle: "bottom",
+            targetHandle: "top",
+          },
+        ],
+      }).edges[0],
+    ).toMatchObject({ sourceHandle: "bottom", targetHandle: "top" })
+    expect(
+      Schema.decodeUnknownSync(Architecture.Resource)({
+        ...resource,
+        nodes,
+        edges: [{ id: "legacy", source: "conversation", target: "memory" }],
+      }).edges[0],
+    ).not.toHaveProperty("sourceHandle")
+  })
+
   test("drops fields from the previous richer graph model", () => {
     const encoded = Schema.encodeSync(Architecture.Resource)(
       Schema.decodeUnknownSync(Architecture.Resource)({ ...resource, metadata: { obsolete: true }, references: [] }),

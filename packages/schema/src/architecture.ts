@@ -50,11 +50,18 @@ export const Node = Schema.Struct({
   layout: Schema.Struct({ position: Position }),
 }).annotate({ identifier: "Architecture.Node" })
 
+export const ConnectionSide = Schema.Literals(["top", "right", "bottom", "left"]).annotate({
+  identifier: "Architecture.ConnectionSide",
+})
+export type ConnectionSide = typeof ConnectionSide.Type
+
 export interface Edge extends Schema.Schema.Type<typeof Edge> {}
 export const Edge = Schema.Struct({
   id: EdgeID,
   source: NodeID,
   target: NodeID,
+  sourceHandle: ConnectionSide.pipe(optional),
+  targetHandle: ConnectionSide.pipe(optional),
 }).annotate({ identifier: "Architecture.Edge" })
 
 export interface Resource extends Schema.Schema.Type<typeof Resource> {}

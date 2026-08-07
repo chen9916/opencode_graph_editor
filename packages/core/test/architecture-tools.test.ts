@@ -119,9 +119,26 @@ describe("ArchitectureTools", () => {
           id: "a-to-b",
           source: "a",
           target: "b",
+          sourceHandle: "bottom",
+          targetHandle: "top",
         }),
       )
-      expect(connected.output?.structured).toMatchObject({ edge: { id: "a-to-b", source: "a", target: "b" } })
+      expect(connected.output?.structured).toMatchObject({
+        edge: { id: "a-to-b", source: "a", target: "b", sourceHandle: "bottom", targetHandle: "top" },
+      })
+
+      const updatedConnection = yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.updateConnection, {
+          resourceID,
+          edgeID: "a-to-b",
+          sourceHandle: "left",
+          targetHandle: "right",
+        }),
+      )
+      expect(updatedConnection.output?.structured).toMatchObject({
+        edge: { id: "a-to-b", sourceHandle: "left", targetHandle: "right" },
+      })
 
       const queried = yield* settleTool(
         registry,
@@ -141,6 +158,7 @@ describe("ArchitectureTools", () => {
 
       const context = yield* settleTool(registry, call(ArchitectureTools.names.getContext, {}))
       expect(context.output?.structured).toContain("Updated conversation [interaction, planned]")
+      expect(context.output?.structured).toContain("a.left -> b.right")
       expect(context.output?.structured).toContain("details")
       expect(assertions.every((item) => item.resources[0]?.startsWith(".opencode/architecture/resources"))).toBe(true)
       expect(assertions.every((item) => item.source?.type === "tool")).toBe(true)

@@ -227,7 +227,13 @@ export type ArchitectureCreateResourceOutput = {
         readonly tags: ReadonlyArray<string>
         readonly layout: { readonly position: { readonly x: number; readonly y: number } }
       }>
-      readonly edges: ReadonlyArray<{ readonly id: string; readonly source: string; readonly target: string }>
+      readonly edges: ReadonlyArray<{
+        readonly id: string
+        readonly source: string
+        readonly target: string
+        readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+        readonly targetHandle?: "top" | "right" | "bottom" | "left"
+      }>
     }
     readonly digest: string
     readonly storage: { readonly root: string; readonly path: string }
@@ -259,7 +265,13 @@ export type ArchitectureGetResourceOutput = {
         readonly tags: ReadonlyArray<string>
         readonly layout: { readonly position: { readonly x: number; readonly y: number } }
       }>
-      readonly edges: ReadonlyArray<{ readonly id: string; readonly source: string; readonly target: string }>
+      readonly edges: ReadonlyArray<{
+        readonly id: string
+        readonly source: string
+        readonly target: string
+        readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+        readonly targetHandle?: "top" | "right" | "bottom" | "left"
+      }>
     }
     readonly digest: string
     readonly storage: { readonly root: string; readonly path: string }
@@ -314,12 +326,24 @@ export type ArchitecturePatchResourceInput = {
       | {
           readonly id: string
           readonly type: "edge.create"
-          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+          readonly edge: {
+            readonly id: string
+            readonly source: string
+            readonly target: string
+            readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+            readonly targetHandle?: "top" | "right" | "bottom" | "left"
+          }
         }
       | {
           readonly id: string
           readonly type: "edge.update"
-          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+          readonly edge: {
+            readonly id: string
+            readonly source: string
+            readonly target: string
+            readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+            readonly targetHandle?: "top" | "right" | "bottom" | "left"
+          }
           readonly expectedDigest?: string
         }
       | { readonly id: string; readonly type: "edge.remove"; readonly edgeID: string; readonly expectedDigest?: string }
@@ -368,12 +392,24 @@ export type ArchitecturePatchResourceInput = {
       | {
           readonly id: string
           readonly type: "edge.create"
-          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+          readonly edge: {
+            readonly id: string
+            readonly source: string
+            readonly target: string
+            readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+            readonly targetHandle?: "top" | "right" | "bottom" | "left"
+          }
         }
       | {
           readonly id: string
           readonly type: "edge.update"
-          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+          readonly edge: {
+            readonly id: string
+            readonly source: string
+            readonly target: string
+            readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+            readonly targetHandle?: "top" | "right" | "bottom" | "left"
+          }
           readonly expectedDigest?: string
         }
       | { readonly id: string; readonly type: "edge.remove"; readonly edgeID: string; readonly expectedDigest?: string }
@@ -422,12 +458,24 @@ export type ArchitecturePatchResourceInput = {
       | {
           readonly id: string
           readonly type: "edge.create"
-          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+          readonly edge: {
+            readonly id: string
+            readonly source: string
+            readonly target: string
+            readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+            readonly targetHandle?: "top" | "right" | "bottom" | "left"
+          }
         }
       | {
           readonly id: string
           readonly type: "edge.update"
-          readonly edge: { readonly id: string; readonly source: string; readonly target: string }
+          readonly edge: {
+            readonly id: string
+            readonly source: string
+            readonly target: string
+            readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+            readonly targetHandle?: "top" | "right" | "bottom" | "left"
+          }
           readonly expectedDigest?: string
         }
       | { readonly id: string; readonly type: "edge.remove"; readonly edgeID: string; readonly expectedDigest?: string }
@@ -453,7 +501,13 @@ export type ArchitecturePatchResourceOutput = {
         readonly tags: ReadonlyArray<string>
         readonly layout: { readonly position: { readonly x: number; readonly y: number } }
       }>
-      readonly edges: ReadonlyArray<{ readonly id: string; readonly source: string; readonly target: string }>
+      readonly edges: ReadonlyArray<{
+        readonly id: string
+        readonly source: string
+        readonly target: string
+        readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+        readonly targetHandle?: "top" | "right" | "bottom" | "left"
+      }>
     }
     readonly digest: string
     readonly storage: { readonly root: string; readonly path: string }
@@ -503,7 +557,13 @@ export type ArchitectureResetResourceOutput = {
         readonly tags: ReadonlyArray<string>
         readonly layout: { readonly position: { readonly x: number; readonly y: number } }
       }>
-      readonly edges: ReadonlyArray<{ readonly id: string; readonly source: string; readonly target: string }>
+      readonly edges: ReadonlyArray<{
+        readonly id: string
+        readonly source: string
+        readonly target: string
+        readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+        readonly targetHandle?: "top" | "right" | "bottom" | "left"
+      }>
     }
     readonly digest: string
     readonly storage: { readonly root: string; readonly path: string }
