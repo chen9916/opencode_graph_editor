@@ -1,4 +1,4 @@
-// Architecture is new, developer-facing vocabulary. Keep these keys on the
+// Graph editor is new, developer-facing vocabulary. Keep these keys on the
 // existing English runtime fallback until each locale receives terminology
 // reviewed against its developer-tooling corpus.
 export const englishFallbackKeys = new Set([

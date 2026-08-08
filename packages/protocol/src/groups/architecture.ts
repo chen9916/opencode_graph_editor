@@ -117,7 +117,7 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
   )
   .annotateMerge(
     OpenApi.annotations({
-      title: "architecture",
+      title: "graph editor",
       description: "Location-scoped Graph editor resources shared by people and agents.",
     }),
   )

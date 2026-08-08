@@ -65,7 +65,7 @@ function mapError<A, E, R>(effect: Effect.Effect<A, E, R>) {
         return new ArchitectureUnavailableError({ message: error.message })
       if (error instanceof ArchitectureGraph.StorageError)
         return new ArchitectureUnavailableError({ message: error.message })
-      return new ArchitectureUnavailableError({ message: "Architecture resources are temporarily unavailable" })
+      return new ArchitectureUnavailableError({ message: "Graph editor resources are temporarily unavailable" })
     }),
   )
 }

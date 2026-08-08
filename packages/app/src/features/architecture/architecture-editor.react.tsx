@@ -18,7 +18,7 @@ import {
   useEdgesState,
   useNodesState,
 } from "@xyflow/react"
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react"
 import type {
   ArchitectureConnectionSide,
   ArchitectureEdge,
@@ -69,6 +69,11 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const loadedResourceID = useRef(base.resource.id)
   const canvas = useRef<HTMLDivElement>(null)
   const viewportMotion = useRef<ViewportMotion>({ active: false, velocity: { x: 0, y: 0 } })
+  const reconnectedEdgeIDs = useRef(new Set<string>())
+  const selectionRef = useRef<Selection>(emptySelection)
+  const pendingSelection = useRef<Selection>()
+  const suppressEmptySelectionUntil = useRef(0)
+  const connecting = useRef(false)
   const outlineID = useId()
   const inspectorID = useId()
   const [editor, setEditor] = useState<EditorState>(() => ({
@@ -125,11 +130,18 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     commit([{ id: operationID(), type: "edge.update", edge: { ...edge, style } }])
   }
 
+  const applySelection = (selected: Selection) => {
+    selectionRef.current = selected
+    setSelection((current) => (sameSelection(current, selected) ? current : selected))
+    setNodes((current) => applyNodeSelection(current, selected))
+    setEdges((current) => applyEdgeSelection(current, selected))
+  }
+
   const select = (next: SingleSelection | undefined) => {
     const selected = selectionFromSingle(next)
-    setSelection((current) => (sameSelection(current, selected) ? current : selected))
-    setNodes((current) => current.map((node) => ({ ...node, selected: selected.nodeIDs.includes(node.id) })))
-    setEdges((current) => current.map((edge) => ({ ...edge, selected: selected.edgeIDs.includes(edge.id) })))
+    pendingSelection.current = selected
+    if (next) suppressEmptySelectionUntil.current = performanceNow() + 220
+    applySelection(selected)
   }
 
   useEffect(() => {
@@ -155,7 +167,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
 
   useEffect(() => () => cancelViewportInertia(viewportMotion.current), [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (loaded.current === initialKey) return
     const resourceChanged = loadedResourceID.current !== base.resource.id
     loaded.current = initialKey
@@ -172,7 +184,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     setInspectorOpen(false)
   }, [base.digest, base.resource.id, initialKey])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const next = toReactFlow(editor.resource, updateNodeText, {
       label: props.labels.connectionStyle,
       styles: {
@@ -185,21 +197,25 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     const visible = new Set(
       editor.resource.nodes.filter((node) => nodeMatchesFilter(node, filter)).map((node) => node.id),
     )
+    const selected = selectionInResource(pendingSelection.current ?? selectionRef.current, editor.resource)
+    pendingSelection.current = undefined
+    selectionRef.current = selected
+    setSelection((current) => (sameSelection(current, selected) ? current : selected))
     setNodes(
       next.nodes.map((node) => ({
         ...node,
         hidden: !visible.has(node.id),
-        selected: selection.nodeIDs.includes(node.id),
+        selected: selected.nodeIDs.includes(node.id),
       })),
     )
     setEdges(
       next.edges.map((edge) => ({
         ...edge,
         hidden: !visible.has(edge.source) || !visible.has(edge.target),
-        selected: selection.edgeIDs.includes(edge.id),
+        selected: selected.edgeIDs.includes(edge.id),
       })),
     )
-  }, [editor.resource, filter.tag, filter.text, selection, setEdges, setNodes])
+  }, [editor.resource, filter.tag, filter.text, setEdges, setNodes])
 
   const undo = () => {
     const batch = editor.past.at(-1)
@@ -320,7 +336,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
 
   const onSelectionChange = (change: OnSelectionChangeParams<ArchitectureFlowNode, ArchitectureFlowEdge>) => {
     const next = selectionFromChange(change)
-    setSelection((current) => (sameSelection(current, next) ? current : next))
+    if (isEmptySelection(next) && (connecting.current || performanceNow() < suppressEmptySelectionUntil.current)) return
+    applySelection(next)
   }
 
   const onConnect = (connection: Connection) => {
@@ -352,6 +369,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     if (!connection.source || !connection.target) return
     const edge = editor.resource.edges.find((candidate) => candidate.id === edgeID)
     if (!edge) return
+    reconnectedEdgeIDs.current.add(edgeID)
     commit([
       {
         id: operationID(),
@@ -401,7 +419,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
 
   const startViewportMove = (event: MouseEvent | TouchEvent | null) => {
     cancelViewportInertia(viewportMotion.current)
-    if (!isViewportPointerEvent(event)) {
+    if (!isViewportPanStartEvent(event)) {
       viewportMotion.current = { active: false, velocity: { x: 0, y: 0 } }
       return
     }
@@ -412,7 +430,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   const trackViewportMove = (event: MouseEvent | TouchEvent | null, viewport: ArchitectureViewport) => {
-    if (!viewportMotion.current.active || !isViewportPointerEvent(event)) return
+    if (!viewportMotion.current.active || !isViewportMotionEvent(event)) return
     const time = performance.now()
     const last = viewportMotion.current.last
     const nextVelocity = last
@@ -432,7 +450,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     props.onViewport(viewport)
     const motion = viewportMotion.current
     viewportMotion.current = { active: false, velocity: { x: 0, y: 0 } }
-    if (!flow || !motion.active || !isViewportPointerEvent(event)) return
+    if (!flow || !motion.active || !isViewportMotionEvent(event)) return
     const speed = Math.hypot(motion.velocity.x, motion.velocity.y)
     if (speed < 0.04) return
     glideViewport(viewport, {
@@ -493,6 +511,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       data-prevent-session-autofocus
       tabIndex={-1}
       onPointerDownCapture={(event) => {
+        cancelViewportInertia(viewportMotion.current)
         if (!(event.target instanceof Element)) return
         if (event.target.closest("button, input, textarea, select, [contenteditable='true']")) return
         event.currentTarget.focus({ preventScroll: true })
@@ -549,9 +568,11 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
           data-active={filterActive || undefined}
           aria-expanded={outlineOpen}
           aria-controls={outlineID}
+          aria-label={props.labels.outlineTitle}
+          title={props.labels.outlineTitle}
           onClick={() => setOutlineOpen((open) => !open)}
         >
-          {props.labels.outlineTitle}
+          <span aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -559,9 +580,11 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
           data-open={inspectorOpen || undefined}
           aria-expanded={inspectorOpen}
           aria-controls={inspectorID}
+          aria-label={props.labels.properties}
+          title={props.labels.properties}
           onClick={() => setInspectorOpen((open) => !open)}
         >
-          {props.labels.properties}
+          <span aria-hidden="true" />
         </button>
         {outlineOpen && (
           <aside
@@ -649,6 +672,14 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onSelectionChange={onSelectionChange}
+            onConnectStart={() => {
+              connecting.current = true
+              suppressEmptySelectionUntil.current = performanceNow() + 220
+            }}
+            onConnectEnd={() => {
+              connecting.current = false
+              suppressEmptySelectionUntil.current = performanceNow() + 120
+            }}
             onConnect={onConnect}
             onPaneClick={() => {
               select(undefined)
@@ -684,6 +715,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             }}
             onReconnect={(edge, connection) => reconnect(edge.id, connection)}
             onReconnectEnd={(_event, edge, _handle, connection) => {
+              if (reconnectedEdgeIDs.current.delete(edge.id)) return
               if (!connectionEndedDisconnected(connection)) return
               disconnect(edge.id)
             }}
@@ -697,18 +729,6 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
                 draggedNodes.length > 1 ? draggedNodes : (flow?.getNodes() ?? [node]),
               )
             }
-            onNodesDelete={(removed) => {
-              commit(
-                removed.map((node) => ({ id: operationID(), type: "node.remove", nodeID: node.id, cascade: true })),
-              )
-              select(undefined)
-              setContextMenu(undefined)
-            }}
-            onEdgesDelete={(removed) => {
-              commit(removed.map((edge) => ({ id: operationID(), type: "edge.remove", edgeID: edge.id })))
-              select(undefined)
-              setContextMenu(undefined)
-            }}
             onInit={setFlow}
             onMoveStart={startViewportMove}
             onMove={trackViewportMove}
@@ -1079,6 +1099,42 @@ function unique(values: ReadonlyArray<string>) {
   return Array.from(new Set(values)).toSorted((left, right) => left.localeCompare(right))
 }
 
+function applyNodeSelection(nodes: ArchitectureFlowNode[], selection: Selection) {
+  const selected = new Set(selection.nodeIDs)
+  const next = nodes.map((node) =>
+    node.selected === selected.has(node.id) ? node : { ...node, selected: selected.has(node.id) },
+  )
+  return next.every((node, index) => node === nodes[index]) ? nodes : next
+}
+
+function applyEdgeSelection(edges: ArchitectureFlowEdge[], selection: Selection) {
+  const selected = new Set(selection.edgeIDs)
+  const next = edges.map((edge) =>
+    edge.selected === selected.has(edge.id) ? edge : { ...edge, selected: selected.has(edge.id) },
+  )
+  return next.every((edge, index) => edge === edges[index]) ? edges : next
+}
+
+function selectionInResource(selection: Selection, resource: ArchitectureResource): Selection {
+  const nodeIDs = new Set(resource.nodes.map((node) => node.id))
+  const edgeIDs = new Set(resource.edges.map((edge) => edge.id))
+  const next = {
+    nodeIDs: selection.nodeIDs.filter((id) => nodeIDs.has(id)),
+    edgeIDs: selection.edgeIDs.filter((id) => edgeIDs.has(id)),
+  }
+  const primary =
+    selection.primary?.type === "node" && next.nodeIDs.includes(selection.primary.id)
+      ? selection.primary
+      : selection.primary?.type === "edge" && next.edgeIDs.includes(selection.primary.id)
+        ? selection.primary
+        : next.nodeIDs[0]
+          ? ({ type: "node", id: next.nodeIDs[0] } as const)
+          : next.edgeIDs[0]
+            ? ({ type: "edge", id: next.edgeIDs[0] } as const)
+            : undefined
+  return primary ? { ...next, primary } : next
+}
+
 function selectionFromSingle(selection: SingleSelection | undefined): Selection {
   if (!selection) return emptySelection
   if (selection.type === "node") return { nodeIDs: [selection.id], edgeIDs: [], primary: selection }
@@ -1112,6 +1168,10 @@ function sameIDs(left: ReadonlyArray<string>, right: ReadonlyArray<string>) {
   return left.length === right.length && left.every((id, index) => id === right[index])
 }
 
+function isEmptySelection(selection: Selection) {
+  return selection.nodeIDs.length === 0 && selection.edgeIDs.length === 0
+}
+
 function nodeMatchesFilter(node: ArchitectureNode, filter: { readonly text: string; readonly tag: string }) {
   if (filter.tag && !node.tags.includes(filter.tag)) return false
   if (!filter.text) return true
@@ -1122,12 +1182,21 @@ function samePosition(left: XYPosition, right: XYPosition) {
   return left.x === right.x && left.y === right.y
 }
 
-function isViewportPointerEvent(event: MouseEvent | TouchEvent | null) {
+function isViewportMotionEvent(event: MouseEvent | TouchEvent | null) {
   if (!event) return false
   if (typeof WheelEvent !== "undefined" && event instanceof WheelEvent) return false
   if (typeof MouseEvent !== "undefined" && event instanceof MouseEvent)
     return event.buttons > 0 || event.type === "mouseup"
   return "touches" in event || "changedTouches" in event
+}
+
+function isViewportPanStartEvent(event: MouseEvent | TouchEvent | null) {
+  if (!event) return false
+  if (!isViewportMotionEvent(event)) return false
+  if (!(event.target instanceof Element)) return true
+  return !event.target.closest(
+    ".react-flow__node, .react-flow__edge, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .architecture-editor__toolbar, .architecture-editor__side-toggle, .architecture-editor__context-menu, .architecture-editor__wire-toolbar",
+  )
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -1139,8 +1208,12 @@ function cancelViewportInertia(motion: ViewportMotion) {
   cancelAnimationFrame(motion.inertia)
 }
 
-function connectionEndedDisconnected(connection: FinalConnectionState) {
-  return connection.toHandle === null && connection.toNode === null
+function performanceNow() {
+  return typeof performance === "undefined" ? Date.now() : performance.now()
+}
+
+function connectionEndedDisconnected(connection: FinalConnectionState | null | undefined) {
+  return connection?.toHandle === null && connection.toNode === null
 }
 
 function connectionSide(value: string | null | undefined, fallback: ArchitectureConnectionSide) {
