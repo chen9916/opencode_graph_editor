@@ -15,6 +15,7 @@ import { ArchitecturePatch } from "./patch"
 export const names = {
   listResources: "graph_list_resources",
   createResource: "graph_create_resource",
+  reloadResource: "graph_reload_resource",
   updateResource: "graph_update_resource",
   deleteResource: "graph_delete_resource",
   query: "graph_query",
@@ -87,6 +88,29 @@ const layer = Layer.effectDiscard(
             ),
         }),
         "edit",
+      ),
+      [names.reloadResource]: Tool.withPermission(
+        Tool.make({
+          description:
+            "Reload one managed Graph editor resource by resourceID after creating, editing, or laying out a graph. Use this to inspect the latest saved graph state instead of reading JSON files directly.",
+          input: Schema.Struct({ resourceID: Architecture.ResourceID }),
+          output: Architecture.ResourceSnapshot,
+          toModelOutput: ({ output }) => [
+            {
+              type: "text",
+              text: JSON.stringify({
+                path: `${root}/${output.resource.id}.json`,
+                ...output,
+              }),
+            },
+          ],
+          execute: (input, context) =>
+            authorize("read", context, input.resourceID).pipe(
+              Effect.andThen(graph.load(input.resourceID)),
+              Effect.mapError((error) => failure(`Unable to reload graph resource ${input.resourceID}`, error)),
+            ),
+        }),
+        "read",
       ),
       [names.updateResource]: Tool.withPermission(
         Tool.make({

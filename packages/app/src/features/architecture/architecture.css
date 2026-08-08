@@ -21,8 +21,7 @@
 }
 
 .architecture-editor__heading,
-.architecture-editor__actions,
-.architecture-editor__filters {
+.architecture-editor__actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -32,13 +31,8 @@
   justify-content: space-between;
 }
 
-.architecture-editor__actions,
-.architecture-editor__filters {
+.architecture-editor__actions {
   flex-wrap: wrap;
-}
-
-.architecture-editor__filters {
-  margin-block-start: 8px;
 }
 
 .architecture-editor button,
@@ -71,10 +65,6 @@
   padding-inline: 8px;
 }
 
-.architecture-editor__filters input {
-  flex: 1 1 160px;
-}
-
 .architecture-editor__title {
   font-size: 14px;
   font-weight: 600;
@@ -87,6 +77,8 @@
 }
 
 .architecture-editor__body {
+  --architecture-outline-width: clamp(190px, 21vw, 292px);
+  --architecture-inspector-width: clamp(220px, 24vw, 320px);
   min-block-size: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -101,9 +93,63 @@
   position: relative;
 }
 
+.architecture-editor__side-toggle {
+  z-index: 25;
+  position: absolute;
+  inset-block-start: 50%;
+  inline-size: 24px;
+  min-inline-size: 24px;
+  block-size: 76px;
+  padding: 0;
+  border-color: var(--color-v2-border-subtle, var(--color-border-weaker-base));
+  background: color-mix(in srgb, var(--color-v2-background-bg-raised, var(--color-background-stronger)) 94%, transparent);
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  opacity: 0.84;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 22%);
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease,
+    transform 160ms ease;
+  transform: translateY(-50%);
+}
+
+.architecture-editor__side-toggle:hover,
+.architecture-editor__side-toggle[data-open="true"],
+.architecture-editor__side-toggle[data-active="true"] {
+  opacity: 1;
+  color: var(--color-v2-text-primary, var(--color-text-base));
+  background: color-mix(in srgb, var(--architecture-accent) 16%, var(--color-v2-background-bg-raised, var(--color-background-stronger)));
+}
+
+.architecture-editor__side-toggle--outline {
+  inset-inline-start: 0;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.architecture-editor__side-toggle--outline[data-open="true"] {
+  transform: translateX(calc(var(--architecture-outline-width) - 1px)) translateY(-50%);
+}
+
+.architecture-editor__side-toggle--inspector {
+  inset-inline-end: 0;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.architecture-editor__side-toggle--inspector[data-open="true"] {
+  transform: translateX(calc(-1 * (var(--architecture-inspector-width) - 1px))) translateY(-50%);
+}
+
 .architecture-editor__inspector {
   grid-column: 3;
-  inline-size: clamp(220px, 24vw, 320px);
+  inline-size: var(--architecture-inspector-width);
   min-block-size: 0;
   overflow: auto;
   padding-block: 16px;
@@ -181,7 +227,7 @@
 
 .architecture-editor__outline {
   grid-column: 1;
-  inline-size: clamp(180px, 20vw, 280px);
+  inline-size: var(--architecture-outline-width);
   min-block-size: 0;
   overflow: auto;
   padding-block: 12px;
@@ -205,6 +251,27 @@
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+.architecture-editor__outline-filter {
+  display: grid;
+  gap: 6px;
+  margin-block-end: 10px;
+}
+
+.architecture-editor__outline-filter > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.architecture-editor__outline-filter input,
+.architecture-editor__outline-filter select {
+  inline-size: 100%;
+}
+
+.architecture-editor__outline-filter button {
+  white-space: nowrap;
 }
 
 .architecture-editor__outline ul {
@@ -253,7 +320,43 @@
   box-shadow: 0 14px 38px rgb(0 0 0 / 30%);
 }
 
+.architecture-editor__canvas-status {
+  z-index: 22;
+  position: absolute;
+  inset-block-start: 12px;
+  inset-inline-start: 50%;
+  display: flex;
+  gap: 6px;
+  max-inline-size: min(70%, 520px);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.architecture-editor__canvas-status span {
+  padding-block: 4px;
+  padding-inline: 8px;
+  border: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-v2-background-bg-raised, var(--color-background-stronger)) 92%, transparent);
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  font-size: 11px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 20%);
+  white-space: nowrap;
+}
+
+.architecture-editor .react-flow__edge-toolbar {
+  z-index: 60;
+  pointer-events: all;
+}
+
+.architecture-editor__wire-toolbar-anchor {
+  z-index: 60;
+  pointer-events: all;
+}
+
 .architecture-editor__wire-toolbar {
+  position: relative;
+  z-index: 61;
   display: flex;
   gap: 4px;
   padding: 4px;
@@ -261,7 +364,8 @@
   border-radius: 999px;
   background: var(--color-v2-background-bg-raised, var(--color-background-stronger));
   box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
-  transform: translateY(-10px);
+  pointer-events: auto;
+  transform: translateY(-18px);
 }
 
 .architecture-editor__wire-toolbar button {
@@ -271,6 +375,7 @@
   place-items: center;
   padding: 0;
   border-radius: 999px;
+  pointer-events: auto;
 }
 
 .architecture-editor__wire-toolbar button[aria-pressed="true"] {
@@ -396,16 +501,31 @@
   block-size: 9px;
   border: 2px solid var(--color-v2-background-bg-raised, var(--color-background-stronger));
   background: var(--architecture-node-accent);
-  opacity: 0.72;
+  opacity: 0;
+  pointer-events: none;
+  scale: 0.36;
   transition:
-    opacity 120ms ease,
-    scale 120ms ease;
+    opacity 120ms ease 170ms,
+    scale 140ms ease 170ms;
 }
 
-.architecture-node:hover .react-flow__handle,
-.architecture-editor .react-flow__node.selected .architecture-node .react-flow__handle {
+.architecture-node:hover .react-flow__handle {
+  opacity: 0.42;
+  pointer-events: auto;
+  scale: 0.82;
+  transition-delay: 0ms;
+}
+
+.architecture-node[data-active-socket="top"] .react-flow__handle[data-side="top"],
+.architecture-node[data-active-socket="right"] .react-flow__handle[data-side="right"],
+.architecture-node[data-active-socket="bottom"] .react-flow__handle[data-side="bottom"],
+.architecture-node[data-active-socket="left"] .react-flow__handle[data-side="left"],
+.architecture-editor .react-flow__node.selected .architecture-node .react-flow__handle,
+.architecture-node[data-selected="true"] .react-flow__handle {
   opacity: 1;
+  pointer-events: auto;
   scale: 1.2;
+  transition-delay: 0ms;
 }
 
 .architecture-node__text {
@@ -470,6 +590,11 @@
   .architecture-editor__heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .architecture-editor__body {
+    --architecture-outline-width: min(82vw, 280px);
+    --architecture-inspector-width: min(82vw, 280px);
   }
 
   .architecture-editor__outline,

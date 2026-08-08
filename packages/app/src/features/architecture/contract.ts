@@ -37,10 +37,12 @@ export type ArchitectureLabels = {
   readonly tags: string
   readonly search: string
   readonly allTags: string
+  readonly clearFilters: string
   readonly addNode: string
   readonly save: string
   readonly reload: string
   readonly fitView: string
+  readonly fitSelection: string
   readonly undo: string
   readonly redo: string
   readonly delete: string
@@ -49,10 +51,13 @@ export type ArchitectureLabels = {
   readonly conflicts: string
   readonly dirty: string
   readonly clean: string
+  readonly selectedItems: (nodes: number, edges: number) => string
+  readonly moveSelectionHint: string
   readonly resourceDetails: string
   readonly discardConfirm: string
   readonly deleteNodeConfirm: string
   readonly deleteEdgeConfirm: string
+  readonly deleteSelectionConfirm: string
   readonly copied: string
   readonly saveFailed: string
   readonly saveSucceeded: string
@@ -66,7 +71,10 @@ export type ArchitecturePanelProps = {
   readonly draft?: ArchitectureDraft
   readonly viewport?: ArchitectureViewport
   readonly busy: boolean
-  readonly action?: { readonly id: number; readonly type: "save" | "reload" | "fitView" | "addNode" }
+  readonly action?: {
+    readonly id: number
+    readonly type: "save" | "reload" | "fitView" | "addNode" | "undo" | "redo" | "delete"
+  }
   readonly labels: ArchitectureLabels
   readonly onJournal: (operations: ReadonlyArray<ArchitectureOperation>) => void
   readonly onViewport: (viewport: ArchitectureViewport) => void

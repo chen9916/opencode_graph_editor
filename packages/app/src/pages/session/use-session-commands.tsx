@@ -144,6 +144,16 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const terminalCommand = withCategory(language.t("command.category.terminal"))
   const mcpCommand = withCategory(language.t("command.category.mcp"))
   const permissionsCommand = withCategory(language.t("command.category.permissions"))
+  const graphEditorFocused = (event: KeyboardEvent) => {
+    const target =
+      event.target instanceof Element
+        ? event.target
+        : typeof document !== "undefined" && document.activeElement instanceof Element
+          ? document.activeElement
+          : undefined
+    if (!target?.closest(".architecture-editor")) return false
+    return !target.closest("input, textarea, select, [contenteditable='true']")
+  }
 
   const isAutoAcceptActive = () => {
     const sessionID = params.id
@@ -584,6 +594,8 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
           viewCommand({
             id: "architecture.save",
             title: language.t("command.architecture.save"),
+            keybind: "mod+s",
+            when: graphEditorFocused,
             onSelect: () => dispatchArchitectureCommand("save"),
           }),
           viewCommand({
@@ -594,7 +606,30 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
           viewCommand({
             id: "architecture.fitView",
             title: language.t("command.architecture.fitView"),
+            keybind: "mod+0",
+            when: graphEditorFocused,
             onSelect: () => dispatchArchitectureCommand("fitView"),
+          }),
+          viewCommand({
+            id: "architecture.undo",
+            title: language.t("command.architecture.undo"),
+            keybind: "mod+z",
+            when: graphEditorFocused,
+            onSelect: () => dispatchArchitectureCommand("undo"),
+          }),
+          viewCommand({
+            id: "architecture.redo",
+            title: language.t("command.architecture.redo"),
+            keybind: "mod+shift+z",
+            when: graphEditorFocused,
+            onSelect: () => dispatchArchitectureCommand("redo"),
+          }),
+          viewCommand({
+            id: "architecture.delete",
+            title: language.t("command.architecture.delete"),
+            keybind: "backspace,delete",
+            when: graphEditorFocused,
+            onSelect: () => dispatchArchitectureCommand("delete"),
           }),
           viewCommand({
             id: "architecture.addNode",

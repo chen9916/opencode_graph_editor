@@ -8,7 +8,11 @@ export const englishFallbackKeys = new Set([
   "command.architecture.save",
   "command.architecture.reload",
   "command.architecture.fitView",
+  "command.architecture.undo",
+  "command.architecture.redo",
+  "command.architecture.delete",
   "command.architecture.addNode",
+  "settings.shortcuts.group.graphEditor",
 ])
 
 export function usesEnglishFallback(key: string) {

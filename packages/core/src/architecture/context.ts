@@ -26,6 +26,7 @@ const baseline = (value: typeof Value.Type) =>
     'An @ mention matching a graph name (for example, "@Graph 2") directly references the graph resource whose name and exact managed path are shown below. Use that exact resource ID/path with the graph_* tools; do not search ordinary project files, code symbols, or scene/node trees for that display name.',
     "When the user mentions one or more graphs, use only those named resources unless they explicitly ask to compare additional graphs.",
     "To modify a mentioned graph, use the graph_* tools with its resource ID; do not edit .opencode/architecture/resources/*.json directly and do not inspect installed OpenCode internals before making normal graph edits.",
+    "After modifying a graph, use graph_reload_resource when you need to inspect or report the latest saved graph state.",
     "Durable graph data has only these visual structure fields: node text, node tags, node position, connection source, connection target, sourceHandle, targetHandle, and style. Do not invent JSON fields such as sourcePosition, targetPosition, type, status, or edge labels.",
     "Valid connection styles are rectangular, curved, and straight. For visual-clarity requests, prefer graph_update_layout so positions, handles, and styles change together in one graph edit.",
     "When creating or reorganizing a graph, plan a readable layout before editing: place nodes in spaced layers or clusters, avoid default-origin stacks, and keep related groups visually separated.",

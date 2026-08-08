@@ -164,6 +164,32 @@ describe("ArchitectureTools", () => {
         edgeIDs: ["a-to-b"],
       })
 
+      const reloaded = yield* settleTool(registry, call(ArchitectureTools.names.reloadResource, { resourceID }))
+      expect(reloaded.output?.structured).toMatchObject({
+        resource: {
+          id: "product",
+          nodes: [
+            {
+              id: "a",
+              text: "Updated conversation",
+              tags: ["interaction", "planned"],
+              layout: { position: { x: -160, y: 80 } },
+            },
+            { id: "b", text: "Memory", tags: ["implemented"], layout: { position: { x: 0, y: 0 } } },
+          ],
+          edges: [
+            {
+              id: "a-to-b",
+              source: "a",
+              target: "b",
+              sourceHandle: "right",
+              targetHandle: "left",
+              style: "rectangular",
+            },
+          ],
+        },
+      })
+
       const queried = yield* settleTool(
         registry,
         call(ArchitectureTools.names.query, {
