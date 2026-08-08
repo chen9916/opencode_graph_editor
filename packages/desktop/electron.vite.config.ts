@@ -94,6 +94,11 @@ const require = __cjs_mod__.createRequire(import.meta.url);
     plugins: [appPlugin, sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
+    server: {
+      watch: {
+        ignored: [/(^|[/\\])\.opencode[/\\]architecture([/\\]|$)/],
+      },
+    },
     build: {
       sourcemap: true,
       rollupOptions: {

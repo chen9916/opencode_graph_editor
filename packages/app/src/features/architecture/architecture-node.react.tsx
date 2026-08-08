@@ -6,6 +6,14 @@ import { useRef, useState, type PointerEvent } from "react"
 import type { ArchitectureConnectionSide } from "./contract"
 import { architectureNodeClass, type ArchitectureFlowNode } from "./model"
 
+const connectionSides = ["top", "right", "bottom", "left"] as const satisfies ReadonlyArray<ArchitectureConnectionSide>
+const positions = {
+  top: Position.Top,
+  right: Position.Right,
+  bottom: Position.Bottom,
+  left: Position.Left,
+} as const satisfies Record<ArchitectureConnectionSide, Position>
+
 export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
   const node = props.data.node
   const [editing, setEditing] = useState(false)
@@ -49,28 +57,26 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
         setEditing(true)
       }}
     >
-      <Handle id="top" className="architecture-node__socket" data-side="top" type="source" position={Position.Top} />
-      <Handle
-        id="right"
-        className="architecture-node__socket"
-        data-side="right"
-        type="source"
-        position={Position.Right}
-      />
-      <Handle
-        id="bottom"
-        className="architecture-node__socket"
-        data-side="bottom"
-        type="source"
-        position={Position.Bottom}
-      />
-      <Handle
-        id="left"
-        className="architecture-node__socket"
-        data-side="left"
-        type="source"
-        position={Position.Left}
-      />
+      {connectionSides.flatMap((side) => [
+        <Handle
+          key={`${side}:target`}
+          id={side}
+          className="architecture-node__socket architecture-node__socket--target"
+          data-side={side}
+          type="target"
+          position={positions[side]}
+        />,
+        <Handle
+          key={`${side}:source`}
+          id={side}
+          className="architecture-node__socket architecture-node__socket--source"
+          data-side={side}
+          type="source"
+          position={positions[side]}
+        >
+          <span aria-hidden="true" />
+        </Handle>,
+      ])}
       {editing ? (
         <textarea
           className="architecture-node__text-input nodrag nowheel"

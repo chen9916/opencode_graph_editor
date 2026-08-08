@@ -32,6 +32,11 @@ export default [
         worker: {
           format: "es",
         },
+        server: {
+          watch: {
+            ignored: [/(^|[/\\])\.opencode[/\\]architecture([/\\]|$)/],
+          },
+        },
       }
     },
   },

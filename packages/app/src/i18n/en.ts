@@ -754,7 +754,6 @@ export const dict = {
   "architecture.confirm.deleteResource": "Delete this graph?",
   "architecture.toast.copied": "Pending graph patch copied.",
   "architecture.toast.saveFailed": "Graph changes could not be saved.",
-  "architecture.toast.saveSucceeded": "Graph changes saved.",
   "architecture.toast.resourceCreateFailed": "The graph could not be created.",
   "architecture.toast.resourceDeleteFailed": "The graph could not be deleted.",
   "command.architecture.open": "Open Graph editor",

@@ -146,4 +146,37 @@ describe("file watcher invalidation", () => {
 
     expect(refresh).toEqual([])
   })
+
+  test("ignores managed architecture storage updates", () => {
+    const refresh: string[] = []
+    const paths = [
+      ".opencode/architecture/resources/design.json",
+      ".opencode\\architecture\\resources\\design.json",
+      "E:\\repo\\.opencode\\architecture\\resources\\design.json",
+    ]
+
+    paths.forEach((file) =>
+      invalidateFromWatcher(
+        {
+          type: "file.watcher.updated",
+          properties: {
+            file,
+            event: "change",
+          },
+        },
+        {
+          normalize: (input) => input,
+          hasFile: () => true,
+          loadFile: () => {
+            throw new Error("should not load")
+          },
+          node: () => ({ path: file, type: "file", name: "design.json", absolute: file, ignored: false }),
+          isDirLoaded: () => true,
+          refreshDir: (path) => refresh.push(path),
+        },
+      ),
+    )
+
+    expect(refresh).toEqual([])
+  })
 })

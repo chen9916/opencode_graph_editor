@@ -32,6 +32,8 @@ const FOLDERS = new Set([
 ])
 
 const FILES = [
+  "**/.opencode/architecture",
+  "**/.opencode/architecture/**",
   "**/*.swp",
   "**/*.swo",
   "**/*.pyc",

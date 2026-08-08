@@ -17,6 +17,7 @@ import {
   type XYPosition,
   useEdgesState,
   useNodesState,
+  useUpdateNodeInternals,
 } from "@xyflow/react"
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react"
 import type {
@@ -95,6 +96,10 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const visibleNodes = editor.resource.nodes.filter((node) => nodeMatchesFilter(node, filter))
   const hasSelection = selection.nodeIDs.length > 0 || selection.edgeIDs.length > 0
   const filterActive = !!filter.text || !!filter.tag
+  const nodeIDsKey = editor.resource.nodes.map((node) => node.id).join(",")
+  const nodeInternalsKey = editor.resource.nodes
+    .map((node) => [node.id, node.layout.position.x, node.layout.position.y, node.text, ...node.tags].join("\u001f"))
+    .join("\u001e")
 
   const commit = (batch: ReadonlyArray<ArchitectureOperation>) => {
     if (batch.length === 0) return
@@ -440,8 +445,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         }
       : { x: 0, y: 0 }
     const velocity = {
-      x: viewportMotion.current.velocity.x * 0.55 + nextVelocity.x * 0.45,
-      y: viewportMotion.current.velocity.y * 0.55 + nextVelocity.y * 0.45,
+      x: viewportMotion.current.velocity.x * 0.35 + nextVelocity.x * 0.65,
+      y: viewportMotion.current.velocity.y * 0.35 + nextVelocity.y * 0.65,
     }
     viewportMotion.current = { active: true, last: { viewport, time }, velocity }
   }
@@ -454,8 +459,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     const speed = Math.hypot(motion.velocity.x, motion.velocity.y)
     if (speed < 0.04) return
     glideViewport(viewport, {
-      x: clamp(motion.velocity.x, -1.35, 1.35),
-      y: clamp(motion.velocity.y, -1.35, 1.35),
+      x: clamp(motion.velocity.x, -2.8, 2.8),
+      y: clamp(motion.velocity.y, -2.8, 2.8),
     })
   }
 
@@ -475,11 +480,11 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         zoom: current.zoom,
       }
       momentum = {
-        x: momentum.x * Math.exp(-delta / 360),
-        y: momentum.y * Math.exp(-delta / 360),
+        x: momentum.x * Math.exp(-delta / 150),
+        y: momentum.y * Math.exp(-delta / 150),
       }
       void flow.setViewport(current)
-      if (Math.hypot(momentum.x, momentum.y) < 0.012 || elapsed > 920) {
+      if (Math.hypot(momentum.x, momentum.y) < 0.025 || elapsed > 420) {
         viewportMotion.current = { active: false, velocity: { x: 0, y: 0 } }
         props.onViewport(current)
         return
@@ -747,6 +752,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             fitView={!props.viewport}
             proOptions={{ hideAttribution: true }}
           >
+            <NodeInternalsRefresh nodeIDs={nodeIDsKey} refreshKey={nodeInternalsKey} />
             <Background />
             <Controls position={controlsPosition} />
             {!props.mobile && <MiniMap position={minimapPosition} pannable zoomable />}
@@ -874,6 +880,21 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       </div>
     </div>
   )
+}
+
+function NodeInternalsRefresh(props: { readonly nodeIDs: string; readonly refreshKey: string }) {
+  const updateNodeInternals = useUpdateNodeInternals()
+  useLayoutEffect(() => {
+    const nodeIDs = props.nodeIDs.split(",").filter(Boolean)
+    if (nodeIDs.length === 0) return
+    if (typeof requestAnimationFrame !== "function") {
+      updateNodeInternals(nodeIDs)
+      return
+    }
+    const frame = requestAnimationFrame(() => updateNodeInternals(nodeIDs))
+    return () => cancelAnimationFrame(frame)
+  }, [props.nodeIDs, props.refreshKey, updateNodeInternals])
+  return null
 }
 
 function Inspector(props: {

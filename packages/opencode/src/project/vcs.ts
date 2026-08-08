@@ -20,6 +20,13 @@ const emptyPatch = (file: string) => formatPatch(structuredPatch(file, file, "",
 const nums = (list: Git.Stat[]) =>
   new Map(list.map((item) => [item.file, { additions: item.additions, deletions: item.deletions }] as const))
 
+const managedArchitecturePath = (file: string) => {
+  const normalized = file.replace(/\\/g, "/")
+  return normalized === ".opencode/architecture" || normalized.startsWith(".opencode/architecture/")
+}
+
+const visibleItems = (list: Git.Item[]) => list.filter((item) => !managedArchitecturePath(item.file))
+
 const merge = (...lists: Git.Item[][]) => {
   const out = new Map<string, Git.Item>()
   lists.flat().forEach((item) => {
@@ -93,6 +100,14 @@ const splitGitPatch = (patch: Git.Patch) => {
   if (!patch.truncated) return chunks
   return chunks.slice(0, -1)
 }
+
+const visiblePatchText = (patch: Git.Patch) =>
+  splitGitPatch(patch)
+    .filter((chunk) => {
+      const file = fileFromPatchChunk(chunk)
+      return !file || !managedArchitecturePath(file)
+    })
+    .join("\n")
 
 const batchPatches = Effect.fnUntraced(function* (
   git: Git.Interface,
@@ -208,16 +223,17 @@ const diffAgainstRef = Effect.fnUntraced(function* (
   const [list, stats, extra] = yield* Effect.all([git.diff(cwd, ref), git.stats(cwd, ref), git.status(cwd)], {
     concurrency: 3,
   })
+  const tracked = visibleItems(list)
   return yield* files(
     git,
     cwd,
     ref,
     merge(
-      list,
-      extra.filter((item) => item.code === "??"),
+      tracked,
+      visibleItems(extra.filter((item) => item.code === "??")),
     ),
     nums(stats),
-    yield* batchPatches(git, cwd, ref, list, options),
+    tracked.length === list.length ? yield* batchPatches(git, cwd, ref, tracked, options) : emptyBatch(),
     options,
   )
 })
@@ -228,7 +244,7 @@ const track = Effect.fnUntraced(function* (
   ref: string | undefined,
   options?: DiffOptions,
 ) {
-  if (!ref) return yield* files(git, cwd, ref, yield* git.status(cwd), new Map(), emptyBatch(), options)
+  if (!ref) return yield* files(git, cwd, ref, visibleItems(yield* git.status(cwd)), new Map(), emptyBatch(), options)
   return yield* diffAgainstRef(git, cwd, ref, options)
 })
 
@@ -355,7 +371,7 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
         )
         const map = nums(stats)
         return yield* Effect.forEach(
-          list.toSorted((a, b) => a.file.localeCompare(b.file)),
+          visibleItems(list).toSorted((a, b) => a.file.localeCompare(b.file)),
           (item) =>
             Effect.gen(function* () {
               const stat =
@@ -390,9 +406,9 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
         const [hasHead, status] = yield* Effect.all([git.hasHead(ctx.directory), git.status(ctx.directory)], {
           concurrency: 2,
         })
-        const tracked = hasHead ? (yield* git.patchAll(ctx.directory, "HEAD")).text : ""
+        const tracked = hasHead ? visiblePatchText(yield* git.patchAll(ctx.directory, "HEAD")) : ""
         const untracked = yield* Effect.forEach(
-          status.filter((item) => item.code === "??"),
+          visibleItems(status.filter((item) => item.code === "??")),
           (item) => git.patchUntracked(ctx.directory, item.file).pipe(Effect.map((patch) => patch.text)),
         )
         return [tracked, ...untracked].filter(Boolean).join("\n")

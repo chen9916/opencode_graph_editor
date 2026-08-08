@@ -47,6 +47,16 @@
   font: inherit;
 }
 
+.architecture-editor select option {
+  background-color: Canvas;
+  color: CanvasText;
+}
+
+.architecture-editor select option:checked {
+  background-color: Highlight;
+  color: HighlightText;
+}
+
 .architecture-editor button {
   padding-block: 5px;
   padding-inline: 8px;
@@ -468,6 +478,7 @@
 
 .architecture-node {
   --architecture-node-accent: var(--architecture-accent);
+  position: relative;
   min-inline-size: 148px;
   padding-block: 10px;
   padding-inline: 12px;
@@ -506,34 +517,79 @@
 }
 
 .architecture-node .react-flow__handle {
-  inline-size: 9px;
-  block-size: 9px;
-  border: 2px solid var(--color-v2-background-bg-raised, var(--color-background-stronger));
-  background: var(--architecture-node-accent);
-  opacity: 0;
+  inline-size: 12px;
+  block-size: 12px;
+  min-inline-size: 12px;
+  min-block-size: 12px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  opacity: 1;
   pointer-events: none;
-  scale: 0.36;
-  transition:
-    opacity 120ms ease 170ms,
-    scale 140ms ease 170ms;
 }
 
+.architecture-node .react-flow__handle-top {
+  inset-block-start: 0;
+  inset-inline-start: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.architecture-node .react-flow__handle-right {
+  inset-block-start: 50%;
+  inset-inline-end: 0;
+  transform: translate(50%, -50%);
+}
+
+.architecture-node .react-flow__handle-bottom {
+  inset-block-end: 0;
+  inset-inline-start: 50%;
+  transform: translate(-50%, 50%);
+}
+
+.architecture-node .react-flow__handle-left {
+  inset-block-start: 50%;
+  inset-inline-start: 0;
+  transform: translate(-50%, -50%);
+}
+
+.architecture-node__socket--source span {
+  position: absolute;
+  inline-size: 9px;
+  block-size: 9px;
+  display: block;
+  border: 2px solid var(--color-v2-background-bg-raised, var(--color-background-stronger));
+  border-radius: 999px;
+  background: var(--architecture-node-accent);
+  opacity: 0;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  transform: translate(-50%, -50%) scale(0.36);
+  transition:
+    opacity 120ms ease 170ms,
+    transform 140ms ease 170ms;
+}
+
+.architecture-editor .react-flow__handle.connectionindicator,
+.architecture-editor .react-flow__handle.connectingfrom,
 .architecture-node:hover .react-flow__handle {
-  opacity: 0.42;
   pointer-events: auto;
-  scale: 0.82;
+}
+
+.architecture-node:hover .architecture-node__socket--source span {
+  opacity: 0.42;
+  transform: translate(-50%, -50%) scale(0.82);
   transition-delay: 0ms;
 }
 
-.architecture-node[data-active-socket="top"] .react-flow__handle[data-side="top"],
-.architecture-node[data-active-socket="right"] .react-flow__handle[data-side="right"],
-.architecture-node[data-active-socket="bottom"] .react-flow__handle[data-side="bottom"],
-.architecture-node[data-active-socket="left"] .react-flow__handle[data-side="left"],
-.architecture-editor .react-flow__node.selected .architecture-node .react-flow__handle,
-.architecture-node[data-selected="true"] .react-flow__handle {
+.architecture-node[data-active-socket="top"] .architecture-node__socket--source[data-side="top"] span,
+.architecture-node[data-active-socket="right"] .architecture-node__socket--source[data-side="right"] span,
+.architecture-node[data-active-socket="bottom"] .architecture-node__socket--source[data-side="bottom"] span,
+.architecture-node[data-active-socket="left"] .architecture-node__socket--source[data-side="left"] span,
+.architecture-editor .react-flow__node.selected .architecture-node .architecture-node__socket--source span,
+.architecture-node[data-selected="true"] .architecture-node__socket--source span {
   opacity: 1;
-  pointer-events: auto;
-  scale: 1.2;
+  transform: translate(-50%, -50%) scale(1.2);
   transition-delay: 0ms;
 }
 

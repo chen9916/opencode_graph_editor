@@ -59,4 +59,9 @@ describe("electron vite publicDir", () => {
     expect(existsSync(resolved)).toBe(true)
     expect(existsSync(join(resolved, "oc-theme-preload.js"))).toBe(true)
   })
+
+  test("renderer dev watcher ignores managed architecture storage", async () => {
+    const config = await Bun.file(join(root, "electron.vite.config.ts")).text()
+    expect(config).toContain("ignored: [/(^|[/\\\\])\\.opencode[/\\\\]architecture([/\\\\]|$)/]")
+  })
 })

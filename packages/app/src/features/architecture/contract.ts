@@ -60,7 +60,6 @@ export type ArchitectureLabels = {
   readonly deleteSelectionConfirm: string
   readonly copied: string
   readonly saveFailed: string
-  readonly saveSucceeded: string
   readonly conflictReasons: Record<ArchitectureConflict["reason"], string>
 }
 

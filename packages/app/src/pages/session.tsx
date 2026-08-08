@@ -26,6 +26,7 @@ import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { debounce } from "@solid-primitives/scheduled"
 import { useLocal } from "@/context/local"
 import { FileProvider, selectionFromLines, useFile, type FileSelection, type SelectedLineRange } from "@/context/file"
+import { isIgnoredWatcherPath } from "@/context/file/watcher"
 import { createStore } from "solid-js/store"
 import type { SessionReviewLineComment } from "@opencode-ai/session-ui/session-review"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
@@ -972,8 +973,9 @@ export default function Page() {
       typeof details.properties === "object" && details.properties
         ? (details.properties as Record<string, unknown>)
         : undefined
-    const file = typeof props?.file === "string" ? props.file : undefined
-    if (!file || file.startsWith(".git/")) return
+    const rawFile = typeof props?.file === "string" ? props.file : undefined
+    const watchedPath = rawFile ? file.normalize(rawFile) : undefined
+    if (!watchedPath || isIgnoredWatcherPath(watchedPath)) return
     refreshVcs()
   })
   onCleanup(stopVcs)

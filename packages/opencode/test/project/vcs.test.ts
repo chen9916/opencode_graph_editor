@@ -237,6 +237,34 @@ describe("Vcs diff", () => {
   )
 
   it.instance(
+    "status(), diff('git'), and diffRaw() ignore managed architecture storage",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        yield* write(path.join(test.directory, "file.txt"), "original\n")
+        yield* write(path.join(test.directory, ".opencode", "architecture", "resources", "design.json"), "original\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "add files"])
+        yield* write(path.join(test.directory, "file.txt"), "changed\n")
+        yield* write(path.join(test.directory, "new.txt"), "new\n")
+        yield* write(path.join(test.directory, ".opencode", "architecture", "resources", "design.json"), "changed\n")
+        yield* write(path.join(test.directory, ".opencode", "architecture", "resources", "draft.json"), "draft\n")
+
+        const vcs = yield* init()
+        const status = yield* vcs.status()
+        const diff = yield* vcs.diff("git")
+        const raw = yield* vcs.diffRaw()
+
+        expect(status.map((item) => item.file)).toEqual(["file.txt", "new.txt"])
+        expect(diff.map((item) => item.file)).toEqual(["file.txt", "new.txt"])
+        expect(raw).toContain("file.txt")
+        expect(raw).toContain("new.txt")
+        expect(raw).not.toContain(".opencode/architecture")
+      }),
+    { git: true },
+  )
+
+  it.instance(
     "diff('git') handles special filenames",
     () =>
       Effect.gen(function* () {

@@ -26,7 +26,7 @@ export function invalidateFromWatcher(event: WatcherEvent, ops: WatcherOps) {
 
   const path = ops.normalize(rawPath)
   if (!path) return
-  if (path.startsWith(".git/")) return
+  if (isIgnoredWatcherPath(path)) return
 
   if (ops.hasFile(path) || ops.isOpen?.(path)) {
     ops.loadFile(path)
@@ -50,4 +50,20 @@ export function invalidateFromWatcher(event: WatcherEvent, ops: WatcherOps) {
   if (!ops.isDirLoaded(parent)) return
 
   ops.refreshDir(parent)
+}
+
+export function isIgnoredWatcherPath(input: string) {
+  const path = input.replace(/\\/g, "/")
+  if (path === ".git" || path.startsWith(".git/")) return true
+  return isManagedArchitecturePath(path)
+}
+
+export function isManagedArchitecturePath(input: string) {
+  const path = input.replace(/\\/g, "/")
+  return (
+    path === ".opencode/architecture" ||
+    path.startsWith(".opencode/architecture/") ||
+    path.endsWith("/.opencode/architecture") ||
+    path.includes("/.opencode/architecture/")
+  )
 }

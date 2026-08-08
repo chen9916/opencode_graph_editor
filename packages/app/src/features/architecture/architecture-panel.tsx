@@ -1,7 +1,8 @@
-import { createEffect, createMemo, onCleanup, Show } from "solid-js"
+import { batch, createEffect, createMemo, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { createQuery, useQueryClient } from "@tanstack/solid-query"
+import type { ArchitectureListResourcesOutput } from "@opencode-ai/client/promise"
 import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
 import { useServerArchitectureAvailable, useServerSDK } from "@/context/server-sdk"
@@ -25,9 +26,18 @@ import type {
   ArchitectureDraft,
   ArchitectureLabels,
   ArchitectureOperation,
+  ArchitectureSnapshot,
   ArchitectureViewport,
 } from "./contract"
+import {
+  architectureResourceEventInfo,
+  architectureSnapshotMatchesEvent,
+  architectureSummaryMatchesEvent,
+  beginArchitectureLocalSave,
+  isArchitectureLocalSaveEvent,
+} from "./event"
 import { rebaseOperations } from "./journal"
+import "./architecture-panel.css"
 
 export default function ArchitecturePanel() {
   const sdk = useSDK()
@@ -120,7 +130,6 @@ export default function ArchitecturePanel() {
     deleteSelectionConfirm: language.t("architecture.confirm.deleteSelection"),
     copied: language.t("architecture.toast.copied"),
     saveFailed: language.t("architecture.toast.saveFailed"),
-    saveSucceeded: language.t("architecture.toast.saveSucceeded"),
     conflictReasons: {
       changed: language.t("architecture.conflict.changed"),
       missing: language.t("architecture.conflict.missing"),
@@ -135,19 +144,43 @@ export default function ArchitecturePanel() {
 
   createEffect(() => {
     const current = sdk()
-    const invalidate = () => {
-      void queryClient.invalidateQueries({
-        queryKey: architectureResourcesQueryKey(current.url, current.directory),
-      })
-      const id = resourceID()
-      if (id)
-        void queryClient.invalidateQueries({
-          queryKey: architectureResourceQueryKey(current.url, current.directory, id),
-        })
-    }
     const unsubscribe = serverSDK().event.on(current.directory, (event) => {
       const type = String(event.type)
-      if (type === "architecture.resource.updated" || type === "architecture.resource.removed") invalidate()
+      const eventInfo = architectureResourceEventInfo({ type, properties: event.properties })
+      if (!eventInfo) return
+      const resourcesKey = architectureResourcesQueryKey(current.url, current.directory)
+      if (type === "architecture.resource.removed") {
+        queryClient.setQueryData(
+          resourcesKey,
+          (current: ArchitectureListResourcesOutput["data"] | undefined) =>
+            removeResourceSummary(current, eventInfo.resourceID),
+        )
+        setPersistedState("drafts", eventInfo.resourceID, undefined)
+        setPersistedState("viewports", eventInfo.resourceID, undefined)
+        if (persistedState.selectedID === eventInfo.resourceID) setPersistedState("selectedID", undefined)
+        return
+      }
+
+      const pending = isArchitectureLocalSaveEvent({
+        server: current.url,
+        directory: current.directory,
+        event: eventInfo,
+      })
+      if (!pending && !architectureSummaryMatchesEvent(queryClient.getQueryData(resourcesKey), eventInfo))
+        void queryClient.refetchQueries({
+          queryKey: resourcesKey,
+          exact: true,
+          type: "active",
+        })
+
+      if (eventInfo.resourceID !== resourceID()) return
+      const resourceKey = architectureResourceQueryKey(current.url, current.directory, eventInfo.resourceID)
+      if (!pending && !architectureSnapshotMatchesEvent(queryClient.getQueryData(resourceKey), eventInfo))
+        void queryClient.refetchQueries({
+          queryKey: resourceKey,
+          exact: true,
+          type: "active",
+        })
     })
     onCleanup(unsubscribe)
   })
@@ -186,29 +219,48 @@ export default function ArchitecturePanel() {
     const base = draft()?.base ?? resource.data
     if (!id || !base || operations.length === 0 || state.busy) return false
     setState("busy", true)
+    const finishLocalSave = beginArchitectureLocalSave({
+      server: sdk().url,
+      directory: sdk().directory,
+      resourceID: id,
+      revision: base.resource.revision + 1,
+    })
     try {
       const saved = await patchArchitectureResource(serverSDK().currentApi, sdk().directory, base, operations)
       const conflicts = draft()?.conflicts ?? []
-      setPersistedState("drafts", id, conflicts.length > 0 ? { base: saved, operations: [], conflicts } : undefined)
-      queryClient.setQueryData(architectureResourceQueryKey(sdk().url, sdk().directory, id), saved)
-      void resources.refetch()
-      showToast({ title: labels().saveSucceeded })
+      batch(() => {
+        queryClient.setQueryData(architectureResourceQueryKey(sdk().url, sdk().directory, id), saved)
+        queryClient.setQueryData(
+          architectureResourcesQueryKey(sdk().url, sdk().directory),
+          (current: ArchitectureListResourcesOutput["data"] | undefined) =>
+            updateResourceSummaries(current, resourceSummary(saved)),
+        )
+        setPersistedState("drafts", id, conflicts.length > 0 ? { base: saved, operations: [], conflicts } : undefined)
+      })
       return true
     } catch (error) {
       if (isConflict(error)) {
         const latest = await loadArchitectureResource(serverSDK().currentApi, sdk().directory, id)
         const rebased = rebaseOperations(base.resource, latest.resource, operations)
-        setPersistedState("drafts", id, {
-          base: latest,
-          operations: rebased.operations,
-          conflicts: [...(draft()?.conflicts ?? []), ...rebased.conflicts],
+        batch(() => {
+          queryClient.setQueryData(architectureResourceQueryKey(sdk().url, sdk().directory, id), latest)
+          queryClient.setQueryData(
+            architectureResourcesQueryKey(sdk().url, sdk().directory),
+            (current: ArchitectureListResourcesOutput["data"] | undefined) =>
+              updateResourceSummaries(current, resourceSummary(latest)),
+          )
+          setPersistedState("drafts", id, {
+            base: latest,
+            operations: rebased.operations,
+            conflicts: [...(draft()?.conflicts ?? []), ...rebased.conflicts],
+          })
         })
-        queryClient.setQueryData(architectureResourceQueryKey(sdk().url, sdk().directory, id), latest)
       } else {
         showToast({ variant: "error", title: labels().saveFailed })
       }
       return false
     } finally {
+      finishLocalSave()
       setState("busy", false)
     }
   }
@@ -276,6 +328,11 @@ export default function ArchitecturePanel() {
       setState("busy", true)
       void removeArchitectureResource(serverSDK().currentApi, sdk().directory, current)
         .then(async () => {
+          queryClient.setQueryData(
+            architectureResourcesQueryKey(sdk().url, sdk().directory),
+            (list: ArchitectureListResourcesOutput["data"] | undefined) =>
+              removeResourceSummary(list, current.resource.id),
+          )
           setPersistedState("drafts", current.resource.id, undefined)
           setPersistedState("viewports", current.resource.id, undefined)
           setPersistedState("selectedID", undefined)
@@ -314,7 +371,7 @@ export default function ArchitecturePanel() {
       >
         <header class="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-v2-border-subtle">
           <select
-            class="min-w-0 flex-1 rounded-md border border-v2-border-subtle bg-v2-background-bg-raised px-2 py-1"
+            class="architecture-panel__resource-select min-w-0 flex-1 rounded-md border border-v2-border-subtle bg-v2-background-bg-raised px-2 py-1"
             aria-label={language.t("architecture.resource.select")}
             value={resourceID() ?? ""}
             onChange={(event) => setPersistedState("selectedID", event.currentTarget.value)}
@@ -393,6 +450,32 @@ function ArchitectureMessage(props: { readonly value: string }) {
       <div class="max-w-80 text-13-regular text-v2-text-muted">{props.value}</div>
     </div>
   )
+}
+
+function resourceSummary(snapshot: ArchitectureSnapshot): ArchitectureListResourcesOutput["data"][number] {
+  return {
+    id: snapshot.resource.id,
+    name: snapshot.resource.name,
+    revision: snapshot.resource.revision,
+    digest: snapshot.digest,
+    nodes: snapshot.resource.nodes.length,
+    edges: snapshot.resource.edges.length,
+  }
+}
+
+function updateResourceSummaries(
+  current: ArchitectureListResourcesOutput["data"] | undefined,
+  summary: ArchitectureListResourcesOutput["data"][number],
+) {
+  const list = current ?? []
+  const next = list.some((item) => item.id === summary.id)
+    ? list.map((item) => (item.id === summary.id ? summary : item))
+    : [...list, summary]
+  return next.toSorted((left, right) => left.name.localeCompare(right.name))
+}
+
+function removeResourceSummary(current: ArchitectureListResourcesOutput["data"] | undefined, resourceID: string) {
+  return current?.filter((item) => item.id !== resourceID)
 }
 
 function isConflict(value: unknown) {
