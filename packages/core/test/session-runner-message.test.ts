@@ -43,12 +43,66 @@ describe("toLLMMessages", () => {
           { type: "text", text: "Review @Design 1" },
           {
             type: "text",
-            text: "Architecture graph reference: @Design 1 identifies the managed Architecture resource with ID design-1. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.",
+            text: "Architecture graph reference: @Design 1 identifies the managed Architecture resource with ID design-1 at .opencode/architecture/resources/design-1.json. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.",
           },
         ],
         metadata: {},
       }),
     ])
+  })
+
+  test("recognizes legacy architecture references stored only on the source path", () => {
+    const base = FileAttachment.make({
+      uri: "data:application/json;base64,e30=",
+      mime: "application/json",
+      name: "design-1.json",
+      source: { text: "@Design 1", start: 0, end: 9 },
+    })
+    const legacy = { ...base, source: { ...base.source!, path: ".opencode/architecture/resources/design-1.json" } }
+    const message = SessionMessage.User.make({
+      id: id("legacy_architecture"),
+      type: "user",
+      text: "Review @Design 1",
+      files: [],
+      time: { created },
+    })
+    const messages = toLLMMessages(
+      [
+        {
+          ...message,
+          files: [legacy],
+        },
+      ],
+      model,
+    )
+
+    expect(messages[0]?.content).toContainEqual({
+      type: "text",
+      text: "Architecture graph reference: @Design 1 identifies the managed Architecture resource with ID design-1 at .opencode/architecture/resources/design-1.json. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.",
+    })
+  })
+
+  test("falls back to the file URI when a legacy source path is unrelated", () => {
+    const base = FileAttachment.make({
+      uri: "file:///repo/.opencode/architecture/resources/design-2.json",
+      mime: "application/json",
+      name: "design-2.json",
+      source: { text: "@Design 2", start: 0, end: 9 },
+    })
+    const legacy = { ...base, source: { ...base.source!, path: "src/design-2.json" } }
+    const message = SessionMessage.User.make({
+      id: id("architecture_uri_fallback"),
+      type: "user",
+      text: "Review @Design 2",
+      files: [],
+      time: { created },
+    })
+    const messages = toLLMMessages([{ ...message, files: [legacy] }], model)
+
+    expect(messages[0]?.content).toContainEqual({
+      type: "text",
+      text: "Architecture graph reference: @Design 2 identifies the managed Architecture resource with ID design-2 at .opencode/architecture/resources/design-2.json. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.",
+    })
   })
 
   test("omits empty assistant turns", () => {

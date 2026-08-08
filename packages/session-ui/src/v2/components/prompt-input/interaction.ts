@@ -116,7 +116,7 @@ export function createPromptInputV2Controller(input: {
       return [...fixed, ...recent, ...files]
     },
     key: (item) => item.id,
-    filterKeys: ["label"],
+    filterKeys: ["label", "search", "path", "description"],
     skipFilter: (item) => item.kind === "file" && !item.recent,
     groupBy: (item) => {
       if (item.kind === "reference") return "reference"

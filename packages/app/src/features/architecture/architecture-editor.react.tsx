@@ -50,6 +50,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const initial = props.draft?.operations ?? []
   const initialKey = `${base.resource.id}:${base.digest}:${initial.map((operation) => operation.id).join(":")}`
   const loaded = useRef(initialKey)
+  const loadedResourceID = useRef(base.resource.id)
   const canvas = useRef<HTMLDivElement>(null)
   const outlineID = useId()
   const inspectorID = useId()
@@ -140,17 +141,20 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
 
   useEffect(() => {
     if (loaded.current === initialKey) return
+    const resourceChanged = loadedResourceID.current !== base.resource.id
     loaded.current = initialKey
+    loadedResourceID.current = base.resource.id
     setEditor({
       resource: applyOperations(base.resource, initial),
       past: initial.map((operation) => [operation]),
       future: [],
     })
+    if (!resourceChanged) return
     select(undefined)
     setContextMenu(undefined)
     setOutlineOpen(false)
     setInspectorOpen(false)
-  }, [base.digest, initialKey])
+  }, [base.digest, base.resource.id, initialKey])
 
   useEffect(() => {
     setEdgeStyles(props.edgeStyles)

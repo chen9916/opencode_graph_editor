@@ -188,12 +188,15 @@ const layer = Layer.effect(
       return yield* new ArchitecturePatch.NotFoundError({ entity: "resource", id })
     })
 
+    const resourcePath = (resourceID: Architecture.ResourceID) =>
+      `.opencode/architecture/resources/${resourceID}.json`
+
     const snapshot = (storage: ArchitectureRoot.Info, resource: Architecture.Resource) => ({
       resource: ArchitecturePatch.normalize(resource),
       digest: ArchitecturePatch.digest(resource),
       storage: {
         root: storage.root,
-        path: RelativePath.make(`.opencode/architecture/resources/${resource.id}.json`),
+        path: RelativePath.make(resourcePath(resource.id)),
       },
     })
 
@@ -512,7 +515,7 @@ const layer = Layer.effect(
             .slice(0, 50)
             .map(
               (node) =>
-                `- ${node.id}: ${node.text.replace(/\s+/g, " ")}${node.tags.length ? ` [${node.tags.join(", ")}]` : ""}`,
+                `- ${node.id}: ${node.text.replace(/\s+/g, " ")}${node.tags.length ? ` [${node.tags.join(", ")}]` : ""} (position: ${node.layout.position.x}, ${node.layout.position.y})`,
             )
           const edges = resource.edges
             .slice(0, 75)
@@ -520,8 +523,14 @@ const layer = Layer.effect(
               (edge) =>
                 `- ${edge.source}.${edge.sourceHandle ?? "right"} -> ${edge.target}.${edge.targetHandle ?? "left"}`,
             )
+          const compactMention = `@${resource.name.replace(/\s+/g, "")}`
+          const lowerCompactMention = compactMention.toLowerCase()
+          const aliases =
+            compactMention === `@${resource.name}`
+              ? ""
+              : `; mention aliases: ${compactMention}${lowerCompactMention === compactMention ? "" : `, ${lowerCompactMention}`}`
           return [
-            `Architecture resource @${resource.name} (resource ID: ${resource.id}; revision ${resource.revision}; digest ${ArchitecturePatch.digest(resource).slice(0, 12)})`,
+            `Architecture resource @${resource.name} (resource ID: ${resource.id}; path: ${resourcePath(resource.id)}${aliases}; revision ${resource.revision}; digest ${ArchitecturePatch.digest(resource).slice(0, 12)})`,
             ...(nodes.length > 0 ? ["Elements:", ...nodes] : []),
             ...(resource.nodes.length > nodes.length ? ["- additional elements omitted"] : []),
             ...(edges.length > 0 ? ["Relationships:", ...edges] : []),

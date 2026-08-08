@@ -2,15 +2,27 @@ export function architectureResourcePath(resourceID: string) {
   return `.opencode/architecture/resources/${resourceID}.json`
 }
 
+export function architectureResourceAliases(resource: { name: string }) {
+  const compact = resource.name.replace(/\s+/g, "")
+  if (compact === resource.name) return [resource.name]
+  return [resource.name, compact, compact.toLowerCase()]
+}
+
 export function architectureResourceMention(resource: { id: string; name: string }) {
+  const path = architectureResourcePath(resource.id)
+  const content = `@${resource.name}`
   return {
     type: "file" as const,
-    path: architectureResourcePath(resource.id),
-    content: `@${resource.name}`,
+    path,
+    content,
     start: 0,
     end: 0,
-    // The composer uses a file pill, while submission keeps this managed graph reference as visible text only.
-    mime: "text/plain",
+    mime: "application/json",
     filename: `${resource.id}.json`,
+    source: {
+      type: "file" as const,
+      text: { value: content, start: 0, end: content.length },
+      path,
+    },
   }
 }

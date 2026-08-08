@@ -58,7 +58,8 @@ const layer = Layer.effectDiscard(
     const register = {
       [names.listResources]: Tool.withPermission(
         Tool.make({
-          description: "List the project's saved architecture graphs available to people and agents.",
+          description:
+            "List the project's saved Architecture graph resources, including the resource IDs that correspond to @graph mentions. Use this instead of searching workspace files for graph display names.",
           input: Schema.Struct({}),
           output: Schema.Array(Architecture.ResourceSummary),
           toModelOutput: ({ output }) => [{ type: "text", text: JSON.stringify(output) }],
@@ -136,7 +137,8 @@ const layer = Layer.effectDiscard(
       ),
       [names.query]: Tool.withPermission(
         Tool.make({
-          description: "Query saved architecture graphs by graph, node ID, text, or node tags.",
+          description:
+            "Query saved Architecture graph resources by resource ID, node ID, text, or node tags. Use this for user mentions like @Graph 1 after resolving the resource ID/path from Architecture context, rather than reading JSON files directly.",
           input: Architecture.QueryInput,
           output: Architecture.QueryResult,
           toModelOutput: ({ output }) => [{ type: "text", text: JSON.stringify(output) }],
@@ -150,7 +152,8 @@ const layer = Layer.effectDiscard(
       ),
       [names.createNode]: Tool.withPermission(
         Tool.make({
-          description: "Create a text node with optional free-form tags in a named architecture graph.",
+          description:
+            "Create a text node with optional free-form tags in a managed Architecture graph identified by resourceID. Provide deliberate positions that form readable spaced layers or clusters instead of leaving nodes at the default origin.",
           input: Schema.Struct({
             resourceID: Architecture.ResourceID,
             id: Architecture.NodeID.pipe(Schema.optional),
@@ -189,7 +192,8 @@ const layer = Layer.effectDiscard(
       ),
       [names.updateNode]: Tool.withPermission(
         Tool.make({
-          description: "Edit a node's text, tags, or position in an architecture graph.",
+          description:
+            "Edit a node's text, tags, or position in a managed Architecture graph identified by resourceID. Use position updates to improve readability and separate crowded nodes.",
           input: Schema.Struct({
             resourceID: Architecture.ResourceID,
             nodeID: Architecture.NodeID,
@@ -290,7 +294,8 @@ const layer = Layer.effectDiscard(
       ),
       [names.connectNodes]: Tool.withPermission(
         Tool.make({
-          description: "Connect two nodes from explicit source and target sides in the same architecture graph.",
+          description:
+            "Connect two nodes from explicit source and target sides in the same managed Architecture graph. Choose sourceHandle and targetHandle sides to reduce crossing or overlapping wires; vary top/right/bottom/left handles for fan-out, feedback, and cross-cluster links instead of routing everything right-to-left.",
           input: Schema.Struct({
             resourceID: Architecture.ResourceID,
             id: Architecture.EdgeID.pipe(Schema.optional),
@@ -331,7 +336,8 @@ const layer = Layer.effectDiscard(
       ),
       [names.updateConnection]: Tool.withPermission(
         Tool.make({
-          description: "Change a connection's nodes or exact source and target sides in an architecture graph.",
+          description:
+            "Change a connection's nodes or exact source and target sides in a managed Architecture graph. Re-route crowded diagrams by changing sourceHandle and targetHandle.",
           input: Schema.Struct({
             resourceID: Architecture.ResourceID,
             edgeID: Architecture.EdgeID,
@@ -425,7 +431,8 @@ const layer = Layer.effectDiscard(
       ),
       [names.getContext]: Tool.withPermission(
         Tool.make({
-          description: "Return a bounded text summary of selected or all saved architecture graphs.",
+          description:
+            "Return a bounded text summary of selected or all saved Architecture graph resources, including their exact managed file paths.",
           input: Schema.Struct({ resourceIDs: Schema.Array(Architecture.ResourceID).pipe(Schema.optional) }),
           output: Schema.String,
           execute: (input, context) =>

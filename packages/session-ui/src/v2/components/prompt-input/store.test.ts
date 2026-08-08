@@ -105,6 +105,40 @@ describe("prompt input v2 store", () => {
     expect(prompt.state.model).toBeUndefined()
   })
 
+  test("replaces compact graph aliases with structured mentions that include spaces", () => {
+    const [state, setState] = createStore<PromptInputV2PersistedState>({
+      prompt: [{ type: "text", content: "update @graph1", start: 0, end: 14 }],
+      cursor: 14,
+      context: { items: [] },
+    })
+    const prompt = createPromptInputV2Store([state, setState])
+
+    prompt.addMention({
+      type: "file",
+      path: ".opencode/architecture/resources/design-1.json",
+      content: "@Graph 1",
+      start: 0,
+      end: 0,
+      mime: "application/json",
+      filename: "design-1.json",
+    })
+
+    expect(prompt.state.prompt).toEqual([
+      { type: "text", content: "update ", start: 0, end: 7 },
+      {
+        type: "file",
+        path: ".opencode/architecture/resources/design-1.json",
+        content: "@Graph 1",
+        start: 7,
+        end: 15,
+        mime: "application/json",
+        filename: "design-1.json",
+      },
+      { type: "text", content: " ", start: 15, end: 16 },
+    ])
+    expect(prompt.state.cursor).toBe(16)
+  })
+
   test("resets the prompt and cursor", () => {
     const prompt = createPromptStore()
 

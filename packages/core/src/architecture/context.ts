@@ -18,6 +18,19 @@ const Value = Schema.Struct({
   summary: Schema.String,
 })
 
+const emptySummary = "No Architecture graph resources exist yet."
+const baseline = (value: typeof Value.Type) =>
+  [
+    "Architecture graphs are lightweight communication artifacts shared by people and AI, not generated implementation truth. Preserve their authored meaning.",
+    "When the user asks to create an architecture graph or design, use the Architecture graph tools to create a managed graph resource.",
+    'An @ mention matching a graph name (for example, "@Graph 2") directly references the Architecture resource whose name and exact managed path are shown below. Use that exact resource ID/path with the Architecture tools; do not search ordinary project files, code symbols, or scene/node trees for that display name.',
+    "When the user mentions one or more graphs, use only those named resources unless they explicitly ask to compare additional graphs.",
+    "To modify a mentioned graph, use the Architecture graph tools with its resource ID; do not inspect the JSON schema or installed OpenCode internals before making normal node and connection edits.",
+    "When creating or reorganizing a graph, plan a readable layout before editing: place nodes in spaced layers or clusters, avoid default-origin stacks, and keep related groups visually separated.",
+    "Use the durable routing controls available to agents: node positions plus connection sourceHandle/targetHandle sides (top, right, bottom, left). Vary sides for fan-out, feedback, and cross-cluster links so wires do not stack, cross, or overlap unnecessarily.",
+    value.summary,
+  ].join("\n")
+
 const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const graph = yield* ArchitectureGraph.Service
@@ -26,29 +39,23 @@ const layer = Layer.effectDiscard(
       key: SystemContext.Key.make("architecture/registration"),
       load: graph.list().pipe(
         Effect.flatMap((resources) => {
-          if (resources.length === 0) return Effect.succeed(SystemContext.empty)
-          return graph.context().pipe(
+          const value = (summary: string) => ({
+            resources: resources.map((resource) => ({
+              id: resource.id,
+              revision: resource.revision,
+              digest: resource.digest,
+            })),
+            summary,
+          })
+          return (resources.length === 0 ? Effect.succeed(emptySummary) : graph.context()).pipe(
             Effect.map((summary) =>
               SystemContext.make({
                 key: SystemContext.Key.make("architecture/resources"),
                 codec: Schema.toCodecJson(Value),
-                load: Effect.succeed({
-                  resources: resources.map((resource) => ({
-                    id: resource.id,
-                    revision: resource.revision,
-                    digest: resource.digest,
-                  })),
-                  summary,
-                }),
-                baseline: (value) =>
-                  [
-                    "Architecture graphs are lightweight communication artifacts shared by people and AI, not generated implementation truth. Preserve their authored meaning.",
-                    'An @ mention matching a graph name (for example, "@Graph 2") directly references the Architecture resource whose name is shown below. Resolve it here or with the Architecture tools; do not search ordinary project files, code symbols, or scene/node trees for that display name.',
-                    "When the user mentions one or more graphs, use only those named resources unless they explicitly ask to compare additional graphs.",
-                    value.summary,
-                  ].join("\n"),
+                load: Effect.succeed(value(summary)),
+                baseline,
                 update: (_previous, value) => `The project's architecture graphs changed:\n${value.summary}`,
-                removed: () => "The project no longer has architecture graphs.",
+                removed: () => "Architecture graph context is unavailable.",
               }),
             ),
           )

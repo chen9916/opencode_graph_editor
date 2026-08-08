@@ -61,6 +61,12 @@ describe("ArchitectureTools", () => {
       expect((yield* toolDefinitions(registry)).map((tool) => tool.name).toSorted()).toEqual(
         Object.values(ArchitectureTools.names).toSorted(),
       )
+      expect((yield* toolDefinitions(registry)).map((tool) => tool.description).join("\n")).toContain(
+        "Use this instead of searching workspace files",
+      )
+      expect((yield* toolDefinitions(registry)).map((tool) => tool.description).join("\n")).toContain(
+        "sourceHandle and targetHandle sides to reduce crossing or overlapping wires",
+      )
 
       yield* settleTool(
         registry,
@@ -158,6 +164,7 @@ describe("ArchitectureTools", () => {
 
       const context = yield* settleTool(registry, call(ArchitectureTools.names.getContext, {}))
       expect(context.output?.structured).toContain("Updated conversation [interaction, planned]")
+      expect(context.output?.structured).toContain(".opencode/architecture/resources/product.json")
       expect(context.output?.structured).toContain("a.left -> b.right")
       expect(context.output?.structured).toContain("details")
       expect(assertions.every((item) => item.resources[0]?.startsWith(".opencode/architecture/resources"))).toBe(true)

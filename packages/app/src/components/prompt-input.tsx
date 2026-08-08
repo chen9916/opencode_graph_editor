@@ -82,7 +82,11 @@ import { createPromptInputTransientState } from "./prompt-input/transient-state"
 import { showToast } from "@/utils/toast"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
-import { architectureResourceMention, architectureResourcePath } from "@/features/architecture/mention"
+import {
+  architectureResourceAliases,
+  architectureResourceMention,
+  architectureResourcePath,
+} from "@/features/architecture/mention"
 import { useArchitectureResourceMentions } from "@/features/architecture/mentions"
 
 export { createPromptInputHistory }
@@ -610,6 +614,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         name: resource.name,
         path: architectureResourcePath(resource.id),
         display: resource.name,
+        search: architectureResourceAliases(resource).join(" "),
         description: `Architecture graph · ${resource.id}`,
       }),
     ),
@@ -691,7 +696,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       return [...references, ...agents, ...architecture, ...mcpResources, ...pinned, ...fileOptions]
     },
     key: atKey,
-    filterKeys: ["display"],
+    filterKeys: ["display", "search", "path", "description"],
     skipFilter: (item) => item.type === "file" && !item.recent,
     groupBy: (item) => {
       if (item.type === "reference") return "reference"
@@ -1020,7 +1025,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     const shellMode = store.mode === "shell"
 
     if (!shellMode) {
-      const atMatch = rawText.substring(0, cursorPosition).match(/@(\S*)$/)
+      const atMatch = rawText.substring(0, cursorPosition).match(/@([^\n@]*)$/)
       const slashMatch = rawText.match(/^\/(\S*)$/)
 
       if (atMatch) {
@@ -1066,7 +1071,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         .map((p) => ("content" in p ? p.content : ""))
         .join("")
       const textBeforeCursor = rawText.substring(0, cursorPosition)
-      const atMatch = textBeforeCursor.match(/@(\S*)$/)
+      const atMatch = textBeforeCursor.match(/@([^\n@]*)$/)
       const pill = createPill(part)
       const gap = document.createTextNode(" ")
 

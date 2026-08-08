@@ -19,17 +19,34 @@ const media = (file: FileAttachment): ContentPart => ({
 })
 
 const isArchitectureResource = (file: FileAttachment) => {
-  const value = URL.canParse(file.uri) ? new URL(file.uri).pathname : file.uri
-  return value.replaceAll("\\", "/").includes(".opencode/architecture/resources/")
+  return architecturePath(file) !== undefined
 }
 
 const architectureReference = (file: FileAttachment): ContentPart => {
   const mention = file.source?.text.trim() || file.name?.replace(/\.json$/i, "") || "the referenced graph"
-  const resourceID = file.name?.replace(/\.json$/i, "")
+  const managedPath = architecturePath(file)
+  const resourceID = (file.name ?? managedPath?.split("/").at(-1))?.replace(/\.json$/i, "")
   return {
     type: "text",
-    text: `Architecture graph reference: ${mention} identifies the managed Architecture resource${resourceID ? ` with ID ${resourceID}` : ""}. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.`,
+    text: `Architecture graph reference: ${mention} identifies the managed Architecture resource${resourceID ? ` with ID ${resourceID}` : ""}${managedPath ? ` at ${managedPath}` : ""}. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.`,
   }
+}
+
+const architecturePath = (file: FileAttachment) => {
+  const source = file.source as { readonly path?: unknown } | undefined
+  const sourcePath = typeof source?.path === "string" ? managedPath(source.path) : undefined
+  if (sourcePath) return sourcePath
+
+  const value = URL.canParse(file.uri) ? new URL(file.uri).pathname : file.uri
+  return managedPath(value)
+}
+
+const managedPath = (value: string) => {
+  const normalized = value.replaceAll("\\", "/")
+  const marker = ".opencode/architecture/resources/"
+  const index = normalized.indexOf(marker)
+  if (index >= 0) return normalized.slice(index)
+  return undefined
 }
 
 const toolInput = (tool: SessionMessage.AssistantTool) => {

@@ -26,7 +26,11 @@ import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { showToast } from "@/utils/toast"
-import { architectureResourceMention, architectureResourcePath } from "@/features/architecture/mention"
+import {
+  architectureResourceAliases,
+  architectureResourceMention,
+  architectureResourcePath,
+} from "@/features/architecture/mention"
 import { useArchitectureResourceMentions } from "@/features/architecture/mentions"
 import { PromptInputV2, type PromptInputV2Suggestion } from "@opencode-ai/session-ui/v2/prompt-input"
 import {
@@ -277,6 +281,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       id: `architecture:${resource.id}`,
       kind: "resource",
       label: `@${resource.name}`,
+      search: architectureResourceAliases(resource).join(" "),
       path: architectureResourcePath(resource.id),
       description: `Architecture graph · ${resource.id}`,
       mention: architectureResourceMention(resource),

@@ -93,7 +93,7 @@ function inputChanged(
       { type: "draft.setText", value: "" },
     ])
   }
-  const context = value.slice(0, cursor ?? value.length).match(/(?:^|\s)@([^\s@]*)$/)
+  const context = value.slice(0, cursor ?? value.length).match(/(?:^|\s)@([^\n@]*)$/)
   if (context) {
     const query = context[1] ?? ""
     return changed({ ...state, popover: { type: "context", query }, focus: "editor" }, [

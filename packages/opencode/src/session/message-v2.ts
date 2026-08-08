@@ -53,19 +53,31 @@ function truncateToolOutput(text: string, maxChars?: number) {
 }
 
 function isArchitectureResource(part: SessionV1.FilePart) {
-  if (part.source && "path" in part.source && architectureResourcePath(part.source.path)) return true
-  return architectureResourcePath(part.url)
+  return architectureResourcePath(part) !== undefined
 }
 
-function architectureResourcePath(input: string) {
-  const value = URL.canParse(input) ? new URL(input).pathname : input
-  return value.replaceAll("\\", "/").includes(".opencode/architecture/resources/")
+function architectureResourcePath(part: SessionV1.FilePart) {
+  if (part.source && "path" in part.source) {
+    const sourcePath = managedArchitecturePath(part.source.path)
+    if (sourcePath) return sourcePath
+  }
+  const value = URL.canParse(part.url) ? new URL(part.url).pathname : part.url
+  return managedArchitecturePath(value)
+}
+
+function managedArchitecturePath(input: string) {
+  const normalized = input.replaceAll("\\", "/")
+  const marker = ".opencode/architecture/resources/"
+  const index = normalized.indexOf(marker)
+  if (index >= 0) return normalized.slice(index)
+  return undefined
 }
 
 function architectureReference(part: SessionV1.FilePart) {
   const mention = part.source && "text" in part.source ? part.source.text.value.trim() : ""
-  const resourceID = part.filename?.replace(/\.json$/i, "")
-  return `Architecture graph reference: ${mention || resourceID || "the referenced graph"} identifies the managed Architecture resource${resourceID ? ` with ID ${resourceID}` : ""}. Resolve it through Architecture context or tools; do not search ordinary project files or scene/node names for this graph display name.`
+  const managedPath = architectureResourcePath(part)
+  const resourceID = (part.filename ?? managedPath?.split("/").at(-1))?.replace(/\.json$/i, "")
+  return `Architecture graph reference: ${mention || resourceID || "the referenced graph"} identifies the managed Architecture resource${resourceID ? ` with ID ${resourceID}` : ""}${managedPath ? ` at ${managedPath}` : ""}. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.`
 }
 
 export const Event = {

@@ -26,11 +26,15 @@ describe("ArchitectureContext", () => {
       const graph = yield* ArchitectureGraph.Service
       const registry = yield* SystemContextRegistry.Service
 
-      expect(yield* SystemContext.initialize(yield* registry.load())).toEqual({ baseline: "", snapshot: {} })
+      const empty = yield* SystemContext.initialize(yield* registry.load())
+      expect(empty.baseline).toContain("Architecture graphs are lightweight communication artifacts")
+      expect(empty.baseline).toContain("create a managed graph resource")
+      expect(empty.baseline).toContain("plan a readable layout")
+      expect(empty.baseline).toContain("No Architecture graph resources exist yet.")
 
       const base = yield* graph.create({
         id: Architecture.ResourceID.make("product"),
-        name: "Product intent",
+        name: "Graph 1",
       })
       const saved = yield* graph.patch(base.resource.id, {
         revision: base.resource.revision,
@@ -50,9 +54,15 @@ describe("ArchitectureContext", () => {
       })
       const initialized = yield* SystemContext.initialize(yield* registry.load())
       expect(initialized.baseline).toContain("lightweight communication artifacts")
-      expect(initialized.baseline).toContain("@Product intent (resource ID: product")
+      expect(initialized.baseline).toContain(
+        "@Graph 1 (resource ID: product; path: .opencode/architecture/resources/product.json",
+      )
+      expect(initialized.baseline).toContain("mention aliases: @Graph1, @graph1")
       expect(initialized.baseline).toContain("do not search ordinary project files")
+      expect(initialized.baseline).toContain("use the Architecture graph tools with its resource ID")
+      expect(initialized.baseline).toContain("Vary sides for fan-out")
       expect(initialized.baseline).toContain("Conversation [planned, user experience]")
+      expect(initialized.baseline).toContain("(position: 0, 0)")
 
       const current = saved.resource.nodes[0]!
       const changed = yield* graph.patch(saved.resource.id, {

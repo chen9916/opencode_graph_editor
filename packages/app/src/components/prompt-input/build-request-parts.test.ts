@@ -135,7 +135,7 @@ describe("buildRequestParts", () => {
     }
   })
 
-  test("keeps architecture graph mentions as text without model media", () => {
+  test("keeps architecture graph mentions as managed session references", () => {
     const result = buildRequestParts({
       prompt: [
         {
@@ -156,8 +156,26 @@ describe("buildRequestParts", () => {
       sessionDirectory: "/repo",
     })
 
-    expect(result.requestParts).toHaveLength(1)
+    expect(result.requestParts).toHaveLength(2)
     expect(result.requestParts[0]).toMatchObject({ type: "text", text: "@Design 1" })
+    expect(result.requestParts[1]).toMatchObject({
+      type: "file",
+      mime: "application/json",
+      filename: "design-1.json",
+      source: {
+        type: "file",
+        text: { value: "@Design 1", start: 0, end: 9 },
+        path: "/repo/.opencode/architecture/resources/design-1.json",
+      },
+    })
+    expect(result.optimisticParts[1]).toMatchObject({
+      type: "file",
+      filename: "design-1.json",
+      source: {
+        type: "file",
+        text: { value: "@Design 1", start: 0, end: 9 },
+      },
+    })
   })
 
   test("deduplicates context files when prompt already includes same path", () => {

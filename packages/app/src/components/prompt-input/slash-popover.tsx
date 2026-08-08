@@ -13,11 +13,12 @@ export type AtOption =
       uri: string
       client: string
       display: string
+      search?: string
       description?: string
       mime?: string
     }
   | { type: "reference"; name: string; path: string; display: string; description: string }
-  | { type: "architecture"; id: string; name: string; path: string; display: string; description: string }
+  | { type: "architecture"; id: string; name: string; path: string; display: string; search: string; description: string }
   | { type: "file"; path: string; display: string; recent?: boolean }
 
 export interface SlashCommand {

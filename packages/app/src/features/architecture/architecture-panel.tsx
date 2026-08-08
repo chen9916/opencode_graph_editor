@@ -26,7 +26,6 @@ import type {
   ArchitectureEdgeStyle,
   ArchitectureLabels,
   ArchitectureOperation,
-  ArchitectureSnapshot,
   ArchitectureViewport,
 } from "./contract"
 import { rebaseOperations } from "./journal"
@@ -354,37 +353,35 @@ export default function ArchitecturePanel() {
                     when={!resource.error}
                     fallback={<ArchitectureMessage value={language.t("architecture.panel.error")} />}
                   >
-                    <Show when={resource.data} keyed>
-                      {(snapshot: ArchitectureSnapshot) => (
-                        <ArchitectureIsland
-                          direction={language.direction()}
-                          mobile={mobile()}
-                          snapshot={snapshot}
-                          draft={draft()}
-                          viewport={viewport()}
-                          edgeStyles={persistedState.edgeStyles[resourceID()!] ?? {}}
-                          busy={state.busy}
-                          action={state.action}
-                          labels={labels()}
-                          onJournal={journal}
-                          onViewport={(value) => {
-                            const id = resourceID()
-                            if (id) setPersistedState("viewports", id, value)
-                          }}
-                          onEdgeStyle={(edgeID, style) => {
-                            const id = resourceID()
-                            if (!id) return
-                            setPersistedState("edgeStyles", id, {
-                              ...(persistedState.edgeStyles[id] ?? {}),
-                              [edgeID]: style,
-                            })
-                          }}
-                          onSave={(operations) => void save(operations)}
-                          onReload={reload}
-                          onExport={exportPatch}
-                          onConfirm={confirm}
-                        />
-                      )}
+                    <Show when={resource.data}>
+                      <ArchitectureIsland
+                        direction={language.direction()}
+                        mobile={mobile()}
+                        snapshot={resource.data!}
+                        draft={draft()}
+                        viewport={viewport()}
+                        edgeStyles={persistedState.edgeStyles[resourceID()!] ?? {}}
+                        busy={state.busy}
+                        action={state.action}
+                        labels={labels()}
+                        onJournal={journal}
+                        onViewport={(value) => {
+                          const id = resourceID()
+                          if (id) setPersistedState("viewports", id, value)
+                        }}
+                        onEdgeStyle={(edgeID, style) => {
+                          const id = resourceID()
+                          if (!id) return
+                          setPersistedState("edgeStyles", id, {
+                            ...(persistedState.edgeStyles[id] ?? {}),
+                            [edgeID]: style,
+                          })
+                        }}
+                        onSave={(operations) => void save(operations)}
+                        onReload={reload}
+                        onExport={exportPatch}
+                        onConfirm={confirm}
+                      />
                     </Show>
                   </Show>
                 </Show>

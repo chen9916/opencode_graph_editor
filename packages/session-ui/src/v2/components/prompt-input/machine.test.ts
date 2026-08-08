@@ -53,6 +53,18 @@ describe("prompt input v2 interaction machine", () => {
     expect(result.state.popover).toEqual({ type: "context", query: "sr" })
   })
 
+  test("keeps context completion open for graph names with spaces", () => {
+    const value = "modify @Graph 1"
+
+    const result = transitionPromptInputV2(
+      createPromptInputV2InteractionState(),
+      { type: "input.changed", value, persist: false },
+      persisted(value),
+    )
+
+    expect(result.state.popover).toEqual({ type: "context", query: "Graph 1" })
+  })
+
   test("enters shell mode from an initial exclamation mark", () => {
     const result = transitionPromptInputV2(
       createPromptInputV2InteractionState(),

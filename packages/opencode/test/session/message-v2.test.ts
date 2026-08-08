@@ -330,7 +330,7 @@ describe("session.message-v2.toModelMessage", () => {
           },
           {
             type: "text",
-            text: "Architecture graph reference: @design-1 identifies the managed Architecture resource with ID design-1. Resolve it through Architecture context or tools; do not search ordinary project files or scene/node names for this graph display name.",
+            text: "Architecture graph reference: @design-1 identifies the managed Architecture resource with ID design-1 at .opencode/architecture/resources/design-1.json. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.",
           },
           { type: "text", text: "What did we do so far?" },
           { type: "text", text: "The following tool was executed by the user" },
