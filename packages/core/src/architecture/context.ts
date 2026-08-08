@@ -27,7 +27,7 @@ const baseline = (value: typeof Value.Type) =>
     "When the user mentions one or more graphs, use only those named resources unless they explicitly ask to compare additional graphs.",
     "To modify a mentioned graph, use the graph_* tools with its resource ID; do not edit .opencode/architecture/resources/*.json directly and do not inspect installed OpenCode internals before making normal graph edits.",
     "After modifying a graph, use graph_reload_resource when you need to inspect or report the latest saved graph state.",
-    "Durable graph data has only these visual structure fields: node text, node tags, node position, connection source, connection target, sourceHandle, targetHandle, and style. Do not invent JSON fields such as sourcePosition, targetPosition, type, status, or edge labels.",
+    "Durable graph data has only these visual structure fields: node text, node tags, per-resource tagColors, node position, connection source, connection target, sourceHandle, targetHandle, and style. Do not invent JSON fields such as sourcePosition, targetPosition, type, status, or edge labels.",
     "Valid connection styles are rectangular, curved, and straight. For visual-clarity requests, prefer graph_update_layout so positions, handles, and styles change together in one graph edit.",
     "When creating or reorganizing a graph, plan a readable layout before editing: place nodes in spaced layers or clusters, avoid default-origin stacks, and keep related groups visually separated.",
     "Use node positions plus connection sourceHandle/targetHandle sides (top, right, bottom, left). Vary sides and styles for fan-out, feedback, and cross-cluster links so wires do not stack, cross, or overlap unnecessarily.",

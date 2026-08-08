@@ -209,18 +209,24 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     setNodes(
       next.nodes.map((node) => ({
         ...node,
-        hidden: !visible.has(node.id),
+        data: {
+          ...node.data,
+          dimmed: filterActive && !visible.has(node.id),
+        },
         selected: selected.nodeIDs.includes(node.id),
       })),
     )
     setEdges(
-      next.edges.map((edge) => ({
-        ...edge,
-        hidden: !visible.has(edge.source) || !visible.has(edge.target),
-        selected: selected.edgeIDs.includes(edge.id),
-      })),
+      next.edges.map((edge) => {
+        const dimmed = filterActive && (!visible.has(edge.source) || !visible.has(edge.target))
+        return {
+          ...edge,
+          data: edge.data ? { ...edge.data, dimmed } : edge.data,
+          selected: selected.edgeIDs.includes(edge.id),
+        }
+      }),
     )
-  }, [editor.resource, filter.tag, filter.text, setEdges, setNodes])
+  }, [editor.resource, filter.tag, filter.text, filterActive, setEdges, setNodes])
 
   const undo = () => {
     const batch = editor.past.at(-1)
@@ -907,10 +913,10 @@ function Inspector(props: {
 }) {
   if (!props.selection.primary)
     return (
-      <ResourceForm
+      <ResourceHub
         resource={props.resource}
         labels={props.labels}
-        onChange={(name) => props.onCommit([{ id: operationID(), type: "resource.update", name }])}
+        onCommit={props.onCommit}
       />
     )
   if (props.selection.nodeIDs.length + props.selection.edgeIDs.length > 1)
@@ -922,10 +928,10 @@ function Inspector(props: {
     )
   if (!props.selected)
     return (
-      <ResourceForm
+      <ResourceHub
         resource={props.resource}
         labels={props.labels}
-        onChange={(name) => props.onCommit([{ id: operationID(), type: "resource.update", name }])}
+        onCommit={props.onCommit}
       />
     )
   if (props.selection.primary.type === "edge") {
@@ -1014,6 +1020,40 @@ function EdgeStyleControls(props: {
   )
 }
 
+function ResourceHub(props: {
+  readonly resource: ArchitectureResource
+  readonly labels: ArchitecturePanelProps["labels"]
+  readonly onCommit: (operations: ReadonlyArray<ArchitectureOperation>) => void
+}) {
+  const [tab, setTab] = useState<"details" | "tags">("details")
+  return (
+    <div className="architecture-editor__detail">
+      <div className="architecture-editor__tabs" role="tablist" aria-label={props.labels.properties}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "details"}
+          onClick={() => setTab("details")}
+        >
+          {props.labels.resourceDetails}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "tags"} onClick={() => setTab("tags")}>
+          {props.labels.tagHub}
+        </button>
+      </div>
+      {tab === "details" ? (
+        <ResourceForm
+          resource={props.resource}
+          labels={props.labels}
+          onChange={(name) => props.onCommit([{ id: operationID(), type: "resource.update", name }])}
+        />
+      ) : (
+        <TagHub resource={props.resource} labels={props.labels} onCommit={props.onCommit} />
+      )}
+    </div>
+  )
+}
+
 function ResourceForm(props: {
   readonly resource: ArchitectureResource
   readonly labels: ArchitecturePanelProps["labels"]
@@ -1048,6 +1088,127 @@ function ResourceForm(props: {
         />
       </label>
     </form>
+  )
+}
+
+function TagHub(props: {
+  readonly resource: ArchitectureResource
+  readonly labels: ArchitecturePanelProps["labels"]
+  readonly onCommit: (operations: ReadonlyArray<ArchitectureOperation>) => void
+}) {
+  const tags = tagSummaries(props.resource)
+  if (tags.length === 0) return <p className="architecture-editor__empty-detail">{props.labels.noTags}</p>
+  return (
+    <div className="architecture-editor__tag-hub">
+      {tags.map((tag) => (
+        <div className="architecture-editor__tag-row" key={tag.label}>
+          <div className="architecture-editor__tag-name">
+            <TagNameInput
+              tag={tag.label}
+              labels={props.labels}
+              onRename={(next) => props.onCommit(renameTagOperations(props.resource, tag.label, next))}
+            />
+            <span>{props.labels.tagUsage(tag.count)}</span>
+          </div>
+          <TagColorInput
+            tag={tag.label}
+            color={tag.color}
+            labels={props.labels}
+            onChange={(color) =>
+              props.onCommit([
+                {
+                  id: operationID(),
+                  type: "tag.color",
+                  tag: tag.label,
+                  color,
+                },
+              ])
+            }
+          />
+          <button
+            type="button"
+            disabled={!tag.color}
+            aria-label={props.labels.clearColor}
+            title={props.labels.clearColor}
+            onClick={() =>
+              props.onCommit([{ id: operationID(), type: "tag.color", tag: tag.label, color: undefined }])
+            }
+          >
+            {props.labels.clearFilters}
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TagColorInput(props: {
+  readonly tag: string
+  readonly color: string | undefined
+  readonly labels: ArchitecturePanelProps["labels"]
+  readonly onChange: (color: string) => void
+}) {
+  const [value, setValue] = useState(props.color ?? fallbackTagColor(props.tag))
+  const [dirty, setDirty] = useState(false)
+  useEffect(() => {
+    setValue(props.color ?? fallbackTagColor(props.tag))
+    setDirty(false)
+  }, [props.color, props.tag])
+  const commit = () => {
+    if (!dirty || value === props.color) {
+      setDirty(false)
+      return
+    }
+    props.onChange(value)
+    setDirty(false)
+  }
+  return (
+    <label className="architecture-editor__tag-color">
+      <span>{props.labels.tagColor}</span>
+      <input
+        type="color"
+        value={value}
+        onChange={(event) => {
+          setValue(event.currentTarget.value)
+          setDirty(true)
+        }}
+        onBlur={commit}
+      />
+    </label>
+  )
+}
+
+function TagNameInput(props: {
+  readonly tag: string
+  readonly labels: ArchitecturePanelProps["labels"]
+  readonly onRename: (tag: string) => void
+}) {
+  const [value, setValue] = useState(props.tag)
+  useEffect(() => setValue(props.tag), [props.tag])
+  const commit = () => {
+    const tag = cleanTag(value)
+    if (!tag || tag === props.tag) {
+      setValue(props.tag)
+      return
+    }
+    props.onRename(tag)
+  }
+  return (
+    <input
+      aria-label={props.labels.name}
+      value={value}
+      maxLength={128}
+      onChange={(event) => setValue(event.currentTarget.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          setValue(props.tag)
+          event.currentTarget.blur()
+          return
+        }
+        if (event.key === "Enter") event.currentTarget.blur()
+      }}
+    />
   )
 }
 
@@ -1114,6 +1275,52 @@ function NodeForm(props: {
       </label>
     </form>
   )
+}
+
+function tagSummaries(resource: ArchitectureResource) {
+  return unique(resource.nodes.flatMap((node) => node.tags)).map((label) => ({
+    label,
+    color: resource.tagColors?.[label],
+    count: resource.nodes.filter((node) => node.tags.includes(label)).length,
+  }))
+}
+
+function renameTagOperations(resource: ArchitectureResource, current: string, next: string): ArchitectureOperation[] {
+  const targetExists = resource.nodes.some((node) => node.tags.includes(next))
+  const operations = resource.nodes.flatMap((node): ArchitectureOperation[] => {
+    if (!node.tags.includes(current)) return []
+    return [
+      {
+        id: operationID(),
+        type: "node.update",
+        node: {
+          ...node,
+          tags: unique(node.tags.map((tag) => (tag === current ? next : tag))),
+        },
+      },
+    ]
+  })
+  const color = resource.tagColors?.[current]
+  if (!color) return operations
+  return [
+    { id: operationID(), type: "tag.color", tag: current, color: undefined },
+    ...operations,
+    ...(targetExists || resource.tagColors?.[next]
+      ? []
+      : [{ id: operationID(), type: "tag.color", tag: next, color } satisfies ArchitectureOperation]),
+  ]
+}
+
+function cleanTag(value: string) {
+  const tag = value.trim()
+  if (!tag || tag.length > 128 || /[\n,]/.test(tag)) return undefined
+  return tag
+}
+
+function fallbackTagColor(tag: string) {
+  const colors = ["#4c82ff", "#16a34a", "#f59e0b", "#dc2626", "#7c3aed", "#0891b2", "#db2777", "#65a30d"]
+  const index = Array.from(tag).reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 0) % colors.length
+  return colors[index]!
 }
 
 function unique(values: ReadonlyArray<string>) {

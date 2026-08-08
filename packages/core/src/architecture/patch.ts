@@ -43,11 +43,13 @@ export const digest = (resource: Architecture.Resource) => Hash.sha256(canonical
 export const entityDigest = (entity: Architecture.Node | Architecture.Edge) => Hash.sha256(canonical(entity))
 
 export function normalize(resource: Architecture.Resource): Architecture.Resource {
+  const tagColors = normalizeTagColors(resource)
   return {
     version: 2,
     revision: resource.revision,
     id: resource.id,
     name: resource.name,
+    ...(tagColors ? { tagColors } : {}),
     nodes: resource.nodes
       .map((node) => ({
         id: node.id,
@@ -76,6 +78,8 @@ export const validate = Effect.fn("ArchitecturePatch.validate")(function* (resou
     return yield* new InvalidGraphError({ message: "Graph resource exceeds 10,000 nodes" })
   if (resource.edges.length > 20_000)
     return yield* new InvalidGraphError({ message: "Graph resource exceeds 20,000 edges" })
+  if (Object.keys(resource.tagColors ?? {}).length > 100)
+    return yield* new InvalidGraphError({ message: "Graph resource exceeds 100 tag colors" })
   const nodes = new Set<string>()
   for (const node of resource.nodes) {
     if (nodes.has(node.id)) return yield* new InvalidGraphError({ message: `Duplicate node ID: ${node.id}` })
@@ -121,12 +125,22 @@ export const apply = Effect.fn("ArchitecturePatch.apply")(function* (
 ) {
   const draft = {
     name: resource.name,
+    tagColors: resource.tagColors,
     nodes: [...resource.nodes],
     edges: [...resource.edges],
   }
   for (const operation of operations) {
     if (operation.type === "resource.update") {
       draft.name = operation.name
+      continue
+    }
+    if (operation.type === "tag.color") {
+      if (operation.color && !draft.nodes.some((node) => node.tags.includes(operation.tag)))
+        return yield* conflict(operation, `Tag does not exist: ${operation.tag}`)
+      const tagColors = { ...(draft.tagColors ?? {}) }
+      if (operation.color) tagColors[operation.tag] = operation.color
+      else delete tagColors[operation.tag]
+      draft.tagColors = Object.keys(tagColors).length ? tagColors : undefined
       continue
     }
     if (operation.type === "node.create") {
@@ -190,8 +204,18 @@ export const apply = Effect.fn("ArchitecturePatch.apply")(function* (
       revision: resource.revision + 1,
       id: resource.id,
       name: draft.name,
+      tagColors: draft.tagColors,
       nodes: draft.nodes,
       edges: draft.edges,
     }),
   )
 })
+
+function normalizeTagColors(resource: Architecture.Resource) {
+  const tags = new Set(resource.nodes.flatMap((node) => node.tags))
+  const entries = Object.entries(resource.tagColors ?? {})
+    .filter(([tag]) => tags.has(tag as Architecture.Tag))
+    .map(([tag, color]) => [tag, color.toLowerCase() as Architecture.TagColor] as const)
+    .toSorted(([left], [right]) => left.localeCompare(right))
+  return entries.length ? (Object.fromEntries(entries) as NonNullable<Architecture.Resource["tagColors"]>) : undefined
+}

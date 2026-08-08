@@ -35,6 +35,11 @@ export type ArchitectureLabels = {
   readonly name: string
   readonly text: string
   readonly tags: string
+  readonly tagHub: string
+  readonly tagColor: string
+  readonly tagUsage: (count: number) => string
+  readonly noTags: string
+  readonly clearColor: string
   readonly search: string
   readonly allTags: string
   readonly clearFilters: string

@@ -516,7 +516,7 @@ const layer = Layer.effect(
             .slice(0, 50)
             .map(
               (node) =>
-                `- ${node.id}: ${node.text.replace(/\s+/g, " ")}${node.tags.length ? ` [${node.tags.join(", ")}]` : ""} (position: ${node.layout.position.x}, ${node.layout.position.y})`,
+                `- ${node.id}: ${node.text.replace(/\s+/g, " ")}${formatTags(resource, node)} (position: ${node.layout.position.x}, ${node.layout.position.y})`,
             )
           const edges = resource.edges
             .slice(0, 75)
@@ -576,8 +576,16 @@ function sanitizeResource(value: unknown) {
   const resource = value as Record<string, unknown>
   return {
     ...resource,
+    tagColors: resource.tagColors,
     edges: Array.isArray(resource.edges) ? resource.edges.map(sanitizeEdge) : resource.edges,
   }
+}
+
+function formatTags(resource: Architecture.Resource, node: Architecture.Node) {
+  if (node.tags.length === 0) return ""
+  return ` [${node.tags
+    .map((tag) => (resource.tagColors?.[tag] ? `${tag} ${resource.tagColors[tag]}` : tag))
+    .join(", ")}]`
 }
 
 function sanitizeEdge(value: unknown) {

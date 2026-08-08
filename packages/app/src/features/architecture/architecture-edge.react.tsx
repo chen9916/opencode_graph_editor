@@ -16,6 +16,14 @@ export function ArchitectureEdgeView(props: EdgeProps<ArchitectureFlowEdge>) {
       : data.style === "curved"
         ? getBezierPath(props)
         : getSmoothStepPath(props)
+  const style =
+    data.dimmed && !props.selected
+      ? {
+          ...props.style,
+          opacity: 0.38,
+          stroke: "var(--architecture-muted-wire)",
+        }
+      : props.style
 
   return (
     <>
@@ -25,7 +33,7 @@ export function ArchitectureEdgeView(props: EdgeProps<ArchitectureFlowEdge>) {
         markerStart={props.markerStart}
         markerEnd={props.markerEnd}
         interactionWidth={props.interactionWidth}
-        style={props.style}
+        style={style}
       />
       {props.selected && controls && (
         <EdgeToolbar

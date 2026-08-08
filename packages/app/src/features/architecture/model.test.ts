@@ -49,4 +49,14 @@ describe("architecture flow model", () => {
     expect(edges.map((edge) => edge.data?.style)).toEqual(["curved", "straight"])
     expect(edges.map((edge) => edge.data?.edge)).toEqual([...styled.edges])
   })
+
+  test("passes graph tag colors into node render data", () => {
+    const nodes = toReactFlow({ ...resource, tagColors: { planned: "#4c82ff" } }, () => {}).nodes
+
+    expect(nodes.map((node) => node.data.tagColors)).toEqual([
+      { planned: "#4c82ff" },
+      { planned: "#4c82ff" },
+      { planned: "#4c82ff" },
+    ])
+  })
 })

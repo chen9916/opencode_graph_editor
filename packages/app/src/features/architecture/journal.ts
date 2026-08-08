@@ -68,6 +68,12 @@ function applyOperation(graph: ArchitectureResource, operation: ArchitectureOper
       ...graph,
       name: operation.name,
     }
+  if (operation.type === "tag.color") {
+    const tagColors = { ...(graph.tagColors ?? {}) }
+    if (operation.color) tagColors[operation.tag] = operation.color
+    else delete tagColors[operation.tag]
+    return withTagColors(graph, tagColors)
+  }
   if (operation.type === "node.create") return { ...graph, nodes: [...graph.nodes, operation.node] }
   if (operation.type === "node.update")
     return {
@@ -106,6 +112,8 @@ function applicable(
   operation: ArchitectureOperation,
 ): Decision {
   if (operation.type === "resource.update") return same(base.name, latest.name) ? "apply" : "changed"
+  if (operation.type === "tag.color")
+    return same(base.tagColors?.[operation.tag], latest.tagColors?.[operation.tag]) ? "apply" : "changed"
   if (operation.type === "node.create") {
     const current = latest.nodes.find((node) => node.id === operation.node.id)
     if (!current) return "apply"
@@ -147,6 +155,18 @@ function entityDecision(base: unknown, latest: unknown): Decision {
 
 function same(left: unknown, right: unknown) {
   return canonical(left) === canonical(right)
+}
+
+function withTagColors(graph: ArchitectureResource, tagColors: NonNullable<ArchitectureResource["tagColors"]>) {
+  if (Object.keys(tagColors).length > 0) return { ...graph, tagColors }
+  return {
+    version: graph.version,
+    revision: graph.revision,
+    id: graph.id,
+    name: graph.name,
+    nodes: graph.nodes,
+    edges: graph.edges,
+  }
 }
 
 function canonical(value: unknown): string {

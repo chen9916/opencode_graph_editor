@@ -37,4 +37,20 @@ describe("architecture journal", () => {
     expect(rebased.operations.map((operation) => operation.id)).toEqual(["two"])
     expect(rebased.conflicts.map((conflict) => conflict.operation.id)).toEqual(["one"])
   })
+
+  test("applies and rebases tag color edits by tag", () => {
+    const colored = applyOperations(resource(), [
+      { id: "color", type: "tag.color", tag: "planned", color: "#4c82ff" },
+    ])
+    const rebased = rebaseOperations(resource(), { ...resource(), tagColors: { other: "#16a34a" } }, [
+      { id: "color", type: "tag.color", tag: "planned", color: "#4c82ff" },
+    ])
+
+    expect(colored.tagColors).toEqual({ planned: "#4c82ff" })
+    expect(applyOperations(colored, [{ id: "clear", type: "tag.color", tag: "planned" }])).not.toHaveProperty(
+      "tagColors",
+    )
+    expect(rebased.operations.map((operation) => operation.id)).toEqual(["color"])
+    expect(rebased.conflicts).toEqual([])
+  })
 })

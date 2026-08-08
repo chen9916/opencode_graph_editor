@@ -2,7 +2,7 @@
 
 import type { NodeProps } from "@xyflow/react"
 import { Handle, Position } from "@xyflow/react"
-import { useRef, useState, type PointerEvent } from "react"
+import { useRef, useState, type CSSProperties, type PointerEvent } from "react"
 import type { ArchitectureConnectionSide } from "./contract"
 import { architectureNodeClass, type ArchitectureFlowNode } from "./model"
 
@@ -48,6 +48,7 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
     <div
       className={architectureNodeClass()}
       data-active-socket={activeSocket}
+      data-dimmed={props.data.dimmed || undefined}
       data-selected={props.selected || undefined}
       onPointerMove={revealSocket}
       onPointerLeave={() => setActiveSocket(undefined)}
@@ -103,11 +104,21 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
       )}
       {node.tags.length > 0 && (
         <div className="architecture-node__tags">
-          {node.tags.map((tag) => (
-            <span key={tag}>{tag}</span>
-          ))}
+          {node.tags.map((tag) => {
+            const color = props.data.tagColors?.[tag]
+            return (
+              <span key={tag} data-colored={color ? true : undefined} style={tagStyle(color)}>
+                {tag}
+              </span>
+            )
+          })}
         </div>
       )}
     </div>
   )
+}
+
+function tagStyle(color: string | undefined) {
+  if (!color) return undefined
+  return { "--architecture-tag-color": color } as CSSProperties
 }

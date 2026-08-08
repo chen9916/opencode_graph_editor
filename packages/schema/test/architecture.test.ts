@@ -7,6 +7,7 @@ const resource = {
   revision: 0,
   id: "design",
   name: "Product design",
+  tagColors: { planned: "#4C82FF" },
   nodes: [
     {
       id: "conversation",
@@ -23,6 +24,7 @@ describe("Architecture schema", () => {
     expect(Schema.decodeUnknownSync(Architecture.Resource)(resource)).toMatchObject({
       version: 2,
       id: "design",
+      tagColors: { planned: "#4C82FF" },
       nodes: [{ text: "People discuss the design with AI", tags: ["planned", "interaction"] }],
     })
   })
@@ -44,6 +46,23 @@ describe("Architecture schema", () => {
         nodes: [{ ...resource.nodes[0], tags: [""] }],
       }),
     ).toThrow()
+    expect(() =>
+      Schema.decodeUnknownSync(Architecture.Resource)({
+        ...resource,
+        tagColors: { planned: "blue" },
+      }),
+    ).toThrow()
+  })
+
+  test("decodes tag color patch operations", () => {
+    expect(
+      Schema.decodeUnknownSync(Architecture.Operation)({
+        id: "color",
+        type: "tag.color",
+        tag: "planned",
+        color: "#4c82ff",
+      }),
+    ).toMatchObject({ type: "tag.color", tag: "planned", color: "#4c82ff" })
   })
 
   test("decodes explicit connection sides while accepting legacy connections", () => {

@@ -21,6 +21,7 @@ export const names = {
   query: "graph_query",
   createNode: "graph_create_node",
   updateNode: "graph_update_node",
+  setTagColor: "graph_set_tag_color",
   deleteNode: "graph_delete_node",
   connectNodes: "graph_connect_nodes",
   updateConnection: "graph_update_connection",
@@ -268,6 +269,57 @@ const layer = Layer.effectDiscard(
                 node: updated,
               }
             }).pipe(Effect.mapError((error) => failure(`Unable to update graph node ${input.nodeID}`, error))),
+        }),
+        "edit",
+      ),
+      [names.setTagColor]: Tool.withPermission(
+        Tool.make({
+          description:
+            "Set or clear the display color for one free-form node tag in a managed graph resource. Use #RRGGBB colors; tags remain ordinary node labels.",
+          input: Schema.Struct({
+            resourceID: Architecture.ResourceID,
+            tag: Architecture.Tag,
+            color: Architecture.TagColor.pipe(Schema.optional),
+          }),
+          output: Schema.Struct({
+            ...MutationOutput.fields,
+            tag: Architecture.Tag,
+            color: Architecture.TagColor.pipe(Schema.optional),
+          }),
+          toModelOutput: ({ output }) => [
+            {
+              type: "text",
+              text: output.color
+                ? `Set graph tag ${output.tag} color to ${output.color}`
+                : `Cleared graph tag ${output.tag} color`,
+            },
+          ],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.load(input.resourceID)
+              const saved = yield* graph.patch(input.resourceID, {
+                revision: current.resource.revision,
+                digest: current.digest,
+                operations: [
+                  {
+                    id: Architecture.OperationID.create(),
+                    type: "tag.color",
+                    tag: input.tag,
+                    color: input.color,
+                  },
+                ],
+              })
+              return {
+                resourceID: input.resourceID,
+                revision: saved.resource.revision,
+                digest: saved.digest,
+                tag: input.tag,
+                color: input.color,
+              }
+            }).pipe(
+              Effect.mapError((error) => failure(`Unable to update graph tag ${input.tag}`, error)),
+            ),
         }),
         "edit",
       ),

@@ -4,6 +4,8 @@ import type { ArchitectureEdge, ArchitectureEdgeStyle, ArchitectureNode, Archite
 export type ArchitectureFlowNode = Node<
   {
     readonly node: ArchitectureNode
+    readonly tagColors?: ArchitectureResource["tagColors"]
+    readonly dimmed?: boolean
     readonly onTextChange: (node: ArchitectureNode, text: string) => void
   },
   "architecture"
@@ -19,6 +21,7 @@ export type ArchitectureFlowEdge = Edge<
   {
     readonly edge: ArchitectureEdge
     readonly style: ArchitectureEdgeStyle
+    readonly dimmed?: boolean
     readonly controls?: ArchitectureFlowEdgeControls
   },
   "architecture"
@@ -35,7 +38,7 @@ export function toReactFlow(
         id: node.id,
         type: "architecture",
         position: node.layout.position,
-        data: { node, onTextChange },
+        data: { node, tagColors: resource.tagColors, onTextChange },
       }),
     ),
     edges: resource.edges.map(

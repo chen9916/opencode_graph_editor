@@ -121,6 +121,14 @@ describe("ArchitectureTools", () => {
           tags: ["planned", "interaction"],
         }),
       )
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.setTagColor, {
+          resourceID,
+          tag: "interaction",
+          color: "#4c82ff",
+        }),
+      )
       const connected = yield* settleTool(
         registry,
         call(ArchitectureTools.names.connectNodes, {
@@ -168,6 +176,7 @@ describe("ArchitectureTools", () => {
       expect(reloaded.output?.structured).toMatchObject({
         resource: {
           id: "product",
+          tagColors: { interaction: "#4c82ff" },
           nodes: [
             {
               id: "a",
@@ -207,7 +216,7 @@ describe("ArchitectureTools", () => {
       })
 
       const context = yield* settleTool(registry, call(ArchitectureTools.names.getContext, {}))
-      expect(context.output?.structured).toContain("Updated conversation [interaction, planned]")
+      expect(context.output?.structured).toContain("Updated conversation [interaction #4c82ff, planned]")
       expect(context.output?.structured).toContain(".opencode/architecture/resources/product.json")
       expect(context.output?.structured).toContain("a.right -> b.left (style: rectangular)")
       expect(context.output?.structured).toContain("details")

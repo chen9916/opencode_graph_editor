@@ -221,6 +221,7 @@ export type ArchitectureCreateResourceOutput = {
       readonly revision: number
       readonly id: string
       readonly name: string
+      readonly tagColors?: { readonly [x: string]: string }
       readonly nodes: ReadonlyArray<{
         readonly id: string
         readonly text: string
@@ -260,6 +261,7 @@ export type ArchitectureGetResourceOutput = {
       readonly revision: number
       readonly id: string
       readonly name: string
+      readonly tagColors?: { readonly [x: string]: string }
       readonly nodes: ReadonlyArray<{
         readonly id: string
         readonly text: string
@@ -290,6 +292,7 @@ export type ArchitecturePatchResourceInput = {
     readonly digest: string
     readonly operations: ReadonlyArray<
       | { readonly id: string; readonly type: "resource.update"; readonly name: string }
+      | { readonly id: string; readonly type: "tag.color"; readonly tag: string; readonly color?: string }
       | {
           readonly id: string
           readonly type: "node.create"
@@ -358,6 +361,7 @@ export type ArchitecturePatchResourceInput = {
     readonly digest: string
     readonly operations: ReadonlyArray<
       | { readonly id: string; readonly type: "resource.update"; readonly name: string }
+      | { readonly id: string; readonly type: "tag.color"; readonly tag: string; readonly color?: string }
       | {
           readonly id: string
           readonly type: "node.create"
@@ -426,6 +430,7 @@ export type ArchitecturePatchResourceInput = {
     readonly digest: string
     readonly operations: ReadonlyArray<
       | { readonly id: string; readonly type: "resource.update"; readonly name: string }
+      | { readonly id: string; readonly type: "tag.color"; readonly tag: string; readonly color?: string }
       | {
           readonly id: string
           readonly type: "node.create"
@@ -503,6 +508,7 @@ export type ArchitecturePatchResourceOutput = {
       readonly revision: number
       readonly id: string
       readonly name: string
+      readonly tagColors?: { readonly [x: string]: string }
       readonly nodes: ReadonlyArray<{
         readonly id: string
         readonly text: string
@@ -560,6 +566,7 @@ export type ArchitectureResetResourceOutput = {
       readonly revision: number
       readonly id: string
       readonly name: string
+      readonly tagColors?: { readonly [x: string]: string }
       readonly nodes: ReadonlyArray<{
         readonly id: string
         readonly text: string

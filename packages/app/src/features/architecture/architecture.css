@@ -6,6 +6,7 @@
 .architecture-editor {
   --architecture-accent: var(--color-text-interactive-base, #4c82ff);
   --architecture-wire: color-mix(in srgb, var(--architecture-accent) 68%, var(--color-text-strong, #d4d4d4));
+  --architecture-muted-wire: color-mix(in srgb, var(--color-v2-text-muted, var(--color-text-weak)) 62%, transparent);
   block-size: 100%;
   min-block-size: 0;
   display: grid;
@@ -213,6 +214,78 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.architecture-editor__tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-v2-background-bg-raised, var(--color-background-stronger)) 68%, transparent);
+}
+
+.architecture-editor__tabs button {
+  min-block-size: 28px;
+  padding-inline: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  font-size: 12px;
+}
+
+.architecture-editor__tabs button[aria-selected="true"] {
+  background: color-mix(in srgb, var(--architecture-accent) 16%, transparent);
+  color: var(--color-v2-text-primary, var(--color-text-base));
+}
+
+.architecture-editor__tag-hub {
+  display: grid;
+  gap: 8px;
+}
+
+.architecture-editor__tag-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 8px;
+  padding-block: 8px;
+  border-block-end: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+}
+
+.architecture-editor__tag-name,
+.architecture-editor__tag-color {
+  min-inline-size: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.architecture-editor__tag-name > span,
+.architecture-editor__tag-color > span,
+.architecture-editor__empty-detail {
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  font-size: 11px;
+}
+
+.architecture-editor__tag-name input {
+  inline-size: 100%;
+}
+
+.architecture-editor__tag-color input[type="color"] {
+  inline-size: 36px;
+  min-inline-size: 36px;
+  block-size: 32px;
+  padding: 2px;
+}
+
+.architecture-editor__tag-row button {
+  block-size: 32px;
+  white-space: nowrap;
+}
+
+.architecture-editor__empty-detail {
+  margin: 0;
 }
 
 .architecture-editor__form-error,
@@ -490,11 +563,29 @@
     var(--color-v2-background-bg-raised, var(--color-background-stronger))
   );
   box-shadow: 0 10px 28px rgb(0 0 0 / 18%);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    filter 120ms ease,
+    opacity 120ms ease;
+}
+
+.architecture-node[data-dimmed="true"] {
+  border-color: color-mix(in srgb, var(--color-v2-border-subtle, var(--color-border-weaker-base)) 74%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--color-v2-background-bg-raised, var(--color-background-stronger)) 80%,
+    var(--color-v2-background-bg-base, var(--color-background-base))
+  );
+  opacity: 0.46;
+  filter: grayscale(0.78);
 }
 
 .architecture-editor .react-flow__node.selected .architecture-node,
 .architecture-node[data-selected="true"] {
   border-color: var(--architecture-accent);
+  opacity: 1;
+  filter: none;
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--architecture-accent) 28%, transparent),
     0 12px 32px rgb(0 0 0 / 24%);
@@ -618,10 +709,17 @@
 .architecture-node__tags span {
   padding-block: 2px;
   padding-inline: 6px;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: color-mix(in srgb, var(--architecture-node-accent) 18%, transparent);
   color: var(--color-v2-text-muted, var(--color-text-weak));
   font-size: 10px;
+}
+
+.architecture-node__tags span[data-colored="true"] {
+  border-color: color-mix(in srgb, var(--architecture-tag-color) 46%, transparent);
+  background: color-mix(in srgb, var(--architecture-tag-color) 22%, transparent);
+  color: var(--color-v2-text-primary, var(--color-text-base));
 }
 
 @media (max-width: 900px) {

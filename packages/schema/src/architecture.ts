@@ -36,6 +36,11 @@ export const Tag = Schema.NonEmptyString.pipe(Schema.check(Schema.isMaxLength(12
 })
 export type Tag = typeof Tag.Type
 
+export const TagColor = Schema.String.check(Schema.isPattern(/^#[0-9A-Fa-f]{6}$/)).annotate({
+  identifier: "Architecture.TagColor",
+})
+export type TagColor = typeof TagColor.Type
+
 export interface Position extends Schema.Schema.Type<typeof Position> {}
 export const Position = Schema.Struct({
   x: Schema.Finite,
@@ -76,6 +81,7 @@ export const Resource = Schema.Struct({
   revision: NonNegativeInt,
   id: ResourceID,
   name: Schema.NonEmptyString,
+  tagColors: Schema.Record(Tag, TagColor).pipe(optional),
   nodes: Schema.Array(Node),
   edges: Schema.Array(Edge),
 }).annotate({ identifier: "Architecture.Resource" })
@@ -120,6 +126,14 @@ export const ResourceUpdate = Schema.Struct({
   id: OperationID,
   type: Schema.Literal("resource.update"),
   name: Schema.NonEmptyString,
+})
+
+export interface TagColorUpdate extends Schema.Schema.Type<typeof TagColorUpdate> {}
+export const TagColorUpdate = Schema.Struct({
+  id: OperationID,
+  type: Schema.Literal("tag.color"),
+  tag: Tag,
+  color: TagColor.pipe(optional),
 })
 
 export interface NodeCreate extends Schema.Schema.Type<typeof NodeCreate> {}
@@ -180,6 +194,7 @@ export const EdgeRemove = Schema.Struct({
 
 export const Operation = Schema.Union([
   ResourceUpdate,
+  TagColorUpdate,
   NodeCreate,
   NodeUpdate,
   NodePosition,
