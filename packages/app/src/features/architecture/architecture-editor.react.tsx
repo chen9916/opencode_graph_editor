@@ -16,7 +16,7 @@ import {
   useEdgesState,
   useNodesState,
 } from "@xyflow/react"
-import { useEffect, useId, useRef, useState, type FormEvent } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import type {
   ArchitectureConnectionSide,
   ArchitectureEdge,
@@ -48,7 +48,7 @@ type EditorState = {
 export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const base = props.draft?.base ?? props.snapshot
   const initial = props.draft?.operations ?? []
-  const initialKey = `${base.digest}:${initial.map((operation) => operation.id).join(":")}`
+  const initialKey = `${base.resource.id}:${base.digest}:${initial.map((operation) => operation.id).join(":")}`
   const loaded = useRef(initialKey)
   const canvas = useRef<HTMLDivElement>(null)
   const outlineID = useId()
@@ -61,9 +61,10 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [selection, setSelection] = useState<Selection>()
   const [flow, setFlow] = useState<ReactFlowInstance<ArchitectureFlowNode, ArchitectureFlowEdge>>()
   const [filter, setFilter] = useState({ text: "", tag: "" })
-  const [outlineOpen, setOutlineOpen] = useState(!props.mobile)
-  const [inspectorOpen, setInspectorOpen] = useState(!props.mobile)
+  const [outlineOpen, setOutlineOpen] = useState(false)
+  const [inspectorOpen, setInspectorOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenu>()
+  const [edgeStyles, setEdgeStyles] = useState(props.edgeStyles)
   const operations = flattenJournal(editor.past)
   const dirty = operations.length > 0 || (props.draft?.conflicts.length ?? 0) > 0
   const tags = unique(editor.resource.nodes.flatMap((node) => node.tags))
@@ -86,17 +87,29 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     commit([{ id: operationID(), type: "node.update", node: { ...node, text } }])
   }
 
-  const projected = toReactFlow(editor.resource, updateNodeText, props.edgeStyles, {
+  const projected = toReactFlow(editor.resource, updateNodeText, edgeStyles, {
     label: props.labels.connectionStyle,
     styles: {
       smoothstep: props.labels.rectangular,
       default: props.labels.curved,
       straight: props.labels.straight,
     },
-    onChange: props.onEdgeStyle,
+    onChange: (edgeID, style) => changeEdgeStyle(edgeID, style),
   })
   const [nodes, setNodes, onNodesChange] = useNodesState(projected.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(projected.edges)
+
+  const changeEdgeStyle = (edgeID: string, style: ArchitectureEdgeStyle) => {
+    if ((edgeStyles[edgeID] ?? "smoothstep") === style) return
+    setEdgeStyles((current) => (current[edgeID] === style ? current : { ...current, [edgeID]: style }))
+    setEdges((current) =>
+      current.map((edge) => {
+        if (edge.id !== edgeID || !edge.data || edge.data.style === style) return edge
+        return { ...edge, data: { ...edge.data, style } }
+      }),
+    )
+    props.onEdgeStyle(edgeID, style)
+  }
 
   const select = (next: Selection | undefined) => {
     setSelection((current) => (current?.type === next?.type && current?.id === next?.id ? current : next))
@@ -135,17 +148,23 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     })
     select(undefined)
     setContextMenu(undefined)
+    setOutlineOpen(false)
+    setInspectorOpen(false)
   }, [base.digest, initialKey])
 
   useEffect(() => {
-    const next = toReactFlow(editor.resource, updateNodeText, props.edgeStyles, {
+    setEdgeStyles(props.edgeStyles)
+  }, [base.resource.id, props.edgeStyles])
+
+  useEffect(() => {
+    const next = toReactFlow(editor.resource, updateNodeText, edgeStyles, {
       label: props.labels.connectionStyle,
       styles: {
         smoothstep: props.labels.rectangular,
         default: props.labels.curved,
         straight: props.labels.straight,
       },
-      onChange: props.onEdgeStyle,
+      onChange: (edgeID, style) => changeEdgeStyle(edgeID, style),
     })
     const visible = new Set(
       editor.resource.nodes
@@ -170,7 +189,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         selected: selection?.type === "edge" && selection.id === edge.id,
       })),
     )
-  }, [editor.resource, filter.tag, filter.text, props.edgeStyles, setEdges, setNodes])
+  }, [editor.resource, edgeStyles, filter.tag, filter.text, setEdges, setNodes])
 
   const undo = () => {
     const batch = editor.past.at(-1)
@@ -585,8 +604,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
                 <>
                   <EdgeStyleControls
                     labels={props.labels}
-                    style={props.edgeStyles[contextMenu.id] ?? "smoothstep"}
-                    onChange={(style) => props.onEdgeStyle(contextMenu.id, style)}
+                    style={edgeStyles[contextMenu.id] ?? "smoothstep"}
+                    onChange={(style) => changeEdgeStyle(contextMenu.id, style)}
                   />
                   <button
                     type="button"
@@ -619,9 +638,9 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               resource={editor.resource}
               selection={selection}
               selected={selected}
-              edgeStyle={selection?.type === "edge" ? (props.edgeStyles[selection.id] ?? "smoothstep") : undefined}
+              edgeStyle={selection?.type === "edge" ? (edgeStyles[selection.id] ?? "smoothstep") : undefined}
               labels={props.labels}
-              onEdgeStyle={props.onEdgeStyle}
+              onEdgeStyle={changeEdgeStyle}
               onCommit={commit}
             />
             {(props.draft?.conflicts.length ?? 0) > 0 && (
@@ -657,7 +676,7 @@ function Inspector(props: {
       <ResourceForm
         resource={props.resource}
         labels={props.labels}
-        onSave={(name) => props.onCommit([{ id: operationID(), type: "resource.update", name }])}
+        onChange={(name) => props.onCommit([{ id: operationID(), type: "resource.update", name }])}
       />
     )
   if (props.selection.type === "edge") {
@@ -716,7 +735,7 @@ function Inspector(props: {
     <NodeForm
       node={props.selected as ArchitectureNode}
       labels={props.labels}
-      onSave={(node) => props.onCommit([{ id: operationID(), type: "node.update", node }])}
+      onChange={(node) => props.onCommit([{ id: operationID(), type: "node.update", node }])}
     />
   )
 }
@@ -749,23 +768,36 @@ function EdgeStyleControls(props: {
 function ResourceForm(props: {
   readonly resource: ArchitectureResource
   readonly labels: ArchitecturePanelProps["labels"]
-  readonly onSave: (name: string) => void
+  readonly onChange: (name: string) => void
 }) {
+  const commit = (input: HTMLInputElement) => {
+    const name = input.value.trim()
+    if (!name) {
+      input.value = props.resource.name
+      return
+    }
+    input.value = name
+    if (name !== props.resource.name) props.onChange(name)
+  }
   return (
     <form
       className="architecture-editor__form"
       onSubmit={(event) => {
         event.preventDefault()
-        const name = String(new FormData(event.currentTarget).get("name") ?? "").trim()
-        if (name) props.onSave(name)
+        const input = event.currentTarget.elements.namedItem("name")
+        if (input instanceof HTMLInputElement) commit(input)
       }}
     >
       <h3>{props.labels.resourceDetails}</h3>
       <label>
         {props.labels.name}
-        <input name="name" defaultValue={props.resource.name} required />
+        <input
+          name="name"
+          defaultValue={props.resource.name}
+          required
+          onBlur={(event) => commit(event.currentTarget)}
+        />
       </label>
-      <button type="submit">{props.labels.save}</button>
     </form>
   )
 }
@@ -773,35 +805,64 @@ function ResourceForm(props: {
 function NodeForm(props: {
   readonly node: ArchitectureNode
   readonly labels: ArchitecturePanelProps["labels"]
-  readonly onSave: (node: ArchitectureNode) => void
+  readonly onChange: (node: ArchitectureNode) => void
 }) {
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const data = new FormData(event.currentTarget)
+  const commit = (form: HTMLFormElement) => {
+    const data = new FormData(form)
     const text = String(data.get("text") ?? "").trim()
-    if (!text) return
-    props.onSave({
+    if (!text) {
+      const input = form.elements.namedItem("text")
+      if (input instanceof HTMLTextAreaElement) input.value = props.node.text
+      return
+    }
+    const tags = unique(
+      String(data.get("tags") ?? "")
+        .split(/[\n,]/)
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    )
+    if (
+      text === props.node.text &&
+      tags.length === props.node.tags.length &&
+      tags.every((tag, index) => tag === props.node.tags[index])
+    )
+      return
+    props.onChange({
       ...props.node,
       text,
-      tags: unique(
-        String(data.get("tags") ?? "")
-          .split(/[\n,]/)
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-      ),
+      tags,
     })
   }
   return (
-    <form className="architecture-editor__form" onSubmit={submit} data-prevent-session-autofocus>
+    <form
+      className="architecture-editor__form"
+      onSubmit={(event) => {
+        event.preventDefault()
+        commit(event.currentTarget)
+      }}
+      data-prevent-session-autofocus
+    >
       <label>
         {props.labels.text}
-        <textarea name="text" defaultValue={props.node.text} required />
+        <textarea
+          name="text"
+          defaultValue={props.node.text}
+          required
+          onBlur={(event) => {
+            if (event.currentTarget.form) commit(event.currentTarget.form)
+          }}
+        />
       </label>
       <label>
         {props.labels.tags}
-        <textarea name="tags" defaultValue={props.node.tags.join(", ")} />
+        <textarea
+          name="tags"
+          defaultValue={props.node.tags.join(", ")}
+          onBlur={(event) => {
+            if (event.currentTarget.form) commit(event.currentTarget.form)
+          }}
+        />
       </label>
-      <button type="submit">{props.labels.save}</button>
     </form>
   )
 }
