@@ -55,6 +55,11 @@ export const ConnectionSide = Schema.Literals(["top", "right", "bottom", "left"]
 })
 export type ConnectionSide = typeof ConnectionSide.Type
 
+export const EdgeStyle = Schema.Literals(["rectangular", "curved", "straight"]).annotate({
+  identifier: "Architecture.EdgeStyle",
+})
+export type EdgeStyle = typeof EdgeStyle.Type
+
 export interface Edge extends Schema.Schema.Type<typeof Edge> {}
 export const Edge = Schema.Struct({
   id: EdgeID,
@@ -62,6 +67,7 @@ export const Edge = Schema.Struct({
   target: NodeID,
   sourceHandle: ConnectionSide.pipe(optional),
   targetHandle: ConnectionSide.pipe(optional),
+  style: EdgeStyle.pipe(optional),
 }).annotate({ identifier: "Architecture.Edge" })
 
 export interface Resource extends Schema.Schema.Type<typeof Resource> {}

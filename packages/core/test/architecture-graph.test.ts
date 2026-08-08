@@ -217,6 +217,67 @@ describe("ArchitectureGraph storage", () => {
     }),
   )
 
+  it.live("salvages direct JSON layout fields and writes back normalized edges", () =>
+    Effect.gen(function* () {
+      const graph = yield* ArchitectureGraph.Service
+      const roots = yield* ArchitectureRoot.Service
+      const storage = yield* roots.get
+      yield* Effect.promise(async () => {
+        await fs.mkdir(storage.resources, { recursive: true })
+        await fs.writeFile(
+          path.join(storage.resources, "manual.json"),
+          JSON.stringify({
+            version: 2,
+            revision: 3,
+            id: "manual",
+            name: "Manual graph",
+            nodes: [
+              { id: "a", text: "A", tags: [], layout: { position: { x: 0, y: 0 } } },
+              { id: "b", text: "B", tags: [], layout: { position: { x: 200, y: 0 } } },
+            ],
+            edges: [
+              {
+                id: "a-b",
+                source: "a",
+                target: "b",
+                type: "step",
+                sourcePosition: "bottom",
+                targetPosition: "top",
+              },
+            ],
+          }),
+        )
+      })
+
+      const loaded = yield* graph.load(Architecture.ResourceID.make("manual"))
+      expect(loaded.resource.edges[0]).toEqual({
+        id: Architecture.EdgeID.make("a-b"),
+        source: Architecture.NodeID.make("a"),
+        target: Architecture.NodeID.make("b"),
+        sourceHandle: "bottom",
+        targetHandle: "top",
+        style: "rectangular",
+      })
+
+      const saved = yield* graph.patch(loaded.resource.id, {
+        revision: loaded.resource.revision,
+        digest: loaded.digest,
+        operations: [{ id: Architecture.OperationID.make("rename"), type: "resource.update", name: "Clean graph" }],
+      })
+      const raw = yield* Effect.promise(() => fs.readFile(path.join(saved.storage.root, saved.storage.path), "utf8"))
+      const json = JSON.parse(raw)
+
+      expect(json.edges[0]).toEqual({
+        id: "a-b",
+        source: "a",
+        target: "b",
+        sourceHandle: "bottom",
+        targetHandle: "top",
+        style: "rectangular",
+      })
+    }),
+  )
+
   it.live("backs up an invalid resource before explicit recovery", () =>
     Effect.gen(function* () {
       const graph = yield* ArchitectureGraph.Service

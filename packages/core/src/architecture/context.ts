@@ -18,16 +18,18 @@ const Value = Schema.Struct({
   summary: Schema.String,
 })
 
-const emptySummary = "No Architecture graph resources exist yet."
+const emptySummary = "No Graph editor resources exist yet."
 const baseline = (value: typeof Value.Type) =>
   [
-    "Architecture graphs are lightweight communication artifacts shared by people and AI, not generated implementation truth. Preserve their authored meaning.",
-    "When the user asks to create an architecture graph or design, use the Architecture graph tools to create a managed graph resource.",
-    'An @ mention matching a graph name (for example, "@Graph 2") directly references the Architecture resource whose name and exact managed path are shown below. Use that exact resource ID/path with the Architecture tools; do not search ordinary project files, code symbols, or scene/node trees for that display name.',
+    "Graph editor resources are lightweight communication artifacts shared by people and AI, not generated implementation truth. Preserve their authored meaning.",
+    "When the user asks to create a graph or design, use the graph_* tools to create a managed graph resource.",
+    'An @ mention matching a graph name (for example, "@Graph 2") directly references the graph resource whose name and exact managed path are shown below. Use that exact resource ID/path with the graph_* tools; do not search ordinary project files, code symbols, or scene/node trees for that display name.',
     "When the user mentions one or more graphs, use only those named resources unless they explicitly ask to compare additional graphs.",
-    "To modify a mentioned graph, use the Architecture graph tools with its resource ID; do not inspect the JSON schema or installed OpenCode internals before making normal node and connection edits.",
+    "To modify a mentioned graph, use the graph_* tools with its resource ID; do not edit .opencode/architecture/resources/*.json directly and do not inspect installed OpenCode internals before making normal graph edits.",
+    "Durable graph data has only these visual structure fields: node text, node tags, node position, connection source, connection target, sourceHandle, targetHandle, and style. Do not invent JSON fields such as sourcePosition, targetPosition, type, status, or edge labels.",
+    "Valid connection styles are rectangular, curved, and straight. For visual-clarity requests, prefer graph_update_layout so positions, handles, and styles change together in one graph edit.",
     "When creating or reorganizing a graph, plan a readable layout before editing: place nodes in spaced layers or clusters, avoid default-origin stacks, and keep related groups visually separated.",
-    "Use the durable routing controls available to agents: node positions plus connection sourceHandle/targetHandle sides (top, right, bottom, left). Vary sides for fan-out, feedback, and cross-cluster links so wires do not stack, cross, or overlap unnecessarily.",
+    "Use node positions plus connection sourceHandle/targetHandle sides (top, right, bottom, left). Vary sides and styles for fan-out, feedback, and cross-cluster links so wires do not stack, cross, or overlap unnecessarily.",
     value.summary,
   ].join("\n")
 
@@ -54,8 +56,8 @@ const layer = Layer.effectDiscard(
                 codec: Schema.toCodecJson(Value),
                 load: Effect.succeed(value(summary)),
                 baseline,
-                update: (_previous, value) => `The project's architecture graphs changed:\n${value.summary}`,
-                removed: () => "Architecture graph context is unavailable.",
+                update: (_previous, value) => `The project's graph resources changed:\n${value.summary}`,
+                removed: () => "Graph editor context is unavailable.",
               }),
             ),
           )
@@ -70,9 +72,9 @@ const layer = Layer.effectDiscard(
                 key: SystemContext.Key.make("architecture/resource-warning"),
                 codec: Schema.toCodecJson(Schema.String),
                 load: Effect.succeed(error.message),
-                baseline: (message) => `Architecture context is unavailable: ${message}`,
-                update: (_previous, message) => `Architecture context remains unavailable: ${message}`,
-                removed: () => "Architecture context is available again.",
+                baseline: (message) => `Graph editor context is unavailable: ${message}`,
+                update: (_previous, message) => `Graph editor context remains unavailable: ${message}`,
+                removed: () => "Graph editor context is available again.",
               }),
             ),
         ),

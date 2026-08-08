@@ -44,21 +44,38 @@ export const entityDigest = (entity: Architecture.Node | Architecture.Edge) => H
 
 export function normalize(resource: Architecture.Resource): Architecture.Resource {
   return {
-    ...resource,
+    version: 2,
+    revision: resource.revision,
+    id: resource.id,
+    name: resource.name,
     nodes: resource.nodes
-      .map((node) => ({ ...node, tags: Array.from(new Set(node.tags)).toSorted() }))
+      .map((node) => ({
+        id: node.id,
+        text: node.text,
+        tags: Array.from(new Set(node.tags)).toSorted(),
+        layout: { position: node.layout.position },
+      }))
       .toSorted((a, b) => a.id.localeCompare(b.id)),
-    edges: resource.edges.toSorted((a, b) => a.id.localeCompare(b.id)),
+    edges: resource.edges
+      .map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle,
+        style: edge.style,
+      }))
+      .toSorted((a, b) => a.id.localeCompare(b.id)),
   }
 }
 
 export const validate = Effect.fn("ArchitecturePatch.validate")(function* (resource: Architecture.Resource) {
   if (resource.name.length > 256)
-    return yield* new InvalidGraphError({ message: `Architecture resource name is too long: ${resource.id}` })
+    return yield* new InvalidGraphError({ message: `Graph resource name is too long: ${resource.id}` })
   if (resource.nodes.length > 10_000)
-    return yield* new InvalidGraphError({ message: "Architecture resource exceeds 10,000 nodes" })
+    return yield* new InvalidGraphError({ message: "Graph resource exceeds 10,000 nodes" })
   if (resource.edges.length > 20_000)
-    return yield* new InvalidGraphError({ message: "Architecture resource exceeds 20,000 edges" })
+    return yield* new InvalidGraphError({ message: "Graph resource exceeds 20,000 edges" })
   const nodes = new Set<string>()
   for (const node of resource.nodes) {
     if (nodes.has(node.id)) return yield* new InvalidGraphError({ message: `Duplicate node ID: ${node.id}` })

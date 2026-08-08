@@ -115,18 +115,19 @@ const layer = Layer.effect(
         Effect.mapError(
           (cause) =>
             new ArchitecturePatch.InvalidGraphError({
-              message: `Architecture resource ${source} is not valid JSON: ${cause}`,
+              message: `Graph resource ${source} is not valid JSON: ${cause}`,
             }),
         ),
       )
-      if (typeof value === "object" && value !== null && "version" in value && value.version !== 2)
-        return yield* new UnsupportedVersionError({ version: String(value.version) })
-      if (Schema.is(Architecture.Resource)(value)) return yield* ArchitecturePatch.validate(value)
-      const resource = yield* decodePrevious(value).pipe(
+      const candidate = sanitizeResource(value)
+      if (typeof candidate === "object" && candidate !== null && "version" in candidate && candidate.version !== 2)
+        return yield* new UnsupportedVersionError({ version: String(candidate.version) })
+      if (Schema.is(Architecture.Resource)(candidate)) return yield* ArchitecturePatch.validate(candidate)
+      const resource = yield* decodePrevious(candidate).pipe(
         Effect.mapError(
           (cause) =>
             new ArchitecturePatch.InvalidGraphError({
-              message: `Architecture resource ${source} is invalid: ${cause}`,
+              message: `Graph resource ${source} is invalid: ${cause}`,
             }),
         ),
       )
@@ -138,7 +139,7 @@ const layer = Layer.effect(
         Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(undefined)),
         Effect.mapError(
           (cause) =>
-            new StorageError({ operation: "read", message: "Unable to read legacy architecture graph", cause }),
+            new StorageError({ operation: "read", message: "Unable to read legacy graph", cause }),
         ),
       )
       if (raw === undefined) return
@@ -146,7 +147,7 @@ const layer = Layer.effect(
         Effect.mapError(
           (cause) =>
             new ArchitecturePatch.InvalidGraphError({
-              message: `Legacy architecture graph is not valid JSON: ${cause}`,
+              message: `Legacy graph is not valid JSON: ${cause}`,
             }),
         ),
       )
@@ -155,7 +156,7 @@ const layer = Layer.effect(
       const graph = yield* decodeLegacy(value).pipe(
         Effect.mapError(
           (cause) =>
-            new ArchitecturePatch.InvalidGraphError({ message: `Legacy architecture graph is invalid: ${cause}` }),
+            new ArchitecturePatch.InvalidGraphError({ message: `Legacy graph is invalid: ${cause}` }),
         ),
       )
       return yield* ArchitecturePatch.validate({
@@ -177,7 +178,7 @@ const layer = Layer.effect(
         Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(undefined)),
         Effect.mapError(
           (cause) =>
-            new StorageError({ operation: "read", message: `Unable to read architecture resource ${id}`, cause }),
+            new StorageError({ operation: "read", message: `Unable to read graph resource ${id}`, cause }),
         ),
       )
       if (raw !== undefined) return { resource: yield* parse(raw, id), source }
@@ -237,7 +238,7 @@ const layer = Layer.effect(
         .pipe(
           Effect.mapError(
             (cause) =>
-              new StorageError({ operation: "mkdir", message: "Unable to create architecture resources", cause }),
+              new StorageError({ operation: "mkdir", message: "Unable to create graph resources", cause }),
           ),
         )
       yield* fs.writeFileString(temporary, encoded, { flag: "wx" }).pipe(
@@ -245,7 +246,7 @@ const layer = Layer.effect(
           (cause) =>
             new StorageError({
               operation: "write",
-              message: `Unable to save architecture resource ${resource.id}`,
+              message: `Unable to save graph resource ${resource.id}`,
               cause,
             }),
         ),
@@ -272,7 +273,7 @@ const layer = Layer.effect(
               (cause) =>
                 new StorageError({
                   operation: "write",
-                  message: `Unable to save architecture resource ${resource.id}`,
+                  message: `Unable to save graph resource ${resource.id}`,
                   cause,
                 }),
             ),
@@ -289,7 +290,7 @@ const layer = Layer.effect(
       const entries = (yield* fs.glob("*.json", { cwd: storage.resources }).pipe(
         Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed([])),
         Effect.mapError(
-          (cause) => new StorageError({ operation: "list", message: "Unable to list architecture resources", cause }),
+          (cause) => new StorageError({ operation: "list", message: "Unable to list graph resources", cause }),
         ),
       )).toSorted()
       if (entries.length === 0) {
@@ -304,7 +305,7 @@ const layer = Layer.effect(
               (cause) =>
                 new StorageError({
                   operation: "read",
-                  message: `Unable to read architecture resource ${entry}`,
+                  message: `Unable to read graph resource ${entry}`,
                   cause,
                 }),
             ),
@@ -333,7 +334,7 @@ const layer = Layer.effect(
           const resource = ArchitecturePatch.empty(input)
           if (yield* fs.existsSafe(file(storage, resource.id)))
             return yield* new ArchitecturePatch.ConflictError({
-              message: `Architecture resource already exists: ${resource.id}`,
+              message: `Graph resource already exists: ${resource.id}`,
               operationIDs: [],
             })
           return yield* write(storage, resource)
@@ -393,7 +394,7 @@ const layer = Layer.effect(
               (cause) =>
                 new StorageError({
                   operation: "remove",
-                  message: `Unable to remove architecture resource ${id}`,
+                  message: `Unable to remove graph resource ${id}`,
                   cause,
                 }),
             ),
@@ -425,7 +426,7 @@ const layer = Layer.effect(
               .pipe(
                 Effect.mapError(
                   (cause) =>
-                    new StorageError({ operation: "mkdir", message: "Unable to create architecture resources", cause }),
+                    new StorageError({ operation: "mkdir", message: "Unable to create graph resources", cause }),
                 ),
               )
             yield* fs.rename(source, path.join(storage.resources, `${id}.invalid.${Date.now()}.json`)).pipe(
@@ -433,7 +434,7 @@ const layer = Layer.effect(
                 (cause) =>
                   new StorageError({
                     operation: "backup",
-                    message: `Unable to preserve architecture resource ${id}`,
+                    message: `Unable to preserve graph resource ${id}`,
                     cause,
                   }),
               ),
@@ -521,7 +522,7 @@ const layer = Layer.effect(
             .slice(0, 75)
             .map(
               (edge) =>
-                `- ${edge.source}.${edge.sourceHandle ?? "right"} -> ${edge.target}.${edge.targetHandle ?? "left"}`,
+                `- ${edge.source}.${edge.sourceHandle ?? "right"} -> ${edge.target}.${edge.targetHandle ?? "left"} (style: ${edge.style ?? "rectangular"})`,
             )
           const compactMention = `@${resource.name.replace(/\s+/g, "")}`
           const lowerCompactMention = compactMention.toLowerCase()
@@ -530,7 +531,7 @@ const layer = Layer.effect(
               ? ""
               : `; mention aliases: ${compactMention}${lowerCompactMention === compactMention ? "" : `, ${lowerCompactMention}`}`
           return [
-            `Architecture resource @${resource.name} (resource ID: ${resource.id}; path: ${resourcePath(resource.id)}${aliases}; revision ${resource.revision}; digest ${ArchitecturePatch.digest(resource).slice(0, 12)})`,
+            `Graph resource @${resource.name} (resource ID: ${resource.id}; path: ${resourcePath(resource.id)}${aliases}; revision ${resource.revision}; digest ${ArchitecturePatch.digest(resource).slice(0, 12)})`,
             ...(nodes.length > 0 ? ["Elements:", ...nodes] : []),
             ...(resource.nodes.length > nodes.length ? ["- additional elements omitted"] : []),
             ...(edges.length > 0 ? ["Relationships:", ...edges] : []),
@@ -568,6 +569,40 @@ function migrateNode(node: typeof LegacyNode.Type): Architecture.Node {
     tags: Array.from(new Set([node.type, node.status])),
     layout: node.layout,
   }
+}
+
+function sanitizeResource(value: unknown) {
+  if (value === null || typeof value !== "object" || !("version" in value) || value.version !== 2) return value
+  const resource = value as Record<string, unknown>
+  return {
+    ...resource,
+    edges: Array.isArray(resource.edges) ? resource.edges.map(sanitizeEdge) : resource.edges,
+  }
+}
+
+function sanitizeEdge(value: unknown) {
+  if (value === null || typeof value !== "object") return value
+  const edge = value as Record<string, unknown>
+  return {
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    sourceHandle: connectionSide(edge.sourceHandle) ?? connectionSide(edge.sourcePosition),
+    targetHandle: connectionSide(edge.targetHandle) ?? connectionSide(edge.targetPosition),
+    style: edgeStyle(edge.style) ?? edgeStyle(edge.type),
+  }
+}
+
+function connectionSide(value: unknown) {
+  if (value === "top" || value === "right" || value === "bottom" || value === "left") return value
+  return undefined
+}
+
+function edgeStyle(value: unknown) {
+  if (value === "rectangular" || value === "step" || value === "smoothstep") return "rectangular"
+  if (value === "curved" || value === "default") return "curved"
+  if (value === "straight") return "straight"
+  return undefined
 }
 
 function traverse(

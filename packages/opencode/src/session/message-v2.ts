@@ -77,7 +77,7 @@ function architectureReference(part: SessionV1.FilePart) {
   const mention = part.source && "text" in part.source ? part.source.text.value.trim() : ""
   const managedPath = architectureResourcePath(part)
   const resourceID = (part.filename ?? managedPath?.split("/").at(-1))?.replace(/\.json$/i, "")
-  return `Architecture graph reference: ${mention || resourceID || "the referenced graph"} identifies the managed Architecture resource${resourceID ? ` with ID ${resourceID}` : ""}${managedPath ? ` at ${managedPath}` : ""}. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.`
+  return `Graph editor reference: ${mention || resourceID || "the referenced graph"} identifies the managed graph resource${resourceID ? ` with ID ${resourceID}` : ""}${managedPath ? ` at ${managedPath}` : ""}. Resolve it through Graph editor System Context or the graph_* tools; do not search ordinary project files or scene/node names for this graph display name.`
 }
 
 export const Event = {

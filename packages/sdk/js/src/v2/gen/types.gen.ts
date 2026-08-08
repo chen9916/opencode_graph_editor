@@ -53,6 +53,8 @@ export type Event =
   | EventSessionError
   | EventInstallationUpdated
   | EventInstallationUpdateAvailable
+  | EventArchitectureResourceUpdated
+  | EventArchitectureResourceRemoved
   | EventFileEdited
   | EventReferenceUpdated
   | EventPermissionV2Asked
@@ -1237,6 +1239,22 @@ export type GlobalEvent = {
         type: "installation.update-available"
         properties: {
           version: string
+        }
+      }
+    | {
+        id: string
+        type: "architecture.resource.updated"
+        properties: {
+          resourceID: string
+          revision: number
+          digest: string
+        }
+      }
+    | {
+        id: string
+        type: "architecture.resource.removed"
+        properties: {
+          resourceID: string
         }
       }
     | {
@@ -2682,6 +2700,32 @@ export type UnauthorizedError = {
   message: string
 }
 
+export type ArchitectureConflictError = {
+  _tag: "ArchitectureConflictError"
+  message: string
+  operationIDs: Array<string>
+  currentRevision?: number
+  currentDigest?: string
+}
+
+export type ArchitectureInvalidGraphError = {
+  _tag: "ArchitectureInvalidGraphError"
+  message: string
+  version?: string
+}
+
+export type ArchitectureNotFoundError = {
+  _tag: "ArchitectureNotFoundError"
+  entity: "resource" | "node" | "edge"
+  id: string
+  message: string
+}
+
+export type ArchitectureUnavailableError = {
+  _tag: "ArchitectureUnavailableError"
+  message: string
+}
+
 export type SessionsResponse = {
   data: Array<SessionV2Info>
   cursor: {
@@ -2901,6 +2945,8 @@ export type V2Event =
   | SessionError
   | InstallationUpdated
   | InstallationUpdateAvailable
+  | ArchitectureResourceUpdated
+  | ArchitectureResourceRemoved
   | FileEdited
   | ReferenceUpdated
   | PermissionV2Asked
@@ -3900,6 +3946,129 @@ export type AgentV2Info = {
   color?: AgentColor
   steps?: number
   permissions: PermissionV2Ruleset
+}
+
+export type ArchitectureResourceSummary = {
+  id: string
+  name: string
+  revision: number
+  digest: string
+  nodes: number
+  edges: number
+}
+
+export type ArchitectureResourceCreateInput = {
+  id?: string
+  name: string
+}
+
+export type ArchitectureTag = string
+
+export type ArchitecturePosition = {
+  x: number
+  y: number
+}
+
+export type ArchitectureNode = {
+  id: string
+  text: string
+  tags: Array<ArchitectureTag>
+  layout: {
+    position: ArchitecturePosition
+  }
+}
+
+export type ArchitectureConnectionSide = "top" | "right" | "bottom" | "left"
+
+export type ArchitectureEdgeStyle = "rectangular" | "curved" | "straight"
+
+export type ArchitectureEdge = {
+  id: string
+  source: string
+  target: string
+  sourceHandle?: ArchitectureConnectionSide
+  targetHandle?: ArchitectureConnectionSide
+  style?: ArchitectureEdgeStyle
+}
+
+export type ArchitectureResource = {
+  version: 2
+  revision: number
+  id: string
+  name: string
+  nodes: Array<ArchitectureNode>
+  edges: Array<ArchitectureEdge>
+}
+
+export type ArchitectureStorage = {
+  root: string
+  path: string
+}
+
+export type ArchitectureResourceSnapshot = {
+  resource: ArchitectureResource
+  digest: string
+  storage: ArchitectureStorage
+}
+
+export type ArchitectureOperation =
+  | {
+      id: string
+      type: "resource.update"
+      name: string
+    }
+  | {
+      id: string
+      type: "node.create"
+      node: ArchitectureNode
+    }
+  | {
+      id: string
+      type: "node.update"
+      node: ArchitectureNode
+      expectedDigest?: string
+    }
+  | {
+      id: string
+      type: "node.position"
+      nodeID: string
+      position: ArchitecturePosition
+      expectedDigest?: string
+    }
+  | {
+      id: string
+      type: "node.remove"
+      nodeID: string
+      cascade: boolean
+      expectedDigest?: string
+    }
+  | {
+      id: string
+      type: "edge.create"
+      edge: ArchitectureEdge
+    }
+  | {
+      id: string
+      type: "edge.update"
+      edge: ArchitectureEdge
+      expectedDigest?: string
+    }
+  | {
+      id: string
+      type: "edge.remove"
+      edgeID: string
+      expectedDigest?: string
+    }
+
+export type ArchitecturePatchInput = {
+  revision: number
+  digest: string
+  operations: Array<ArchitectureOperation>
+}
+
+export type ArchitectureResourceRemoveInput = {
+  revision: number
+  digest: string
 }
 
 export type SessionV2Info = {
@@ -5399,6 +5568,42 @@ export type InstallationUpdateAvailable = {
   }
 }
 
+export type ArchitectureResourceUpdated = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "architecture.resource.updated"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    resourceID: string
+    revision: number
+    digest: string
+  }
+}
+
+export type ArchitectureResourceRemoved = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "architecture.resource.removed"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    resourceID: string
+  }
+}
+
 export type FileEdited = {
   id: string
   metadata?: {
@@ -6703,6 +6908,24 @@ export type EventInstallationUpdateAvailable = {
   type: "installation.update-available"
   properties: {
     version: string
+  }
+}
+
+export type EventArchitectureResourceUpdated = {
+  id: string
+  type: "architecture.resource.updated"
+  properties: {
+    resourceID: string
+    revision: number
+    digest: string
+  }
+}
+
+export type EventArchitectureResourceRemoved = {
+  id: string
+  type: "architecture.resource.removed"
+  properties: {
+    resourceID: string
   }
 }
 
@@ -11328,6 +11551,342 @@ export type V2AgentListResponses = {
 }
 
 export type V2AgentListResponse = V2AgentListResponses[keyof V2AgentListResponses]
+
+export type V2ArchitectureResourceListData = {
+  body?: never
+  path?: never
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource"
+}
+
+export type V2ArchitectureResourceListErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceListError = V2ArchitectureResourceListErrors[keyof V2ArchitectureResourceListErrors]
+
+export type V2ArchitectureResourceListResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: Array<ArchitectureResourceSummary>
+  }
+}
+
+export type V2ArchitectureResourceListResponse =
+  V2ArchitectureResourceListResponses[keyof V2ArchitectureResourceListResponses]
+
+export type V2ArchitectureResourceCreateData = {
+  body: ArchitectureResourceCreateInput
+  path?: never
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource"
+}
+
+export type V2ArchitectureResourceCreateErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceCreateError =
+  V2ArchitectureResourceCreateErrors[keyof V2ArchitectureResourceCreateErrors]
+
+export type V2ArchitectureResourceCreateResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: ArchitectureResourceSnapshot
+  }
+}
+
+export type V2ArchitectureResourceCreateResponse =
+  V2ArchitectureResourceCreateResponses[keyof V2ArchitectureResourceCreateResponses]
+
+export type V2ArchitectureResourceRemoveData = {
+  body: ArchitectureResourceRemoveInput
+  path: {
+    resourceID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource/{resourceID}"
+}
+
+export type V2ArchitectureResourceRemoveErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceRemoveError =
+  V2ArchitectureResourceRemoveErrors[keyof V2ArchitectureResourceRemoveErrors]
+
+export type V2ArchitectureResourceRemoveResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: null
+  }
+}
+
+export type V2ArchitectureResourceRemoveResponse =
+  V2ArchitectureResourceRemoveResponses[keyof V2ArchitectureResourceRemoveResponses]
+
+export type V2ArchitectureResourceGetData = {
+  body?: never
+  path: {
+    resourceID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource/{resourceID}"
+}
+
+export type V2ArchitectureResourceGetErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceGetError = V2ArchitectureResourceGetErrors[keyof V2ArchitectureResourceGetErrors]
+
+export type V2ArchitectureResourceGetResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: ArchitectureResourceSnapshot
+  }
+}
+
+export type V2ArchitectureResourceGetResponse =
+  V2ArchitectureResourceGetResponses[keyof V2ArchitectureResourceGetResponses]
+
+export type V2ArchitectureResourcePatchData = {
+  body: ArchitecturePatchInput
+  path: {
+    resourceID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource/{resourceID}"
+}
+
+export type V2ArchitectureResourcePatchErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourcePatchError =
+  V2ArchitectureResourcePatchErrors[keyof V2ArchitectureResourcePatchErrors]
+
+export type V2ArchitectureResourcePatchResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: ArchitectureResourceSnapshot
+  }
+}
+
+export type V2ArchitectureResourcePatchResponse =
+  V2ArchitectureResourcePatchResponses[keyof V2ArchitectureResourcePatchResponses]
+
+export type V2ArchitectureResourceResetData = {
+  body?: never
+  path: {
+    resourceID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource/{resourceID}/reset"
+}
+
+export type V2ArchitectureResourceResetErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceResetError =
+  V2ArchitectureResourceResetErrors[keyof V2ArchitectureResourceResetErrors]
+
+export type V2ArchitectureResourceResetResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: ArchitectureResourceSnapshot
+  }
+}
+
+export type V2ArchitectureResourceResetResponse =
+  V2ArchitectureResourceResetResponses[keyof V2ArchitectureResourceResetResponses]
 
 export type V2SessionListData = {
   body?: never

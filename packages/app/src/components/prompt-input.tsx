@@ -615,7 +615,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         path: architectureResourcePath(resource.id),
         display: resource.name,
         search: architectureResourceAliases(resource).join(" "),
-        description: `Architecture graph · ${resource.id}`,
+        description: `Graph editor · ${resource.id}`,
       }),
     ),
   )

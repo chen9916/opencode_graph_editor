@@ -4,7 +4,7 @@ import { BaseEdge, EdgeToolbar, getBezierPath, getSmoothStepPath, getStraightPat
 import type { ArchitectureEdgeStyle } from "./contract"
 import type { ArchitectureFlowEdge } from "./model"
 
-const styles = ["smoothstep", "default", "straight"] as const satisfies ReadonlyArray<ArchitectureEdgeStyle>
+const styles = ["rectangular", "curved", "straight"] as const satisfies ReadonlyArray<ArchitectureEdgeStyle>
 
 export function ArchitectureEdgeView(props: EdgeProps<ArchitectureFlowEdge>) {
   const data = props.data
@@ -13,7 +13,7 @@ export function ArchitectureEdgeView(props: EdgeProps<ArchitectureFlowEdge>) {
   const path =
     data.style === "straight"
       ? getStraightPath(props)
-      : data.style === "default"
+      : data.style === "curved"
         ? getBezierPath(props)
         : getSmoothStepPath(props)
 

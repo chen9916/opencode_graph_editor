@@ -283,7 +283,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       label: `@${resource.name}`,
       search: architectureResourceAliases(resource).join(" "),
       path: architectureResourcePath(resource.id),
-      description: `Architecture graph · ${resource.id}`,
+      description: `Graph editor · ${resource.id}`,
       mention: architectureResourceMention(resource),
     })),
   )

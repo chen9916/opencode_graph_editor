@@ -35,11 +35,18 @@ describe("architecture flow model", () => {
     expect(edges[0]).toMatchObject({ sourceHandle: "right", targetHandle: "left" })
   })
 
-  test("applies persisted visual wire styles without changing the graph edge", () => {
-    const edges = toReactFlow(resource, () => {}, { vertical: "default", horizontal: "straight" }).edges
+  test("uses durable graph edge styles", () => {
+    const styled = {
+      ...resource,
+      edges: [
+        { ...resource.edges[0]!, style: "curved" as const },
+        { ...resource.edges[1]!, style: "straight" as const },
+      ],
+    }
+    const edges = toReactFlow(styled, () => {}).edges
 
     expect(edges.map((edge) => edge.type)).toEqual(["architecture", "architecture"])
-    expect(edges.map((edge) => edge.data?.style)).toEqual(["default", "straight"])
-    expect(edges.map((edge) => edge.data?.edge)).toEqual([...resource.edges])
+    expect(edges.map((edge) => edge.data?.style)).toEqual(["curved", "straight"])
+    expect(edges.map((edge) => edge.data?.edge)).toEqual([...styled.edges])
   })
 })

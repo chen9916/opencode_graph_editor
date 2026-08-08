@@ -10,6 +10,9 @@ import type {
   AppLogResponses,
   AppSkillsErrors,
   AppSkillsResponses,
+  ArchitecturePatchInput,
+  ArchitectureResourceCreateInput,
+  ArchitectureResourceRemoveInput,
   Auth as Auth3,
   AuthRemoveErrors,
   AuthRemoveResponses,
@@ -265,6 +268,18 @@ import type {
   TuiSubmitPromptResponses,
   V2AgentListErrors,
   V2AgentListResponses,
+  V2ArchitectureResourceCreateErrors,
+  V2ArchitectureResourceCreateResponses,
+  V2ArchitectureResourceGetErrors,
+  V2ArchitectureResourceGetResponses,
+  V2ArchitectureResourceListErrors,
+  V2ArchitectureResourceListResponses,
+  V2ArchitectureResourcePatchErrors,
+  V2ArchitectureResourcePatchResponses,
+  V2ArchitectureResourceRemoveErrors,
+  V2ArchitectureResourceRemoveResponses,
+  V2ArchitectureResourceResetErrors,
+  V2ArchitectureResourceResetResponses,
   V2CommandListErrors,
   V2CommandListResponses,
   V2CredentialRemoveErrors,
@@ -5083,6 +5098,245 @@ export class Agent extends HeyApiClient {
   }
 }
 
+export class Resource2 extends HeyApiClient {
+  /**
+   * List graph resources
+   *
+   * List the saved Graph editor resources available to people and agents in this project.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "location" }] }])
+    return (options?.client ?? this.client).get<
+      V2ArchitectureResourceListResponses,
+      V2ArchitectureResourceListErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create graph resource
+   *
+   * Create a lightweight named graph resource.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      architectureResourceCreateInput: ArchitectureResourceCreateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "location" },
+            { key: "architectureResourceCreateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      V2ArchitectureResourceCreateResponses,
+      V2ArchitectureResourceCreateErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Remove graph resource
+   *
+   * Remove a graph resource with optimistic concurrency checks.
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters: {
+      resourceID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      architectureResourceRemoveInput: ArchitectureResourceRemoveInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "resourceID" },
+            { in: "query", key: "location" },
+            { key: "architectureResourceRemoveInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<
+      V2ArchitectureResourceRemoveResponses,
+      V2ArchitectureResourceRemoveErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource/{resourceID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Get graph resource
+   *
+   * Load one graph resource for the requested project location.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters: {
+      resourceID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "resourceID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      V2ArchitectureResourceGetResponses,
+      V2ArchitectureResourceGetErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource/{resourceID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Update graph resource
+   *
+   * Atomically apply graph edits with optimistic concurrency checks.
+   */
+  public patch<ThrowOnError extends boolean = false>(
+    parameters: {
+      resourceID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      architecturePatchInput: ArchitecturePatchInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "resourceID" },
+            { in: "query", key: "location" },
+            { key: "architecturePatchInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<
+      V2ArchitectureResourcePatchResponses,
+      V2ArchitectureResourcePatchErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource/{resourceID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Reset graph resource
+   *
+   * Preserve an invalid graph as a recovery file and create an empty graph.
+   */
+  public reset<ThrowOnError extends boolean = false>(
+    parameters: {
+      resourceID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "resourceID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      V2ArchitectureResourceResetResponses,
+      V2ArchitectureResourceResetErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource/{resourceID}/reset",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Architecture extends HeyApiClient {
+  private _resource?: Resource2
+  get resource(): Resource2 {
+    return (this._resource ??= new Resource2({ client: this.client }))
+  }
+}
+
 export class Revert extends HeyApiClient {
   /**
    * Stage session revert
@@ -7001,6 +7255,11 @@ export class V2 extends HeyApiClient {
   private _agent?: Agent
   get agent(): Agent {
     return (this._agent ??= new Agent({ client: this.client }))
+  }
+
+  private _architecture?: Architecture
+  get architecture(): Architecture {
+    return (this._architecture ??= new Architecture({ client: this.client }))
   }
 
   private _session?: Session3

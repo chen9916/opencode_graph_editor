@@ -65,7 +65,10 @@ describe("ArchitectureTools", () => {
         "Use this instead of searching workspace files",
       )
       expect((yield* toolDefinitions(registry)).map((tool) => tool.description).join("\n")).toContain(
-        "sourceHandle and targetHandle sides to reduce crossing or overlapping wires",
+        "sourceHandle, targetHandle, and style",
+      )
+      expect((yield* toolDefinitions(registry)).map((tool) => tool.description).join("\n")).toContain(
+        "Do not edit graph JSON directly",
       )
 
       yield* settleTool(
@@ -127,10 +130,11 @@ describe("ArchitectureTools", () => {
           target: "b",
           sourceHandle: "bottom",
           targetHandle: "top",
+          style: "curved",
         }),
       )
       expect(connected.output?.structured).toMatchObject({
-        edge: { id: "a-to-b", source: "a", target: "b", sourceHandle: "bottom", targetHandle: "top" },
+        edge: { id: "a-to-b", source: "a", target: "b", sourceHandle: "bottom", targetHandle: "top", style: "curved" },
       })
 
       const updatedConnection = yield* settleTool(
@@ -140,10 +144,24 @@ describe("ArchitectureTools", () => {
           edgeID: "a-to-b",
           sourceHandle: "left",
           targetHandle: "right",
+          style: "straight",
         }),
       )
       expect(updatedConnection.output?.structured).toMatchObject({
-        edge: { id: "a-to-b", sourceHandle: "left", targetHandle: "right" },
+        edge: { id: "a-to-b", sourceHandle: "left", targetHandle: "right", style: "straight" },
+      })
+
+      const layout = yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.updateLayout, {
+          resourceID,
+          nodes: [{ nodeID: "a", position: { x: -160, y: 80 } }],
+          edges: [{ edgeID: "a-to-b", sourceHandle: "right", targetHandle: "left", style: "rectangular" }],
+        }),
+      )
+      expect(layout.output?.structured).toMatchObject({
+        nodeIDs: ["a"],
+        edgeIDs: ["a-to-b"],
       })
 
       const queried = yield* settleTool(
@@ -165,7 +183,7 @@ describe("ArchitectureTools", () => {
       const context = yield* settleTool(registry, call(ArchitectureTools.names.getContext, {}))
       expect(context.output?.structured).toContain("Updated conversation [interaction, planned]")
       expect(context.output?.structured).toContain(".opencode/architecture/resources/product.json")
-      expect(context.output?.structured).toContain("a.left -> b.right")
+      expect(context.output?.structured).toContain("a.right -> b.left (style: rectangular)")
       expect(context.output?.structured).toContain("details")
       expect(assertions.every((item) => item.resources[0]?.startsWith(".opencode/architecture/resources"))).toBe(true)
       expect(assertions.every((item) => item.source?.type === "tool")).toBe(true)

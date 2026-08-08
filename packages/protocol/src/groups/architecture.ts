@@ -28,8 +28,8 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
       .annotateMerge(
         OpenApi.annotations({
           identifier: "v2.architecture.resource.list",
-          summary: "List architecture resources",
-          description: "List the saved architecture graphs available to people and agents in this project.",
+          summary: "List graph resources",
+          description: "List the saved Graph editor resources available to people and agents in this project.",
         }),
       ),
   )
@@ -44,8 +44,8 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
       .annotateMerge(
         OpenApi.annotations({
           identifier: "v2.architecture.resource.create",
-          summary: "Create architecture resource",
-          description: "Create a lightweight named architecture graph.",
+          summary: "Create graph resource",
+          description: "Create a lightweight named graph resource.",
         }),
       ),
   )
@@ -60,8 +60,8 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
       .annotateMerge(
         OpenApi.annotations({
           identifier: "v2.architecture.resource.get",
-          summary: "Get architecture resource",
-          description: "Load one architecture graph for the requested project location.",
+          summary: "Get graph resource",
+          description: "Load one graph resource for the requested project location.",
         }),
       ),
   )
@@ -77,7 +77,7 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
       .annotateMerge(
         OpenApi.annotations({
           identifier: "v2.architecture.resource.patch",
-          summary: "Update architecture resource",
+          summary: "Update graph resource",
           description: "Atomically apply graph edits with optimistic concurrency checks.",
         }),
       ),
@@ -94,8 +94,8 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
       .annotateMerge(
         OpenApi.annotations({
           identifier: "v2.architecture.resource.remove",
-          summary: "Remove architecture resource",
-          description: "Remove an architecture graph with optimistic concurrency checks.",
+          summary: "Remove graph resource",
+          description: "Remove a graph resource with optimistic concurrency checks.",
         }),
       ),
   )
@@ -110,7 +110,7 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
       .annotateMerge(
         OpenApi.annotations({
           identifier: "v2.architecture.resource.reset",
-          summary: "Reset architecture resource",
+          summary: "Reset graph resource",
           description: "Preserve an invalid graph as a recovery file and create an empty graph.",
         }),
       ),
@@ -118,6 +118,6 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
   .annotateMerge(
     OpenApi.annotations({
       title: "architecture",
-      description: "Location-scoped architecture graphs shared by people and agents.",
+      description: "Location-scoped Graph editor resources shared by people and agents.",
     }),
   )

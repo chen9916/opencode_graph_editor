@@ -233,6 +233,7 @@ export type ArchitectureCreateResourceOutput = {
         readonly target: string
         readonly sourceHandle?: "top" | "right" | "bottom" | "left"
         readonly targetHandle?: "top" | "right" | "bottom" | "left"
+        readonly style?: "rectangular" | "curved" | "straight"
       }>
     }
     readonly digest: string
@@ -271,6 +272,7 @@ export type ArchitectureGetResourceOutput = {
         readonly target: string
         readonly sourceHandle?: "top" | "right" | "bottom" | "left"
         readonly targetHandle?: "top" | "right" | "bottom" | "left"
+        readonly style?: "rectangular" | "curved" | "straight"
       }>
     }
     readonly digest: string
@@ -332,6 +334,7 @@ export type ArchitecturePatchResourceInput = {
             readonly target: string
             readonly sourceHandle?: "top" | "right" | "bottom" | "left"
             readonly targetHandle?: "top" | "right" | "bottom" | "left"
+            readonly style?: "rectangular" | "curved" | "straight"
           }
         }
       | {
@@ -343,6 +346,7 @@ export type ArchitecturePatchResourceInput = {
             readonly target: string
             readonly sourceHandle?: "top" | "right" | "bottom" | "left"
             readonly targetHandle?: "top" | "right" | "bottom" | "left"
+            readonly style?: "rectangular" | "curved" | "straight"
           }
           readonly expectedDigest?: string
         }
@@ -398,6 +402,7 @@ export type ArchitecturePatchResourceInput = {
             readonly target: string
             readonly sourceHandle?: "top" | "right" | "bottom" | "left"
             readonly targetHandle?: "top" | "right" | "bottom" | "left"
+            readonly style?: "rectangular" | "curved" | "straight"
           }
         }
       | {
@@ -409,6 +414,7 @@ export type ArchitecturePatchResourceInput = {
             readonly target: string
             readonly sourceHandle?: "top" | "right" | "bottom" | "left"
             readonly targetHandle?: "top" | "right" | "bottom" | "left"
+            readonly style?: "rectangular" | "curved" | "straight"
           }
           readonly expectedDigest?: string
         }
@@ -464,6 +470,7 @@ export type ArchitecturePatchResourceInput = {
             readonly target: string
             readonly sourceHandle?: "top" | "right" | "bottom" | "left"
             readonly targetHandle?: "top" | "right" | "bottom" | "left"
+            readonly style?: "rectangular" | "curved" | "straight"
           }
         }
       | {
@@ -475,6 +482,7 @@ export type ArchitecturePatchResourceInput = {
             readonly target: string
             readonly sourceHandle?: "top" | "right" | "bottom" | "left"
             readonly targetHandle?: "top" | "right" | "bottom" | "left"
+            readonly style?: "rectangular" | "curved" | "straight"
           }
           readonly expectedDigest?: string
         }
@@ -507,6 +515,7 @@ export type ArchitecturePatchResourceOutput = {
         readonly target: string
         readonly sourceHandle?: "top" | "right" | "bottom" | "left"
         readonly targetHandle?: "top" | "right" | "bottom" | "left"
+        readonly style?: "rectangular" | "curved" | "straight"
       }>
     }
     readonly digest: string
@@ -563,6 +572,7 @@ export type ArchitectureResetResourceOutput = {
         readonly target: string
         readonly sourceHandle?: "top" | "right" | "bottom" | "left"
         readonly targetHandle?: "top" | "right" | "bottom" | "left"
+        readonly style?: "rectangular" | "curved" | "straight"
       }>
     }
     readonly digest: string

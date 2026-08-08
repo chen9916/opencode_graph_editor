@@ -27,7 +27,6 @@ export type ArchitectureFlowEdge = Edge<
 export function toReactFlow(
   resource: ArchitectureResource,
   onTextChange: (node: ArchitectureNode, text: string) => void,
-  edgeStyles: Readonly<Record<string, ArchitectureEdgeStyle>> = {},
   controls?: ArchitectureFlowEdgeControls,
 ) {
   return {
@@ -47,7 +46,7 @@ export function toReactFlow(
         sourceHandle: edge.sourceHandle ?? "right",
         targetHandle: edge.targetHandle ?? "left",
         type: "architecture",
-        data: { edge, style: edgeStyles[edge.id] ?? "smoothstep", controls },
+        data: { edge, style: edge.style ?? "rectangular", controls },
       }),
     ),
   }

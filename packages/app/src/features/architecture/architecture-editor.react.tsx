@@ -65,7 +65,6 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenu>()
-  const [edgeStyles, setEdgeStyles] = useState(props.edgeStyles)
   const operations = flattenJournal(editor.past)
   const dirty = operations.length > 0 || (props.draft?.conflicts.length ?? 0) > 0
   const tags = unique(editor.resource.nodes.flatMap((node) => node.tags))
@@ -88,11 +87,11 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     commit([{ id: operationID(), type: "node.update", node: { ...node, text } }])
   }
 
-  const projected = toReactFlow(editor.resource, updateNodeText, edgeStyles, {
+  const projected = toReactFlow(editor.resource, updateNodeText, {
     label: props.labels.connectionStyle,
     styles: {
-      smoothstep: props.labels.rectangular,
-      default: props.labels.curved,
+      rectangular: props.labels.rectangular,
+      curved: props.labels.curved,
       straight: props.labels.straight,
     },
     onChange: (edgeID, style) => changeEdgeStyle(edgeID, style),
@@ -101,15 +100,9 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState(projected.edges)
 
   const changeEdgeStyle = (edgeID: string, style: ArchitectureEdgeStyle) => {
-    if ((edgeStyles[edgeID] ?? "smoothstep") === style) return
-    setEdgeStyles((current) => (current[edgeID] === style ? current : { ...current, [edgeID]: style }))
-    setEdges((current) =>
-      current.map((edge) => {
-        if (edge.id !== edgeID || !edge.data || edge.data.style === style) return edge
-        return { ...edge, data: { ...edge.data, style } }
-      }),
-    )
-    props.onEdgeStyle(edgeID, style)
+    const edge = editor.resource.edges.find((candidate) => candidate.id === edgeID)
+    if (!edge || (edge.style ?? "rectangular") === style) return
+    commit([{ id: operationID(), type: "edge.update", edge: { ...edge, style } }])
   }
 
   const select = (next: Selection | undefined) => {
@@ -157,15 +150,11 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }, [base.digest, base.resource.id, initialKey])
 
   useEffect(() => {
-    setEdgeStyles(props.edgeStyles)
-  }, [base.resource.id, props.edgeStyles])
-
-  useEffect(() => {
-    const next = toReactFlow(editor.resource, updateNodeText, edgeStyles, {
+    const next = toReactFlow(editor.resource, updateNodeText, {
       label: props.labels.connectionStyle,
       styles: {
-        smoothstep: props.labels.rectangular,
-        default: props.labels.curved,
+        rectangular: props.labels.rectangular,
+        curved: props.labels.curved,
         straight: props.labels.straight,
       },
       onChange: (edgeID, style) => changeEdgeStyle(edgeID, style),
@@ -193,7 +182,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         selected: selection?.type === "edge" && selection.id === edge.id,
       })),
     )
-  }, [editor.resource, edgeStyles, filter.tag, filter.text, setEdges, setNodes])
+  }, [editor.resource, filter.tag, filter.text, setEdges, setNodes])
 
   const undo = () => {
     const batch = editor.past.at(-1)
@@ -304,6 +293,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       target: connection.target,
       sourceHandle: connectionSide(connection.sourceHandle, "right"),
       targetHandle: connectionSide(connection.targetHandle, "left"),
+      style: "rectangular",
     }
     commit([{ id: operationID(), type: "edge.create", edge }])
     select({ type: "edge", id: edge.id })
@@ -608,7 +598,9 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
                 <>
                   <EdgeStyleControls
                     labels={props.labels}
-                    style={edgeStyles[contextMenu.id] ?? "smoothstep"}
+                    style={
+                      editor.resource.edges.find((edge) => edge.id === contextMenu.id)?.style ?? "rectangular"
+                    }
                     onChange={(style) => changeEdgeStyle(contextMenu.id, style)}
                   />
                   <button
@@ -642,7 +634,6 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               resource={editor.resource}
               selection={selection}
               selected={selected}
-              edgeStyle={selection?.type === "edge" ? (edgeStyles[selection.id] ?? "smoothstep") : undefined}
               labels={props.labels}
               onEdgeStyle={changeEdgeStyle}
               onCommit={commit}
@@ -670,7 +661,6 @@ function Inspector(props: {
   readonly resource: ArchitectureResource
   readonly selection: Selection | undefined
   readonly selected: ArchitectureNode | ArchitectureEdge | undefined
-  readonly edgeStyle: ArchitectureEdgeStyle | undefined
   readonly labels: ArchitecturePanelProps["labels"]
   readonly onEdgeStyle: (edgeID: string, style: ArchitectureEdgeStyle) => void
   readonly onCommit: (operations: ReadonlyArray<ArchitectureOperation>) => void
@@ -729,7 +719,7 @@ function Inspector(props: {
         </div>
         <EdgeStyleControls
           labels={props.labels}
-          style={props.edgeStyle ?? "smoothstep"}
+          style={edge.style ?? "rectangular"}
           onChange={(style) => props.onEdgeStyle(edge.id, style)}
         />
       </div>
@@ -755,8 +745,8 @@ function EdgeStyleControls(props: {
       <div>
         {(
           [
-            ["smoothstep", props.labels.rectangular],
-            ["default", props.labels.curved],
+            ["rectangular", props.labels.rectangular],
+            ["curved", props.labels.curved],
             ["straight", props.labels.straight],
           ] as const
         ).map(([style, label]) => (

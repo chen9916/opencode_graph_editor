@@ -9,7 +9,7 @@ export type ArchitectureEdge = ArchitectureResource["edges"][number]
 export type ArchitectureConnectionSide = NonNullable<ArchitectureEdge["sourceHandle"]>
 export type ArchitectureOperation = ArchitecturePatchResourceInput["operations"][number]
 export type ArchitectureViewport = { readonly x: number; readonly y: number; readonly zoom: number }
-export type ArchitectureEdgeStyle = "smoothstep" | "default" | "straight"
+export type ArchitectureEdgeStyle = "rectangular" | "curved" | "straight"
 
 export type ArchitectureDraft = {
   readonly base: ArchitectureSnapshot
@@ -65,13 +65,11 @@ export type ArchitecturePanelProps = {
   readonly snapshot: ArchitectureSnapshot
   readonly draft?: ArchitectureDraft
   readonly viewport?: ArchitectureViewport
-  readonly edgeStyles: Readonly<Record<string, ArchitectureEdgeStyle>>
   readonly busy: boolean
   readonly action?: { readonly id: number; readonly type: "save" | "reload" | "fitView" | "addNode" }
   readonly labels: ArchitectureLabels
   readonly onJournal: (operations: ReadonlyArray<ArchitectureOperation>) => void
   readonly onViewport: (viewport: ArchitectureViewport) => void
-  readonly onEdgeStyle: (edgeID: string, style: ArchitectureEdgeStyle) => void
   readonly onSave: (operations: ReadonlyArray<ArchitectureOperation>) => void
   readonly onReload: () => void
   readonly onExport: (operations: ReadonlyArray<ArchitectureOperation>) => void

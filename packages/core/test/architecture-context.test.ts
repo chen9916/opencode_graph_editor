@@ -27,10 +27,10 @@ describe("ArchitectureContext", () => {
       const registry = yield* SystemContextRegistry.Service
 
       const empty = yield* SystemContext.initialize(yield* registry.load())
-      expect(empty.baseline).toContain("Architecture graphs are lightweight communication artifacts")
+      expect(empty.baseline).toContain("Graph editor resources are lightweight communication artifacts")
       expect(empty.baseline).toContain("create a managed graph resource")
       expect(empty.baseline).toContain("plan a readable layout")
-      expect(empty.baseline).toContain("No Architecture graph resources exist yet.")
+      expect(empty.baseline).toContain("No Graph editor resources exist yet.")
 
       const base = yield* graph.create({
         id: Architecture.ResourceID.make("product"),
@@ -55,12 +55,14 @@ describe("ArchitectureContext", () => {
       const initialized = yield* SystemContext.initialize(yield* registry.load())
       expect(initialized.baseline).toContain("lightweight communication artifacts")
       expect(initialized.baseline).toContain(
-        "@Graph 1 (resource ID: product; path: .opencode/architecture/resources/product.json",
+        "Graph resource @Graph 1 (resource ID: product; path: .opencode/architecture/resources/product.json",
       )
       expect(initialized.baseline).toContain("mention aliases: @Graph1, @graph1")
       expect(initialized.baseline).toContain("do not search ordinary project files")
-      expect(initialized.baseline).toContain("use the Architecture graph tools with its resource ID")
-      expect(initialized.baseline).toContain("Vary sides for fan-out")
+      expect(initialized.baseline).toContain("use the graph_* tools with its resource ID")
+      expect(initialized.baseline).toContain("Valid connection styles are rectangular, curved, and straight")
+      expect(initialized.baseline).toContain("Do not invent JSON fields")
+      expect(initialized.baseline).toContain("Vary sides and styles for fan-out")
       expect(initialized.baseline).toContain("Conversation [planned, user experience]")
       expect(initialized.baseline).toContain("(position: 0, 0)")
 
@@ -87,7 +89,7 @@ describe("ArchitectureContext", () => {
         fs.writeFile(path.join(changed.storage.root, changed.storage.path), "{ invalid architecture"),
       )
       const warning = yield* SystemContext.initialize(yield* registry.load())
-      expect(warning.baseline).toContain("Architecture context is unavailable")
+      expect(warning.baseline).toContain("Graph editor context is unavailable")
       expect(warning.baseline).toContain("not valid JSON")
     }),
   )

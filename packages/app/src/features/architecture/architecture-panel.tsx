@@ -23,7 +23,6 @@ import { ArchitectureIsland } from "./architecture-island"
 import { ARCHITECTURE_COMMAND_EVENT, type ArchitectureCommand } from "./commands"
 import type {
   ArchitectureDraft,
-  ArchitectureEdgeStyle,
   ArchitectureLabels,
   ArchitectureOperation,
   ArchitectureViewport,
@@ -44,7 +43,6 @@ export default function ArchitecturePanel() {
       selectedID: undefined as string | undefined,
       drafts: {} as Record<string, ArchitectureDraft | undefined>,
       viewports: {} as Record<string, ArchitectureViewport | undefined>,
-      edgeStyles: {} as Record<string, Record<string, ArchitectureEdgeStyle> | undefined>,
     }),
   )
   const [state, setState] = createStore({
@@ -275,7 +273,6 @@ export default function ArchitecturePanel() {
         .then(async () => {
           setPersistedState("drafts", current.resource.id, undefined)
           setPersistedState("viewports", current.resource.id, undefined)
-          setPersistedState("edgeStyles", current.resource.id, undefined)
           setPersistedState("selectedID", undefined)
           await resources.refetch()
         })
@@ -360,7 +357,6 @@ export default function ArchitecturePanel() {
                         snapshot={resource.data!}
                         draft={draft()}
                         viewport={viewport()}
-                        edgeStyles={persistedState.edgeStyles[resourceID()!] ?? {}}
                         busy={state.busy}
                         action={state.action}
                         labels={labels()}
@@ -368,14 +364,6 @@ export default function ArchitecturePanel() {
                         onViewport={(value) => {
                           const id = resourceID()
                           if (id) setPersistedState("viewports", id, value)
-                        }}
-                        onEdgeStyle={(edgeID, style) => {
-                          const id = resourceID()
-                          if (!id) return
-                          setPersistedState("edgeStyles", id, {
-                            ...(persistedState.edgeStyles[id] ?? {}),
-                            [edgeID]: style,
-                          })
                         }}
                         onSave={(operations) => void save(operations)}
                         onReload={reload}

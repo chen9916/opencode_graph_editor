@@ -290,13 +290,13 @@
   border-block-start: 2px solid currentColor;
 }
 
-.architecture-editor__wire-toolbar button[data-wire-style="default"] span {
+.architecture-editor__wire-toolbar button[data-wire-style="curved"] span {
   border-block-start: 2px solid currentColor;
   border-radius: 50%;
   transform: rotate(-18deg);
 }
 
-.architecture-editor__wire-toolbar button[data-wire-style="smoothstep"] span {
+.architecture-editor__wire-toolbar button[data-wire-style="rectangular"] span {
   border-block: 2px solid currentColor;
   border-inline-end: 2px solid currentColor;
 }

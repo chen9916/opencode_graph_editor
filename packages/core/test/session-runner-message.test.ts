@@ -43,7 +43,7 @@ describe("toLLMMessages", () => {
           { type: "text", text: "Review @Design 1" },
           {
             type: "text",
-            text: "Architecture graph reference: @Design 1 identifies the managed Architecture resource with ID design-1 at .opencode/architecture/resources/design-1.json. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.",
+            text: "Graph editor reference: @Design 1 identifies the managed graph resource with ID design-1 at .opencode/architecture/resources/design-1.json. Resolve it through Graph editor System Context or the graph_* tools; do not search ordinary project files or scene/node names for this graph display name.",
           },
         ],
         metadata: {},
@@ -78,7 +78,7 @@ describe("toLLMMessages", () => {
 
     expect(messages[0]?.content).toContainEqual({
       type: "text",
-      text: "Architecture graph reference: @Design 1 identifies the managed Architecture resource with ID design-1 at .opencode/architecture/resources/design-1.json. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.",
+      text: "Graph editor reference: @Design 1 identifies the managed graph resource with ID design-1 at .opencode/architecture/resources/design-1.json. Resolve it through Graph editor System Context or the graph_* tools; do not search ordinary project files or scene/node names for this graph display name.",
     })
   })
 
@@ -101,7 +101,7 @@ describe("toLLMMessages", () => {
 
     expect(messages[0]?.content).toContainEqual({
       type: "text",
-      text: "Architecture graph reference: @Design 2 identifies the managed Architecture resource with ID design-2 at .opencode/architecture/resources/design-2.json. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.",
+      text: "Graph editor reference: @Design 2 identifies the managed graph resource with ID design-2 at .opencode/architecture/resources/design-2.json. Resolve it through Graph editor System Context or the graph_* tools; do not search ordinary project files or scene/node names for this graph display name.",
     })
   })
 

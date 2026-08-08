@@ -28,7 +28,7 @@ const architectureReference = (file: FileAttachment): ContentPart => {
   const resourceID = (file.name ?? managedPath?.split("/").at(-1))?.replace(/\.json$/i, "")
   return {
     type: "text",
-    text: `Architecture graph reference: ${mention} identifies the managed Architecture resource${resourceID ? ` with ID ${resourceID}` : ""}${managedPath ? ` at ${managedPath}` : ""}. Resolve it through Architecture System Context or the Architecture tools; do not search ordinary project files or scene/node names for this graph display name.`,
+    text: `Graph editor reference: ${mention} identifies the managed graph resource${resourceID ? ` with ID ${resourceID}` : ""}${managedPath ? ` at ${managedPath}` : ""}. Resolve it through Graph editor System Context or the graph_* tools; do not search ordinary project files or scene/node names for this graph display name.`,
   }
 }
 
