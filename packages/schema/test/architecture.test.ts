@@ -20,6 +20,16 @@ const resource = {
 }
 
 describe("Architecture schema", () => {
+  test("decodes the exact draft identity required by commit", () => {
+    expect(Schema.decodeUnknownSync(Architecture.DraftCommitInput)({ revision: 3, digest: "draft-digest" })).toEqual({
+      revision: 3,
+      digest: "draft-digest",
+    })
+    expect(() =>
+      Schema.decodeUnknownSync(Architecture.DraftCommitInput)({ revision: -1, digest: "draft-digest" }),
+    ).toThrow()
+  })
+
   test("decodes a lightweight graph with text nodes and tags", () => {
     expect(Schema.decodeUnknownSync(Architecture.Resource)(resource)).toMatchObject({
       version: 2,

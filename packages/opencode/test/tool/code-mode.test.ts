@@ -3,6 +3,8 @@ import { CODE_MODE_TOOL, CodeModeTool, Parameters, describeCatalog } from "@/too
 import type { Tool as MCPToolDef } from "@modelcontextprotocol/sdk/types.js"
 import { ArchitectureGraph } from "@opencode-ai/core/architecture/graph"
 import { LocationServiceMap } from "@opencode-ai/core/location-services"
+import { Location } from "@opencode-ai/core/location"
+import { AbsolutePath, RelativePath } from "@opencode-ai/core/schema"
 import { Architecture } from "@opencode-ai/schema/architecture"
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
@@ -46,6 +48,8 @@ function harness(input: {
   permission?: PermissionV1.Rule[]
   trigger?: Plugin.Interface["trigger"]
   graph?: Partial<ArchitectureGraph.Interface>
+  workspaceID?: string
+  location?: (ref: Location.Ref) => void
 }) {
   return Layer.mergeAll(
     Layer.mock(Plugin.Service, {
@@ -58,14 +62,22 @@ function harness(input: {
       get: () => Effect.succeed({ name: "build", permission: input.permission ?? [] } as any),
     }),
     Layer.mock(Session.Service, {
-      get: () => Effect.succeed({ directory: "/tmp/opencode-code-mode-test", permission: [] } as any),
+      get: () =>
+        Effect.succeed({
+          directory: "/tmp/opencode-code-mode-test",
+          permission: [],
+          workspaceID: input.workspaceID,
+        } as any),
     }),
     Layer.mock(MCP.Service, {
       tools: () => Effect.succeed(input.mcpTools),
       clients: () => Effect.succeed(Object.fromEntries(input.servers.map((name) => [name, {} as any]))),
     }),
     Layer.mock(LocationServiceMap.Service, {
-      get: () => Layer.mock(ArchitectureGraph.Service, graphMock(input.graph)),
+      get: (ref: Location.Ref) => {
+        input.location?.(ref)
+        return Layer.mock(ArchitectureGraph.Service, graphMock(input.graph))
+      },
     } as any),
   )
 }
@@ -77,14 +89,43 @@ function serverNames(mcpTools: Record<string, MCP.McpTool>, servers?: string[]) 
 function graphMock(input: Partial<ArchitectureGraph.Interface> = {}): ArchitectureGraph.Interface {
   return {
     list: () => Effect.succeed([]),
+    listLive: () => Effect.succeed({ resources: [], source: "saved" }),
     create: () => Effect.die("unexpected graph create in CodeMode test"),
     load: () => Effect.die("unexpected graph load in CodeMode test"),
+    loadLive: () => Effect.die("unexpected graph live load in CodeMode test"),
+    loadDraft: () => Effect.die("unexpected graph draft load in CodeMode test"),
     patch: () => Effect.die("unexpected graph patch in CodeMode test"),
+    patchLive: () => Effect.die("unexpected graph live patch in CodeMode test"),
+    patchDraft: () => Effect.die("unexpected graph draft patch in CodeMode test"),
+    commitDraft: () => Effect.die("unexpected graph draft commit in CodeMode test"),
+    discardDraft: () => Effect.die("unexpected graph draft discard in CodeMode test"),
+    reloadSaved: () => Effect.die("unexpected graph saved reload in CodeMode test"),
     remove: () => Effect.die("unexpected graph remove in CodeMode test"),
     reset: () => Effect.die("unexpected graph reset in CodeMode test"),
     query: () => Effect.die("unexpected graph query in CodeMode test"),
+    queryLive: () => Effect.die("unexpected graph live query in CodeMode test"),
     context: () => Effect.die("unexpected graph context in CodeMode test"),
+    contextLive: () => Effect.die("unexpected graph live context in CodeMode test"),
     ...input,
+  }
+}
+
+function snapshot(resource: Architecture.Resource, digest = "digest"): Architecture.ResourceSnapshot {
+  return {
+    resource,
+    digest,
+    storage: { root: ".opencode/architecture", path: RelativePath.make(`${resource.id}.json`) },
+  }
+}
+
+function summary(input: Architecture.ResourceSnapshot): Architecture.ResourceSummary {
+  return {
+    id: input.resource.id,
+    name: input.resource.name,
+    revision: input.resource.revision,
+    digest: input.digest,
+    nodes: input.resource.nodes.length,
+    edges: input.resource.edges.length,
   }
 }
 
@@ -316,6 +357,8 @@ describe("code mode execute", () => {
     expect(result.graph).toContain("list_resources")
     expect(result.graph).toContain("batch_edit")
     expect(result.graph).toContain("set_tag_color")
+    expect(result.graph).toContain("validate")
+    expect(result.graph).toContain("auto_layout")
     expect(result.paths).toContain("tools.graph.set_tag_color")
   })
 
@@ -335,7 +378,7 @@ describe("code mode execute", () => {
       undefined,
       undefined,
       {
-        list: () => Effect.succeed([summary]),
+        listLive: () => Effect.succeed({ resources: [{ ...summary, source: "live" as const }], source: "live" as const }),
       },
     )
     const output = await Effect.runPromise(
@@ -345,11 +388,128 @@ describe("code mode execute", () => {
       ),
     )
 
-    expect(JSON.parse(output.output)).toEqual([summary])
+    expect(JSON.parse(output.output)).toEqual([{ ...summary, source: "live" }])
     expect(asked).toEqual(["read"])
     expect(output.metadata.toolCalls).toEqual([
       { tool: "graph.list_resources", status: "completed" },
     ])
+  })
+
+  test("native graph tools use the editor's primary directory location", async () => {
+    const refs: Location.Ref[] = []
+    const tool = await Effect.runPromise(
+      CodeModeTool.pipe(
+        Effect.flatMap(Tool.init),
+        Effect.provide(
+          harness({
+            mcpTools: {},
+            servers: [],
+            workspaceID: "wrk_test",
+            location: (ref) => refs.push(ref),
+          }),
+        ),
+      ),
+    )
+
+    await Effect.runPromise(tool.execute({ code: "return await tools.graph.list_resources({})" }, ctx))
+
+    expect(refs).toEqual([{ directory: AbsolutePath.make("/tmp/opencode-code-mode-test"), workspaceID: undefined }])
+    expect(Object.hasOwn(refs[0]!, "workspaceID")).toBe(true)
+  })
+
+  test("native graph reload reads saved state while live list reports source", async () => {
+    const resourceID = Architecture.ResourceID.make("design_test")
+    const saved = snapshot({
+      version: 2,
+      id: resourceID,
+      name: "Saved graph",
+      revision: 2,
+      nodes: [],
+      edges: [],
+    })
+    const tool = await build(
+      {},
+      undefined,
+      undefined,
+      undefined,
+      {
+        listLive: () => Effect.succeed({ resources: [{ ...summary(saved), source: "live" as const }], source: "live" as const }),
+        reloadSaved: () => Effect.succeed({ snapshot: saved, source: "saved" as const }),
+      },
+    )
+    const output = await Effect.runPromise(
+      tool.execute(
+        {
+          code: `
+            const listed = await tools.graph.list_resources({})
+            const reloaded = await tools.graph.reload_resource({ resourceID: "design_test" })
+            return { listedSource: listed[0].source, reloadSource: reloaded.source, name: reloaded.resource.name }
+          `,
+        },
+        ctx,
+      ),
+    )
+
+    expect(JSON.parse(output.output)).toEqual({ listedSource: "live", reloadSource: "saved", name: "Saved graph" })
+  })
+
+  test("native graph edits patch live drafts by default", async () => {
+    const resourceID = Architecture.ResourceID.make("design_test")
+    const current = snapshot({
+      version: 2,
+      id: resourceID,
+      name: "Live graph",
+      revision: 4,
+      nodes: [],
+      edges: [],
+    }, "live-digest")
+    const patched = snapshot({
+      ...current.resource,
+      revision: 5,
+      nodes: [
+        {
+          id: Architecture.NodeID.make("node_test"),
+          text: "Draft node",
+          tags: [],
+          layout: { position: { x: 1, y: 2 } },
+        },
+      ],
+    }, "patched-digest")
+    const calls: string[] = []
+    const tool = await build(
+      {},
+      undefined,
+      undefined,
+      undefined,
+      {
+        loadLive: () => Effect.sync(() => {
+          calls.push("loadLive")
+          return { snapshot: current, source: "live" as const }
+        }),
+        patchLive: (_id, input) => Effect.sync(() => {
+          calls.push(`patchLive:${input.revision}:${input.digest}`)
+          return { snapshot: patched, source: "live" as const }
+        }),
+      },
+    )
+    const output = await Effect.runPromise(
+      tool.execute(
+        {
+          code: `
+            return await tools.graph.create_node({
+              resourceID: "design_test",
+              id: "node_test",
+              text: "Draft node",
+              position: { x: 1, y: 2 }
+            })
+          `,
+        },
+        ctx,
+      ),
+    )
+
+    expect(calls).toEqual(["loadLive", "patchLive:4:live-digest"])
+    expect(JSON.parse(output.output)).toMatchObject({ revision: 5, digest: "patched-digest", source: "live" })
   })
 
   test("calls a namespaced MCP tool and flows its text result back into the program", async () => {

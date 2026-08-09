@@ -31,6 +31,11 @@ test("exposes every standard HTTP API group", () => {
     "createResource",
     "getResource",
     "patchResource",
+    "getDraft",
+    "patchDraft",
+    "commitDraft",
+    "discardDraft",
+    "reloadSaved",
     "removeResource",
     "resetResource",
   ])
@@ -61,6 +66,32 @@ test("sessions.get returns the wire projection", async () => {
   const result = await client.sessions.get({ sessionID: "ses_test" })
 
   expect(result.time.created).toBe(1_717_171_717_000)
+})
+
+test("architecture commit sends the expected live draft identity", async () => {
+  let body: unknown
+  const client = OpenCode.make({
+    baseUrl: "http://localhost:3000",
+    fetch: async (_input, init) => {
+      body = JSON.parse(String(init?.body))
+      return Response.json({
+        location: { directory: "/repo", project: { id: "project", directory: "/repo" } },
+        data: {
+          resource: { version: 2, revision: 2, id: "design", name: "Design", nodes: [], edges: [] },
+          digest: "saved-digest",
+          storage: { root: "/repo/.opencode/architecture", path: ".opencode/architecture/resources/design.json" },
+        },
+      })
+    },
+  })
+
+  await client.architecture.commitDraft({
+    resourceID: "design",
+    revision: 7,
+    digest: "observed-live-digest",
+  })
+
+  expect(body).toEqual({ revision: 7, digest: "observed-live-digest" })
 })
 
 test("events.subscribe exposes the Promise event stream wire projection", async () => {

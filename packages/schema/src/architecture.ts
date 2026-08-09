@@ -109,6 +109,23 @@ export const ResourceSnapshot = Schema.Struct({
   storage: Storage,
 }).annotate({ identifier: "Architecture.ResourceSnapshot" })
 
+export const DraftSource = Schema.Literals(["live", "saved"]).annotate({
+  identifier: "Architecture.DraftSource",
+})
+export type DraftSource = typeof DraftSource.Type
+
+export interface DraftSnapshot extends Schema.Schema.Type<typeof DraftSnapshot> {}
+export const DraftSnapshot = Schema.Struct({
+  snapshot: ResourceSnapshot,
+  source: DraftSource,
+}).annotate({ identifier: "Architecture.DraftSnapshot" })
+
+export interface DraftCommitInput extends Schema.Schema.Type<typeof DraftCommitInput> {}
+export const DraftCommitInput = Schema.Struct({
+  revision: NonNegativeInt,
+  digest: Schema.String,
+}).annotate({ identifier: "Architecture.DraftCommitInput" })
+
 export interface ResourceCreateInput extends Schema.Schema.Type<typeof ResourceCreateInput> {}
 export const ResourceCreateInput = Schema.Struct({
   id: ResourceID.pipe(optional),
@@ -258,8 +275,30 @@ const ResourceRemoved = define({
   schema: { resourceID: ResourceID },
 })
 
+const ResourceDraftUpdated = define({
+  type: "architecture.resource.draft.updated",
+  schema: {
+    resourceID: ResourceID,
+    revision: NonNegativeInt,
+    digest: Schema.String,
+    baseRevision: NonNegativeInt,
+    baseDigest: Schema.String,
+  },
+})
+
+const ResourceDraftDiscarded = define({
+  type: "architecture.resource.draft.discarded",
+  schema: {
+    resourceID: ResourceID,
+    revision: NonNegativeInt.pipe(optional),
+    digest: Schema.String.pipe(optional),
+  },
+})
+
 export const Event = {
   ResourceUpdated,
   ResourceRemoved,
-  Definitions: inventory(ResourceUpdated, ResourceRemoved),
+  ResourceDraftUpdated,
+  ResourceDraftDiscarded,
+  Definitions: inventory(ResourceUpdated, ResourceRemoved, ResourceDraftUpdated, ResourceDraftDiscarded),
 }

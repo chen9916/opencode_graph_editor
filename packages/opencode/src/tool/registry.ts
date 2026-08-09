@@ -55,7 +55,7 @@ import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
 import { GraphTools } from "./graph"
-import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { LocationServiceMap } from "@opencode-ai/core/location-services"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return providerID === ProviderV2.ID.opencode || flags.exa || flags.parallel
@@ -349,12 +349,6 @@ const layer = Layer.effect(
   }),
 )
 
-const locationServiceMapNode = LayerNode.make({
-  service: LocationServiceMap.Service,
-  layer: locationServiceMapLayer,
-  deps: [],
-})
-
 function isZodType(value: unknown): value is z.ZodType {
   return typeof value === "object" && value !== null && "_zod" in value
 }
@@ -456,7 +450,7 @@ export const node = LayerNode.make({
     MCP.node,
     Database.node,
     Ripgrep.node,
-    locationServiceMapNode,
+    LocationServiceMap.node,
   ],
 })
 

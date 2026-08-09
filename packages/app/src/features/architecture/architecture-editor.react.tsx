@@ -17,19 +17,23 @@ import {
   type XYPosition,
   useEdgesState,
   useNodesState,
+  useStoreApi,
   useUpdateNodeInternals,
 } from "@xyflow/react"
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react"
 import type {
   ArchitectureConnectionSide,
+  ArchitectureDraftChange,
   ArchitectureEdge,
   ArchitectureEdgeStyle,
   ArchitectureNode,
   ArchitectureOperation,
   ArchitecturePanelProps,
   ArchitectureResource,
+  ArchitectureSelectionPrompt,
   ArchitectureViewport,
 } from "./contract"
+import { architectureCommandMatches } from "./commands"
 import { applyOperations, flattenJournal, operationID } from "./journal"
 import { tagColorsKey, toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } from "./model"
 import { ArchitectureEdgeView } from "./architecture-edge.react"
@@ -47,7 +51,19 @@ type Selection = {
 }
 type ContextMenu =
   | { readonly type: "pane"; readonly x: number; readonly y: number; readonly position: XYPosition }
-  | { readonly type: "node" | "edge"; readonly id: string; readonly x: number; readonly y: number }
+  | {
+      readonly type: "node" | "edge"
+      readonly id: string
+      readonly x: number
+      readonly y: number
+      readonly selection: Selection
+    }
+type AskPopover = {
+  readonly x: number
+  readonly y: number
+  readonly selection: Selection
+  readonly text: string
+}
 type EditorState = {
   readonly resource: ArchitectureResource
   readonly past: ReadonlyArray<ReadonlyArray<ArchitectureOperation>>
@@ -65,7 +81,11 @@ const emptySelection: Selection = { nodeIDs: [], edgeIDs: [] }
 export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const base = props.draft?.base ?? props.snapshot
   const initial = props.draft?.operations ?? []
-  const initialKey = `${base.resource.id}:${base.digest}:${initial.map((operation) => operation.id).join(":")}`
+  const historyOrigin = props.draft?.origin ?? props.draft?.live?.snapshot ?? base
+  const historyBase = props.draft?.journalBase ?? historyOrigin.resource
+  const initialKey = props.draft?.live
+    ? `${base.resource.id}:live:${base.digest}:${props.draft.live.snapshot.digest}:${JSON.stringify(props.draft.live.snapshot.resource)}:${initial.map((operation) => operation.id).join(":")}`
+    : `${base.resource.id}:${base.digest}:${initial.map((operation) => operation.id).join(":")}`
   const loaded = useRef(initialKey)
   const loadedResourceID = useRef(base.resource.id)
   const canvas = useRef<HTMLDivElement>(null)
@@ -73,12 +93,13 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const reconnectedEdgeIDs = useRef(new Set<string>())
   const selectionRef = useRef<Selection>(emptySelection)
   const pendingSelection = useRef<Selection>()
+  const handledAction = useRef<number>()
   const suppressEmptySelectionUntil = useRef(0)
   const connecting = useRef(false)
   const outlineID = useId()
   const inspectorID = useId()
   const [editor, setEditor] = useState<EditorState>(() => ({
-    resource: applyOperations(base.resource, initial),
+    resource: applyOperations(historyBase, initial),
     past: initial.map((operation) => [operation]),
     future: [],
   }))
@@ -88,8 +109,9 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenu>()
+  const [askPopover, setAskPopover] = useState<AskPopover>()
   const operations = flattenJournal(editor.past)
-  const dirty = operations.length > 0 || (props.draft?.conflicts.length ?? 0) > 0
+  const dirty = !!props.draft?.live || operations.length > 0 || (props.draft?.conflicts.length ?? 0) > 0
   const tags = unique(editor.resource.nodes.flatMap((node) => node.tags))
   const controlsPosition = props.direction === "rtl" ? "bottom-right" : "bottom-left"
   const minimapPosition = props.direction === "rtl" ? "top-left" : "top-right"
@@ -110,7 +132,9 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       future: [],
     }
     setEditor(next)
-    props.onJournal(flattenJournal(next.past))
+    props.onJournal(
+      draftChange(next.resource, flattenJournal(next.past), base, historyOrigin, props.draft?.conflicts ?? []),
+    )
   }
 
   const updateNodeText = (node: ArchitectureNode, text: string) => {
@@ -154,14 +178,18 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     const pointer = (event: PointerEvent) => {
       if (
         event.target instanceof Element &&
-        event.target.closest(".architecture-editor__context-menu, .architecture-editor__wire-toolbar")
+        event.target.closest(
+          ".architecture-editor__context-menu, .architecture-editor__ask-popover, .architecture-editor__wire-toolbar",
+        )
       )
         return
       setContextMenu(undefined)
+      setAskPopover(undefined)
     }
     const keyboard = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
       setContextMenu(undefined)
+      setAskPopover(undefined)
     }
     document.addEventListener("pointerdown", pointer)
     document.addEventListener("keydown", keyboard)
@@ -179,13 +207,14 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     loaded.current = initialKey
     loadedResourceID.current = base.resource.id
     setEditor({
-      resource: applyOperations(base.resource, initial),
+      resource: applyOperations(historyBase, initial),
       past: initial.map((operation) => [operation]),
       future: [],
     })
     if (!resourceChanged) return
     select(undefined)
     setContextMenu(undefined)
+    setAskPopover(undefined)
     setOutlineOpen(false)
     setInspectorOpen(false)
   }, [base.digest, base.resource.id, initialKey])
@@ -234,11 +263,19 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     if (!batch) return
     const past = editor.past.slice(0, -1)
     setEditor({
-      resource: applyOperations(base.resource, flattenJournal(past)),
+      resource: applyOperations(historyBase, flattenJournal(past)),
       past,
       future: [batch, ...editor.future],
     })
-    props.onJournal(flattenJournal(past))
+    props.onJournal(
+      draftChange(
+        applyOperations(historyBase, flattenJournal(past)),
+        flattenJournal(past),
+        base,
+        historyOrigin,
+        props.draft?.conflicts ?? [],
+      ),
+    )
   }
 
   const redo = () => {
@@ -246,11 +283,19 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     if (!batch) return
     const past = [...editor.past, batch]
     setEditor({
-      resource: applyOperations(base.resource, flattenJournal(past)),
+      resource: applyOperations(historyBase, flattenJournal(past)),
       past,
       future: editor.future.slice(1),
     })
-    props.onJournal(flattenJournal(past))
+    props.onJournal(
+      draftChange(
+        applyOperations(historyBase, flattenJournal(past)),
+        flattenJournal(past),
+        base,
+        historyOrigin,
+        props.draft?.conflicts ?? [],
+      ),
+    )
   }
 
   const addNode = (position?: XYPosition) => {
@@ -336,15 +381,18 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   useEffect(() => {
-    if (!props.action) return
-    if (props.action.type === "save") props.onSave(operations)
-    if (props.action.type === "reload") props.onReload()
-    if (props.action.type === "fitView") fitSelection()
-    if (props.action.type === "addNode") addNode()
-    if (props.action.type === "undo") undo()
-    if (props.action.type === "redo") redo()
-    if (props.action.type === "delete") removeSelection()
-  }, [props.action?.id])
+    const action = props.action
+    if (!action || !architectureCommandMatches(action, base.resource.id) || handledAction.current === action.id) return
+    handledAction.current = action.id
+    if (action.type === "save")
+      props.onSave(draftChange(editor.resource, operations, base, historyOrigin, props.draft?.conflicts ?? []))
+    if (action.type === "reload") props.onReload()
+    if (action.type === "fitView") fitSelection()
+    if (action.type === "addNode") addNode()
+    if (action.type === "undo") undo()
+    if (action.type === "redo") redo()
+    if (action.type === "delete") removeSelection()
+  }, [props.action?.id, props.action?.resourceID, base.resource.id])
 
   const onSelectionChange = (change: OnSelectionChangeParams<ArchitectureFlowNode, ArchitectureFlowEdge>) => {
     const next = selectionFromChange(change)
@@ -376,6 +424,24 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       Math.min(y - (canvas.current?.getBoundingClientRect().top ?? 0), (canvas.current?.clientHeight ?? 252) - 244),
     ),
   })
+
+  const askPosition = (menu: ContextMenu) => ({
+    x: Math.max(8, Math.min(menu.x + 208, (canvas.current?.clientWidth ?? 316) - 316)),
+    y: Math.max(8, Math.min(menu.y, (canvas.current?.clientHeight ?? 244) - 236)),
+  })
+
+  const openAskPopover = (menu: Extract<ContextMenu, { readonly type: "node" | "edge" }>) => {
+    setAskPopover({ ...askPosition(menu), selection: menu.selection, text: "" })
+    setContextMenu(undefined)
+  }
+
+  const sendAskSelection = () => {
+    if (!askPopover) return
+    const text = askPopover.text.trim()
+    if (!text) return
+    props.onAskSelection?.(selectionPrompt(editor.resource, askPopover.selection, text))
+    setAskPopover(undefined)
+  }
 
   const reconnect = (edgeID: string, connection: Connection) => {
     if (!connection.source || !connection.target) return
@@ -558,8 +624,12 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             </button>
             <button
               type="button"
-              onClick={() => props.onSave(operations)}
-              disabled={operations.length === 0 || props.busy}
+              onClick={() =>
+                props.onSave(
+                  draftChange(editor.resource, operations, base, historyOrigin, props.draft?.conflicts ?? []),
+                )
+              }
+              disabled={!dirty || props.busy}
             >
               {props.labels.save}
             </button>
@@ -669,6 +739,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             event.preventDefault()
             const at = menuPosition(event.clientX, event.clientY)
             select(undefined)
+            setAskPopover(undefined)
             setContextMenu({
               type: "pane",
               ...at,
@@ -696,12 +767,14 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             onPaneClick={() => {
               select(undefined)
               setContextMenu(undefined)
+              setAskPopover(undefined)
             }}
             onPaneContextMenu={(event) => {
               event.preventDefault()
               if (!flow) return
               const at = menuPosition(event.clientX, event.clientY)
               select(undefined)
+              setAskPopover(undefined)
               setContextMenu({
                 type: "pane",
                 ...at,
@@ -711,19 +784,28 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             onNodeContextMenu={(event, node) => {
               event.preventDefault()
               const at = menuPosition(event.clientX, event.clientY)
-              select({ type: "node", id: node.id })
-              setContextMenu({ type: "node", id: node.id, ...at })
+              const next = selectionForContextTarget({ type: "node", id: node.id }, selectionRef.current)
+              pendingSelection.current = next
+              suppressEmptySelectionUntil.current = performanceNow() + 220
+              applySelection(next)
+              setAskPopover(undefined)
+              setContextMenu({ type: "node", id: node.id, selection: next, ...at })
             }}
             onEdgeClick={(event, edge) => {
               event.stopPropagation()
               select({ type: "edge", id: edge.id })
               setContextMenu(undefined)
+              setAskPopover(undefined)
             }}
             onEdgeContextMenu={(event, edge) => {
               event.preventDefault()
               const at = menuPosition(event.clientX, event.clientY)
-              select({ type: "edge", id: edge.id })
-              setContextMenu({ type: "edge", id: edge.id, ...at })
+              const next = selectionForContextTarget({ type: "edge", id: edge.id }, selectionRef.current)
+              pendingSelection.current = next
+              suppressEmptySelectionUntil.current = performanceNow() + 220
+              applySelection(next)
+              setAskPopover(undefined)
+              setContextMenu({ type: "edge", id: edge.id, selection: next, ...at })
             }}
             onReconnect={(edge, connection) => reconnect(edge.id, connection)}
             onReconnectEnd={(_event, edge, _handle, connection) => {
@@ -759,6 +841,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             fitView={!props.viewport}
             proOptions={{ hideAttribution: true }}
           >
+            <SelectionLassoCleanup />
             <NodeInternalsRefresh nodeIDs={nodeIDsKey} refreshKey={`${nodeInternalsKey}\u001e${resourceTagColorsKey}`} />
             <Background />
             <Controls position={controlsPosition} />
@@ -799,6 +882,9 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               )}
               {contextMenu.type === "node" && (
                 <>
+                  <button type="button" role="menuitem" onClick={() => openAskPopover(contextMenu)}>
+                    {props.labels.askSelection}
+                  </button>
                   <button
                     type="button"
                     role="menuitem"
@@ -824,6 +910,9 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               )}
               {contextMenu.type === "edge" && (
                 <>
+                  <button type="button" role="menuitem" onClick={() => openAskPopover(contextMenu)}>
+                    {props.labels.askSelection}
+                  </button>
                   <EdgeStyleControls
                     labels={props.labels}
                     style={
@@ -842,6 +931,40 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
                 </>
               )}
             </div>
+          )}
+          {askPopover && (
+            <form
+              className="architecture-editor__ask-popover"
+              style={{ left: askPopover.x, top: askPopover.y }}
+              dir={props.direction}
+              onSubmit={(event) => {
+                event.preventDefault()
+                sendAskSelection()
+              }}
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              <div className="architecture-editor__ask-title">
+                {props.labels.selectedItems(askPopover.selection.nodeIDs.length, askPopover.selection.edgeIDs.length)}
+              </div>
+              <textarea
+                data-prevent-session-autofocus
+                autoFocus
+                value={askPopover.text}
+                placeholder={props.labels.askSelectionPlaceholder}
+                onChange={(event) => setAskPopover({ ...askPopover, text: event.currentTarget.value })}
+                onKeyDown={(event) => {
+                  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") sendAskSelection()
+                }}
+              />
+              <div className="architecture-editor__ask-actions">
+                <button type="button" onClick={() => setAskPopover(undefined)}>
+                  {props.labels.cancel}
+                </button>
+                <button type="submit" disabled={!askPopover.text.trim()}>
+                  {props.labels.send}
+                </button>
+              </div>
+            </form>
           )}
         </div>
         {inspectorOpen && (
@@ -887,6 +1010,37 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       </div>
     </div>
   )
+}
+
+function draftChange(
+  resource: ArchitectureResource,
+  operations: ReadonlyArray<ArchitectureOperation>,
+  base: ArchitecturePanelProps["snapshot"],
+  origin: ArchitecturePanelProps["snapshot"],
+  conflicts: NonNullable<ArchitecturePanelProps["draft"]>["conflicts"],
+): ArchitectureDraftChange {
+  return { base, origin, resource, operations, conflicts }
+}
+
+function SelectionLassoCleanup() {
+  const store = useStoreApi<ArchitectureFlowNode, ArchitectureFlowEdge>()
+  useEffect(() => {
+    const cleanup = () => {
+      const state = store.getState()
+      if (!state.userSelectionActive && !state.userSelectionRect && !state.nodesSelectionActive) return
+      store.setState({ userSelectionActive: false, userSelectionRect: null, nodesSelectionActive: false })
+    }
+    const cleanupAfterReactFlow = () => queueMicrotask(cleanup)
+    window.addEventListener("pointerup", cleanupAfterReactFlow)
+    window.addEventListener("pointercancel", cleanupAfterReactFlow)
+    window.addEventListener("blur", cleanupAfterReactFlow)
+    return () => {
+      window.removeEventListener("pointerup", cleanupAfterReactFlow)
+      window.removeEventListener("pointercancel", cleanupAfterReactFlow)
+      window.removeEventListener("blur", cleanupAfterReactFlow)
+    }
+  }, [store])
+  return null
 }
 
 function NodeInternalsRefresh(props: { readonly nodeIDs: string; readonly refreshKey: string }) {
@@ -1370,6 +1524,13 @@ function selectionFromSingle(selection: SingleSelection | undefined): Selection 
   return { nodeIDs: [], edgeIDs: [selection.id], primary: selection }
 }
 
+function selectionForContextTarget(target: SingleSelection, current: Selection): Selection {
+  const targetSelected =
+    target.type === "node" ? current.nodeIDs.includes(target.id) : current.edgeIDs.includes(target.id)
+  if (targetSelected && current.nodeIDs.length + current.edgeIDs.length > 1) return { ...current, primary: target }
+  return selectionFromSingle(target)
+}
+
 function selectionFromChange(change: OnSelectionChangeParams<ArchitectureFlowNode, ArchitectureFlowEdge>): Selection {
   const nodeIDs = change.nodes.map((node) => node.id)
   const edgeIDs = change.edges.map((edge) => edge.id)
@@ -1401,6 +1562,52 @@ function isEmptySelection(selection: Selection) {
   return selection.nodeIDs.length === 0 && selection.edgeIDs.length === 0
 }
 
+function selectionPrompt(
+  resource: ArchitectureResource,
+  selection: Selection,
+  message: string,
+): ArchitectureSelectionPrompt {
+  return {
+    message,
+    resourceID: resource.id,
+    resourceName: resource.name,
+    nodeIDs: selection.nodeIDs,
+    edgeIDs: selection.edgeIDs,
+    nodes: selection.nodeIDs.flatMap((id) => {
+      const node = resource.nodes.find((candidate) => candidate.id === id)
+      if (!node) return []
+      return [
+        {
+          id: node.id,
+          text: shortSummary(node.text),
+          tags: node.tags,
+          position: node.layout.position,
+        },
+      ]
+    }),
+    edges: selection.edgeIDs.flatMap((id) => {
+      const edge = resource.edges.find((candidate) => candidate.id === id)
+      if (!edge) return []
+      return [
+        {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: edge.sourceHandle,
+          targetHandle: edge.targetHandle,
+          style: edge.style,
+        },
+      ]
+    }),
+  }
+}
+
+function shortSummary(text: string) {
+  const summary = text.replace(/\s+/g, " ").trim()
+  if (summary.length <= 160) return summary
+  return `${summary.slice(0, 157)}...`
+}
+
 function nodeMatchesFilter(node: ArchitectureNode, filter: { readonly text: string; readonly tag: string }) {
   if (filter.tag && !node.tags.includes(filter.tag)) return false
   if (!filter.text) return true
@@ -1424,7 +1631,7 @@ function isViewportPanStartEvent(event: MouseEvent | TouchEvent | null) {
   if (!isViewportMotionEvent(event)) return false
   if (!(event.target instanceof Element)) return true
   return !event.target.closest(
-    ".react-flow__node, .react-flow__edge, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .architecture-editor__toolbar, .architecture-editor__side-toggle, .architecture-editor__context-menu, .architecture-editor__wire-toolbar",
+    ".react-flow__node, .react-flow__edge, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .architecture-editor__toolbar, .architecture-editor__side-toggle, .architecture-editor__context-menu, .architecture-editor__ask-popover, .architecture-editor__wire-toolbar",
   )
 }
 

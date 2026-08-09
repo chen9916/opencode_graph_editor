@@ -55,6 +55,8 @@ export type Event =
   | EventInstallationUpdateAvailable
   | EventArchitectureResourceUpdated
   | EventArchitectureResourceRemoved
+  | EventArchitectureResourceDraftUpdated
+  | EventArchitectureResourceDraftDiscarded
   | EventFileEdited
   | EventReferenceUpdated
   | EventPermissionV2Asked
@@ -1255,6 +1257,26 @@ export type GlobalEvent = {
         type: "architecture.resource.removed"
         properties: {
           resourceID: string
+        }
+      }
+    | {
+        id: string
+        type: "architecture.resource.draft.updated"
+        properties: {
+          resourceID: string
+          revision: number
+          digest: string
+          baseRevision: number
+          baseDigest: string
+        }
+      }
+    | {
+        id: string
+        type: "architecture.resource.draft.discarded"
+        properties: {
+          resourceID: string
+          revision?: number
+          digest?: string
         }
       }
     | {
@@ -2702,12 +2724,27 @@ export type UnauthorizedError = {
 
 export type ArchitectureConflictError = {
   _tag: "ArchitectureConflictError"
+  error: "GraphConflictError"
   message: string
   operationIDs: Array<string>
+  resourceID?: string
+  resourceName?: string
+  operation?: string
+  expected?: {
+    revision?: number
+    digest?: string
+  }
+  actual?: {
+    revision: number
+    digest: string
+  }
   expectedRevision?: number
   expectedDigest?: string
   currentRevision?: number
   currentDigest?: string
+  safeToRetry?: boolean | "unknown" | "partial"
+  conflictKind?: "draft_changed" | "draft_missing"
+  retryHint?: string
 }
 
 export type ArchitectureInvalidGraphError = {
@@ -2949,6 +2986,8 @@ export type V2Event =
   | InstallationUpdateAvailable
   | ArchitectureResourceUpdated
   | ArchitectureResourceRemoved
+  | ArchitectureResourceDraftUpdated
+  | ArchitectureResourceDraftDiscarded
   | FileEdited
   | ReferenceUpdated
   | PermissionV2Asked
@@ -4077,6 +4116,18 @@ export type ArchitecturePatchInput = {
   revision: number
   digest: string
   operations: Array<ArchitectureOperation>
+}
+
+export type ArchitectureDraftSource = "live" | "saved"
+
+export type ArchitectureDraftSnapshot = {
+  snapshot: ArchitectureResourceSnapshot
+  source: ArchitectureDraftSource
+}
+
+export type ArchitectureDraftCommitInput = {
+  revision: number
+  digest: string
 }
 
 export type ArchitectureResourceRemoveInput = {
@@ -5617,6 +5668,46 @@ export type ArchitectureResourceRemoved = {
   }
 }
 
+export type ArchitectureResourceDraftUpdated = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "architecture.resource.draft.updated"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    resourceID: string
+    revision: number
+    digest: string
+    baseRevision: number
+    baseDigest: string
+  }
+}
+
+export type ArchitectureResourceDraftDiscarded = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "architecture.resource.draft.discarded"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    resourceID: string
+    revision?: number
+    digest?: string
+  }
+}
+
 export type FileEdited = {
   id: string
   metadata?: {
@@ -6939,6 +7030,28 @@ export type EventArchitectureResourceRemoved = {
   type: "architecture.resource.removed"
   properties: {
     resourceID: string
+  }
+}
+
+export type EventArchitectureResourceDraftUpdated = {
+  id: string
+  type: "architecture.resource.draft.updated"
+  properties: {
+    resourceID: string
+    revision: number
+    digest: string
+    baseRevision: number
+    baseDigest: string
+  }
+}
+
+export type EventArchitectureResourceDraftDiscarded = {
+  id: string
+  type: "architecture.resource.draft.discarded"
+  properties: {
+    resourceID: string
+    revision?: number
+    digest?: string
   }
 }
 
@@ -11843,6 +11956,291 @@ export type V2ArchitectureResourcePatchResponses = {
 
 export type V2ArchitectureResourcePatchResponse =
   V2ArchitectureResourcePatchResponses[keyof V2ArchitectureResourcePatchResponses]
+
+export type V2ArchitectureResourceDraftGetData = {
+  body?: never
+  path: {
+    resourceID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource/{resourceID}/draft"
+}
+
+export type V2ArchitectureResourceDraftGetErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceDraftGetError =
+  V2ArchitectureResourceDraftGetErrors[keyof V2ArchitectureResourceDraftGetErrors]
+
+export type V2ArchitectureResourceDraftGetResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: ArchitectureDraftSnapshot
+  }
+}
+
+export type V2ArchitectureResourceDraftGetResponse =
+  V2ArchitectureResourceDraftGetResponses[keyof V2ArchitectureResourceDraftGetResponses]
+
+export type V2ArchitectureResourceDraftPatchData = {
+  body: ArchitecturePatchInput
+  path: {
+    resourceID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource/{resourceID}/draft"
+}
+
+export type V2ArchitectureResourceDraftPatchErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceDraftPatchError =
+  V2ArchitectureResourceDraftPatchErrors[keyof V2ArchitectureResourceDraftPatchErrors]
+
+export type V2ArchitectureResourceDraftPatchResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: ArchitectureDraftSnapshot
+  }
+}
+
+export type V2ArchitectureResourceDraftPatchResponse =
+  V2ArchitectureResourceDraftPatchResponses[keyof V2ArchitectureResourceDraftPatchResponses]
+
+export type V2ArchitectureResourceDraftCommitData = {
+  body: ArchitectureDraftCommitInput
+  path: {
+    resourceID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource/{resourceID}/draft/commit"
+}
+
+export type V2ArchitectureResourceDraftCommitErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceDraftCommitError =
+  V2ArchitectureResourceDraftCommitErrors[keyof V2ArchitectureResourceDraftCommitErrors]
+
+export type V2ArchitectureResourceDraftCommitResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: ArchitectureResourceSnapshot
+  }
+}
+
+export type V2ArchitectureResourceDraftCommitResponse =
+  V2ArchitectureResourceDraftCommitResponses[keyof V2ArchitectureResourceDraftCommitResponses]
+
+export type V2ArchitectureResourceDraftDiscardData = {
+  body?: never
+  path: {
+    resourceID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource/{resourceID}/draft/discard"
+}
+
+export type V2ArchitectureResourceDraftDiscardErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceDraftDiscardError =
+  V2ArchitectureResourceDraftDiscardErrors[keyof V2ArchitectureResourceDraftDiscardErrors]
+
+export type V2ArchitectureResourceDraftDiscardResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: ArchitectureDraftSnapshot
+  }
+}
+
+export type V2ArchitectureResourceDraftDiscardResponse =
+  V2ArchitectureResourceDraftDiscardResponses[keyof V2ArchitectureResourceDraftDiscardResponses]
+
+export type V2ArchitectureResourceDraftReloadData = {
+  body?: never
+  path: {
+    resourceID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource/{resourceID}/draft/reload"
+}
+
+export type V2ArchitectureResourceDraftReloadErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceDraftReloadError =
+  V2ArchitectureResourceDraftReloadErrors[keyof V2ArchitectureResourceDraftReloadErrors]
+
+export type V2ArchitectureResourceDraftReloadResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: ArchitectureDraftSnapshot
+  }
+}
+
+export type V2ArchitectureResourceDraftReloadResponse =
+  V2ArchitectureResourceDraftReloadResponses[keyof V2ArchitectureResourceDraftReloadResponses]
 
 export type V2ArchitectureResourceResetData = {
   body?: never

@@ -9,8 +9,8 @@ import { WorkspaceEvent } from "../src/workspace-event"
 
 describe("public event manifest", () => {
   test("owns the complete public event surface", () => {
-    expect(EventManifest.ServerDefinitions.length).toBe(60)
-    expect(EventManifest.Definitions.length).toBe(90)
+    expect(EventManifest.ServerDefinitions.length).toBe(62)
+    expect(EventManifest.Definitions.length).toBe(92)
     expect(SessionV1.Event.Definitions).toEqual([
       SessionV1.Event.Created,
       SessionV1.Event.Updated,
@@ -23,7 +23,7 @@ describe("public event manifest", () => {
       SessionV1.Event.Diff,
       SessionV1.Event.Error,
     ])
-    expect(EventManifest.Latest.size).toBe(90)
+    expect(EventManifest.Latest.size).toBe(92)
     expect(EventManifest.Durable.size).toBe(35)
   })
 
@@ -43,9 +43,15 @@ describe("public event manifest", () => {
     expect(Architecture.Event.Definitions).toEqual([
       Architecture.Event.ResourceUpdated,
       Architecture.Event.ResourceRemoved,
+      Architecture.Event.ResourceDraftUpdated,
+      Architecture.Event.ResourceDraftDiscarded,
     ])
     expect(EventManifest.Latest.get("architecture.resource.updated")).toBe(Architecture.Event.ResourceUpdated)
     expect(EventManifest.Latest.get("architecture.resource.removed")).toBe(Architecture.Event.ResourceRemoved)
+    expect(EventManifest.Latest.get("architecture.resource.draft.updated")).toBe(Architecture.Event.ResourceDraftUpdated)
+    expect(EventManifest.Latest.get("architecture.resource.draft.discarded")).toBe(
+      Architecture.Event.ResourceDraftDiscarded,
+    )
     expect(EventManifest.Latest.has("ide.installed")).toBe(false)
     expect(IdeEvent.Definitions).toEqual([IdeEvent.Installed])
     expect(EventManifest.Definitions.slice(43, 46)).toEqual([

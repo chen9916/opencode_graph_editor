@@ -22,6 +22,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { MCP } from "@/mcp"
 import type { Tool as MCPToolDef } from "@modelcontextprotocol/sdk/types.js"
 import { ArchitectureTools } from "@opencode-ai/core/architecture/tools"
+import { AppNodeBuilderV1 } from "@/effect/app-node-builder-v1"
 
 const configLayer = TestConfig.layer({
   directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
@@ -57,9 +58,9 @@ const replacements = [
   [RuntimeFlags.node, RuntimeFlags.layer()],
 ] as const
 
-const it = testEffect(LayerNode.compile(root, replacements))
+const it = testEffect(AppNodeBuilderV1.build(root, replacements))
 const withCodeMode = testEffect(
-  LayerNode.compile(root, [
+  AppNodeBuilderV1.build(root, [
     [Config.node, configLayer],
     [RuntimeFlags.node, RuntimeFlags.layer({ experimentalCodeMode: true })],
     [
@@ -82,7 +83,7 @@ const withCodeMode = testEffect(
   ]),
 )
 const withGraphOnlyCodeMode = testEffect(
-  LayerNode.compile(root, [
+  AppNodeBuilderV1.build(root, [
     [Config.node, configLayer],
     [RuntimeFlags.node, RuntimeFlags.layer({ experimentalCodeMode: true })],
     [
@@ -94,7 +95,7 @@ const withGraphOnlyCodeMode = testEffect(
     ],
   ]),
 )
-const withBrokenPlugin = testEffect(LayerNode.compile(root, [...replacements, [Plugin.node, brokenPluginLayer]]))
+const withBrokenPlugin = testEffect(AppNodeBuilderV1.build(root, [...replacements, [Plugin.node, brokenPluginLayer]]))
 
 afterEach(async () => {
   await disposeAllInstances()

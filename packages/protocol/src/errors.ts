@@ -124,12 +124,31 @@ export class ArchitectureNotFoundError extends Schema.TaggedErrorClass<Architect
 export class ArchitectureConflictError extends Schema.TaggedErrorClass<ArchitectureConflictError>()(
   "ArchitectureConflictError",
   {
+    error: Schema.Literal("GraphConflictError"),
     message: Schema.String,
     operationIDs: Schema.Array(Architecture.OperationID),
+    resourceID: Schema.optional(Architecture.ResourceID),
+    resourceName: Schema.optional(Schema.String),
+    operation: Schema.optional(Schema.String),
+    expected: Schema.optional(
+      Schema.Struct({
+        revision: Schema.optional(Schema.Int),
+        digest: Schema.optional(Schema.String),
+      }),
+    ),
+    actual: Schema.optional(
+      Schema.Struct({
+        revision: Schema.Int,
+        digest: Schema.String,
+      }),
+    ),
     expectedRevision: Schema.optional(Schema.Int),
     expectedDigest: Schema.optional(Schema.String),
     currentRevision: Schema.optional(Schema.Int),
     currentDigest: Schema.optional(Schema.String),
+    safeToRetry: Schema.optional(Schema.Union([Schema.Boolean, Schema.Literals(["unknown", "partial"])])),
+    conflictKind: Schema.optional(Schema.Literals(["draft_changed", "draft_missing"])),
+    retryHint: Schema.optional(Schema.String),
   },
   { httpApiStatus: 409 },
 ) {}

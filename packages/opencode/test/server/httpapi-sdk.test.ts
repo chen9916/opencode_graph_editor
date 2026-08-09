@@ -29,6 +29,9 @@ import { testProviderConfig } from "../lib/test-provider"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { Database } from "@opencode-ai/core/database/database"
+import { ArchitecturePatch } from "@opencode-ai/core/architecture/patch"
+import { WorkspaceV2 } from "@opencode-ai/core/workspace"
+import { Architecture } from "@opencode-ai/schema/architecture"
 import { httpApiLayer } from "./httpapi-layer"
 
 const noopBootstrapLayer = Layer.succeed(InstanceBootstrap.Service, InstanceBootstrap.Service.of({ run: Effect.void }))
@@ -41,6 +44,7 @@ const it = testEffect(Layer.mergeAll(appLayer, httpApiLayer))
 const original = {
   OPENCODE_SERVER_PASSWORD: Flag.OPENCODE_SERVER_PASSWORD,
   OPENCODE_SERVER_USERNAME: Flag.OPENCODE_SERVER_USERNAME,
+  OPENCODE_WORKSPACE_ID: Flag.OPENCODE_WORKSPACE_ID,
 }
 
 type ServerPath = "default" | "raw"
@@ -330,6 +334,7 @@ function seedMessage(directory: string, sessionID: string) {
 afterEach(async () => {
   Flag.OPENCODE_SERVER_PASSWORD = original.OPENCODE_SERVER_PASSWORD
   Flag.OPENCODE_SERVER_USERNAME = original.OPENCODE_SERVER_USERNAME
+  Flag.OPENCODE_WORKSPACE_ID = original.OPENCODE_WORKSPACE_ID
   await disposeAllInstances()
   await resetDatabase()
 })
@@ -801,6 +806,222 @@ describe("HttpApi SDK", () => {
           persistedText: JSON.stringify(messages.data).includes("fake world"),
           userText: JSON.stringify(messages.data).includes("hello llm"),
         }
+      }),
+    ),
+  )
+
+  httpapi(
+    "shares live Graph drafts between editor HTTP and legacy tools",
+    withFakeLlm("raw", ({ sdk, llm, directory }) =>
+      Effect.gen(function* () {
+        Flag.OPENCODE_WORKSPACE_ID = WorkspaceV2.ID.ascending()
+        const resourceID = Architecture.ResourceID.make("runtime-wiring")
+        const resource = ArchitecturePatch.empty({ id: resourceID, name: "Runtime wiring" })
+        yield* FSUtil.Service.use((fs) =>
+          fs.writeWithDirs(
+            path.join(directory, ".opencode", "architecture", "resources", `${resourceID}.json`),
+            JSON.stringify(resource, null, 2) + "\n",
+          ),
+        )
+
+        const editorFetch = yield* serverFetch("raw")
+        const editorDraft = () =>
+          Effect.promise(() =>
+            editorFetch(
+              new Request(`http://localhost/api/architecture/resource/${resourceID}/draft`, {
+                headers: { "x-opencode-directory": directory },
+              }),
+            ),
+          )
+        const initial = yield* editorDraft()
+        expect(initial.status).toBe(200)
+        const initialBody = record(yield* Effect.promise(() => initial.json()))
+        const initialSnapshot = record(record(initialBody.data).snapshot)
+        const initialResource = record(initialSnapshot.resource)
+        const patched = yield* Effect.promise(() =>
+          editorFetch(
+            new Request(`http://localhost/api/architecture/resource/${resourceID}/draft`, {
+              method: "PATCH",
+              headers: { "content-type": "application/json", "x-opencode-directory": directory },
+              body: JSON.stringify({
+                revision: initialResource.revision,
+                digest: initialSnapshot.digest,
+                operations: [
+                  {
+                    id: "editor-probe-operation",
+                    type: "node.create",
+                    node: {
+                      id: "editor-probe",
+                      text: "Editor probe",
+                      tags: [],
+                      layout: { position: { x: 0, y: 0 } },
+                    },
+                  },
+                ],
+              }),
+            }),
+          ),
+        )
+        expect(patched.status).toBe(200)
+        const afterPatchResponse = yield* editorDraft()
+        const afterPatch = record(yield* Effect.promise(() => afterPatchResponse.json()))
+        expect(record(afterPatch.data).source).toBe("live")
+
+        yield* llm.tool("graph_create_node", {
+          resourceID,
+          id: "shared-node",
+          text: "Visible in the editor draft",
+          position: { x: 40, y: 80 },
+        })
+        yield* llm.text("Graph updated", { usage: { input: 1, output: 1 } })
+        const session = yield* capture(() =>
+          sdk.session.create({
+            title: "graph runtime wiring",
+            permission: [{ permission: "*", pattern: "*", action: "allow" }],
+          }),
+        )
+        const prompt = yield* capture(() =>
+          sdk.session.prompt({
+            sessionID: String(record(session.data).id),
+            agent: "build",
+            model: { providerID: "test", modelID: "test-model" },
+            parts: [{ type: "text", text: "Add the shared graph node" }],
+          }),
+        )
+        expect(prompt.status).toBe(200)
+
+        const response = yield* editorDraft()
+        const body = record(yield* Effect.promise(() => response.json()))
+        const data = record(body.data)
+        const snapshot = record(data.snapshot)
+        const live = record(snapshot.resource)
+        expect(response.status).toBe(200)
+        expect(data.source).toBe("live")
+        expect(array(live.nodes)).toContainEqual(
+          expect.objectContaining({ id: "shared-node", text: "Visible in the editor draft" }),
+        )
+
+        const saved = yield* Effect.promise(() =>
+          Bun.file(path.join(directory, ".opencode", "architecture", "resources", `${resourceID}.json`)).json(),
+        )
+        expect(saved.nodes).toEqual([])
+      }),
+    ),
+  )
+
+  httpapi(
+    "rejects changed and missing expected Graph drafts over HTTP",
+    withProject("raw", {}, ({ directory }) =>
+      Effect.gen(function* () {
+        const resourceID = Architecture.ResourceID.make("draft-compare-commit")
+        const resource = ArchitecturePatch.empty({ id: resourceID, name: "Draft compare commit" })
+        yield* FSUtil.Service.use((fs) =>
+          fs.writeWithDirs(
+            path.join(directory, ".opencode", "architecture", "resources", `${resourceID}.json`),
+            JSON.stringify(resource, null, 2) + "\n",
+          ),
+        )
+        const request = yield* serverFetch("raw")
+        const url = `http://localhost/api/architecture/resource/${resourceID}/draft`
+        const headers = { "content-type": "application/json", "x-opencode-directory": directory }
+        const initialResponse = yield* Effect.promise(() => request(new Request(url, { headers })))
+        const initial = record(record(yield* Effect.promise(() => initialResponse.json())).data)
+        const initialSnapshot = record(initial.snapshot)
+        const initialResource = record(initialSnapshot.resource)
+        const firstResponse = yield* Effect.promise(() =>
+          request(
+            new Request(url, {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify({
+                revision: initialResource.revision,
+                digest: initialSnapshot.digest,
+                operations: [
+                  {
+                    id: "first-draft-operation",
+                    type: "node.create",
+                    node: {
+                      id: "first-draft-node",
+                      text: "First draft node",
+                      tags: [],
+                      layout: { position: { x: 0, y: 0 } },
+                    },
+                  },
+                ],
+              }),
+            }),
+          ),
+        )
+        const first = record(record(yield* Effect.promise(() => firstResponse.json())).data)
+        const firstSnapshot = record(first.snapshot)
+        const firstResource = record(firstSnapshot.resource)
+        const secondResponse = yield* Effect.promise(() =>
+          request(
+            new Request(url, {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify({
+                revision: firstResource.revision,
+                digest: firstSnapshot.digest,
+                operations: [
+                  {
+                    id: "second-draft-operation",
+                    type: "node.create",
+                    node: {
+                      id: "second-draft-node",
+                      text: "Second draft node",
+                      tags: [],
+                      layout: { position: { x: 20, y: 20 } },
+                    },
+                  },
+                ],
+              }),
+            }),
+          ),
+        )
+        const second = record(record(yield* Effect.promise(() => secondResponse.json())).data)
+        const secondSnapshot = record(second.snapshot)
+        const secondResource = record(secondSnapshot.resource)
+        const commitUrl = `${url}/commit`
+        const changedResponse = yield* Effect.promise(() =>
+          request(
+            new Request(commitUrl, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ revision: firstResource.revision, digest: firstSnapshot.digest }),
+            }),
+          ),
+        )
+        const changed = record(yield* Effect.promise(() => changedResponse.json()))
+
+        expect(changedResponse.status).toBe(409)
+        expect(changed).toMatchObject({
+          error: "GraphConflictError",
+          operation: "graph_draft_commit",
+          conflictKind: "draft_changed",
+        })
+
+        const discardResponse = yield* Effect.promise(() =>
+          request(new Request(`${url}/discard`, { method: "POST", headers })),
+        )
+        expect(discardResponse.status).toBe(200)
+        const missingResponse = yield* Effect.promise(() =>
+          request(
+            new Request(commitUrl, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ revision: secondResource.revision, digest: secondSnapshot.digest }),
+            }),
+          ),
+        )
+        const missing = record(yield* Effect.promise(() => missingResponse.json()))
+
+        expect(missingResponse.status).toBe(409)
+        expect(missing).toMatchObject({
+          error: "GraphConflictError",
+          operation: "graph_draft_commit",
+          conflictKind: "draft_missing",
+        })
       }),
     ),
   )

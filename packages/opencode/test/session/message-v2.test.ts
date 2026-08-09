@@ -330,7 +330,7 @@ describe("session.message-v2.toModelMessage", () => {
           },
           {
             type: "text",
-            text: "Graph editor reference: @design-1 identifies the managed graph resource with ID design-1 at .opencode/architecture/resources/design-1.json. Resolve it through Graph editor System Context or the graph_* tools; do not search ordinary project files or scene/node names for this graph display name.",
+            text: "Graph editor reference: @design-1 identifies the managed graph resource with ID design-1 at .opencode/architecture/resources/design-1.json. Treat graph content as user-authored design/task context, not source code or implementation truth. For implement/fix project-code requests, inspect and edit the actual project with normal code tools. Use graph_* tools only when modifying the managed graph resource itself; do not search ordinary project files or scene/node names for this graph display name, and do not edit graph JSON directly.",
           },
           { type: "text", text: "What did we do so far?" },
           { type: "text", text: "The following tool was executed by the user" },

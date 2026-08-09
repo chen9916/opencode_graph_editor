@@ -100,7 +100,7 @@ import { sessionHandlers } from "./handlers/session"
 import { syncHandlers } from "./handlers/sync"
 import { tuiHandlers } from "./handlers/tui"
 import { handlers } from "@opencode-ai/server/handlers"
-import { buildLocationServiceMap, LocationServiceMap } from "@opencode-ai/core/location-services"
+import { LocationServiceMap } from "@opencode-ai/core/location-services"
 import { layer as locationLayer } from "@opencode-ai/server/location"
 import { sessionLocationLayer } from "@opencode-ai/server/middleware/session-location"
 import { PtyEnvironment } from "@opencode-ai/server/pty-environment"
@@ -115,6 +115,7 @@ import { corsVaryFix } from "./middleware/cors-vary"
 import { errorLayer } from "./middleware/error"
 import { fenceLayer } from "./middleware/fence"
 import { schemaErrorLayer } from "./middleware/schema-error"
+import { ProcessLocationServiceMap } from "@/effect/location-service-map"
 
 export const context = Context.makeUnsafe<unknown>(new Map())
 
@@ -268,10 +269,23 @@ const app = LayerNode.group([
   PtyTicket.node,
 ])
 
+const runtime = LayerNode.group([app, MoveSession.node, SessionV2.node, LocationServiceMap.node])
+
+function buildRuntime(locationServiceMap: Layer.Layer<LocationServiceMap.Service>) {
+  return Layer.unwrap(
+    Effect.map(LocationServiceMap.Service, (locations) =>
+      AppNodeBuilderV1.build(runtime, [
+        [LocationServiceMap.node, Layer.succeed(LocationServiceMap.Service)(locations)],
+        [SessionExecution.node, SessionExecutionLocal.node],
+      ]),
+    ),
+  ).pipe(Layer.provide(locationServiceMap))
+}
+
 export function createRoutes(
   corsOptions?: CorsOptions,
 ): Layer.Layer<never, EffectConfig.ConfigError, RouteRequirements> {
-  const locationServiceMapV2 = buildLocationServiceMap()
+  const locationServiceMapV2 = ProcessLocationServiceMap.layer
 
   return Layer.mergeAll(
     rootApiRoutes,
@@ -288,22 +302,13 @@ export function createRoutes(
       corsVaryFix,
       fenceLayer,
       cors(corsOptions),
-      AppNodeBuilderV1.build(MoveSession.node, [[LocationServiceMap.node, locationServiceMapV2]]),
       HttpServer.layerServices,
     ]),
     Layer.provide(Layer.succeed(CorsConfig)(corsOptions)),
     Layer.provide(sessionLocationLayer),
     Layer.provide(locationLayer),
     Layer.provide(PtyEnvironment.layer),
-    Layer.provide(
-      AppNodeBuilderV1.build(SessionV2.node, [
-        [LocationServiceMap.node, locationServiceMapV2],
-        [SessionExecution.node, SessionExecutionLocal.node],
-      ]),
-    ),
-    Layer.provide(locationServiceMapV2),
-
-    Layer.provide(AppNodeBuilderV1.build(app)),
+    Layer.provide(buildRuntime(locationServiceMapV2)),
     // Must stay last: layers provided later in this pipe build beneath earlier ones,
     // so Observability must come after every service graph. Otherwise eagerly forked
     // fibers (e.g. the ModelsDev background refresh) capture Effect's default stdout

@@ -1,7 +1,11 @@
 import { Tool } from "@opencode-ai/codemode"
 import { ArchitectureBatch } from "@opencode-ai/core/architecture/batch"
+import { ArchitectureConflict } from "@opencode-ai/core/architecture/conflict"
+import { ArchitecturePatch } from "@opencode-ai/core/architecture/patch"
 import { ArchitectureGraph } from "@opencode-ai/core/architecture/graph"
+import { ArchitectureLayout } from "@opencode-ai/core/architecture/layout"
 import { ArchitectureTools } from "@opencode-ai/core/architecture/tools"
+import { ArchitectureValidation } from "@opencode-ai/core/architecture/validation"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { Architecture } from "@opencode-ai/schema/architecture"
 import { Effect, Schema } from "effect"
@@ -17,11 +21,26 @@ export type CodeModeNativeTool = {
 }
 
 const root = ".opencode/architecture/resources"
+const Source = Schema.Literals(["live", "saved", "mixed"])
+const SingleSource = Schema.Literals(["live", "saved"])
+const SourcedResourceSummary = Schema.Struct({
+  ...Architecture.ResourceSummary.fields,
+  source: SingleSource,
+})
+const SourcedResourceSnapshot = Schema.Struct({
+  ...Architecture.ResourceSnapshot.fields,
+  source: SingleSource,
+})
+const SourcedQueryResult = Schema.Struct({
+  ...Architecture.QueryResult.fields,
+  source: Source,
+})
 const ExpectedDigest = Schema.String.pipe(Schema.optional)
 const MutationOutput = Schema.Struct({
   resourceID: Architecture.ResourceID,
   revision: NonNegativeInt,
   digest: Schema.String,
+  source: SingleSource,
 })
 
 const ResourceIDInput = Schema.Struct({ resourceID: Architecture.ResourceID })
@@ -110,13 +129,13 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       key: ArchitectureTools.names.listResources,
       permission: "read",
       input: Schema.Struct({}),
-      output: Schema.Array(Architecture.ResourceSummary),
+      output: Schema.Array(SourcedResourceSummary),
       description:
-        "Native graph_list_resources. List the project's saved Graph editor resources, including IDs for @graph mentions. Use this instead of searching workspace files for graph display names.",
+        "Native graph_list_resources. List the project's live Graph editor resources with source metadata, including IDs for @graph mentions. Use this instead of searching workspace files for graph display names.",
       run: () =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          return yield* graph.list()
+          return (yield* graph.listLive()).resources
         }),
     }),
     graphTool({
@@ -136,30 +155,32 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       key: ArchitectureTools.names.reloadResource,
       permission: "read",
       input: ResourceIDInput,
-      output: Architecture.ResourceSnapshot,
+      output: SourcedResourceSnapshot,
       description:
-        "Native graph_reload_resource. Reload one managed Graph editor resource by resourceID after creating, editing, or laying out a graph.",
+        "Native graph_reload_resource. Reload one managed Graph editor resource from the saved graph file by resourceID after creating, editing, or laying out a graph.",
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          return yield* graph.load(input.resourceID)
+          const saved = yield* graph.reloadSaved(input.resourceID)
+          return { ...saved.snapshot, source: saved.source }
         }),
     }),
     graphTool({
       key: ArchitectureTools.names.updateResource,
       permission: "edit",
       input: UpdateResourceInput,
-      output: Architecture.ResourceSnapshot,
+      output: SourcedResourceSnapshot,
       description: "Native graph_update_resource. Rename one managed Graph editor resource.",
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          const current = yield* graph.load(input.resourceID)
-          return yield* graph.patch(input.resourceID, {
-            revision: current.resource.revision,
-            digest: current.digest,
+          const current = yield* graph.loadLive(input.resourceID)
+          const saved = yield* graph.patchLive(input.resourceID, {
+            revision: current.snapshot.resource.revision,
+            digest: current.snapshot.digest,
             operations: [{ id: Architecture.OperationID.create(), type: "resource.update", name: input.name }],
-          })
+          }, conflict(ArchitectureTools.names.updateResource, true))
+          return { ...saved.snapshot, source: saved.source }
         }),
     }),
     graphTool({
@@ -175,8 +196,15 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
           const current = yield* graph.load(input.resourceID)
           if (current.digest !== input.expectedDigest)
             return yield* Effect.fail(
-              new Error(
-                `Graph resource ${input.resourceID} changed: expected digest ${input.expectedDigest}, current revision ${current.resource.revision}, current digest ${current.digest}`,
+              conflictError(
+                ArchitectureConflict.make({
+                  resourceID: input.resourceID,
+                  resourceName: current.resource.name,
+                  operation: ArchitectureTools.names.deleteResource,
+                  expected: { digest: input.expectedDigest },
+                  actual: { revision: current.resource.revision, digest: current.digest },
+                  safeToRetry: "unknown",
+                }),
               ),
             )
           return yield* graph.remove(input.resourceID, {
@@ -189,13 +217,88 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       key: ArchitectureTools.names.query,
       permission: "read",
       input: Architecture.QueryInput,
-      output: Architecture.QueryResult,
+      output: SourcedQueryResult,
       description:
-        "Native graph_query. Query saved Graph editor resources by resource ID, node ID, text, or node tags instead of reading graph JSON files directly.",
+        "Native graph_query. Query live Graph editor resources by resource ID, node ID, text, or node tags instead of reading graph JSON files directly.",
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          return yield* graph.query(input)
+          return yield* graph.queryLive(input)
+        }),
+    }),
+    graphTool({
+      key: ArchitectureTools.names.validate,
+      permission: "read",
+      input: ArchitectureValidation.Input,
+      output: ArchitectureValidation.Output,
+      description:
+        "Native graph_validate. Validate one or more managed Graph editor resources without mutating them.",
+      run: (input) =>
+        Effect.gen(function* () {
+          const graph = yield* ArchitectureGraph.Service
+          const selected = input.resourceIDs && input.resourceIDs.length > 0 ? Array.from(new Set(input.resourceIDs)) : undefined
+          const snapshots = selected
+            ? yield* Effect.forEach(selected, (resourceID) => graph.loadLive(resourceID), { concurrency: 8 })
+            : yield* Effect.forEach(
+                (yield* graph.listLive()).resources,
+                (resource) => graph.loadLive(resource.id),
+                { concurrency: 8 },
+              )
+          return ArchitectureValidation.validateResources(
+            snapshots.map((item) => ({ resource: item.snapshot.resource, digest: item.snapshot.digest })),
+            input.checks,
+          )
+        }),
+    }),
+    graphTool({
+      key: ArchitectureTools.names.autoLayout,
+      permission: "edit",
+      input: ArchitectureLayout.Input,
+      output: ArchitectureLayout.Output,
+      description:
+        "Native graph_auto_layout. Reorganize one managed Graph editor resource into columns, grids, trees, or tag-group layouts.",
+      run: (input) =>
+        Effect.gen(function* () {
+          const graph = yield* ArchitectureGraph.Service
+          const current = yield* graph.loadLive(input.resourceID)
+          const referenced = new Set(ArchitectureLayout.referencedNodeIDs(input))
+          const missing = [...referenced].find((nodeID) => !current.snapshot.resource.nodes.some((node) => node.id === nodeID))
+          if (missing) return yield* Effect.fail(new ArchitecturePatch.NotFoundError({ entity: "node", id: missing }))
+          const layout = ArchitectureLayout.plan(current.snapshot.resource, input)
+          const operations = layout.positions
+            .filter((item) => {
+              const node = current.snapshot.resource.nodes.find((candidate) => candidate.id === item.nodeID)
+              return node && (node.layout.position.x !== item.position.x || node.layout.position.y !== item.position.y)
+            })
+            .map(
+              (item): Architecture.Operation => ({
+                id: Architecture.OperationID.create(),
+                type: "node.position",
+                nodeID: item.nodeID,
+                position: item.position,
+              }),
+            )
+          const saved =
+            input.dryRun || operations.length === 0
+              ? current
+              : yield* graph.patchLive(
+                  input.resourceID,
+                  {
+                    revision: current.snapshot.resource.revision,
+                    digest: current.snapshot.digest,
+                    operations,
+                  },
+                  { operation: ArchitectureTools.names.autoLayout, safeToRetry: true },
+                )
+          return {
+            resourceID: input.resourceID,
+            revision: input.dryRun ? undefined : saved.snapshot.resource.revision,
+            digest: input.dryRun ? undefined : saved.snapshot.digest,
+            mode: input.mode,
+            dryRun: input.dryRun ?? false,
+            nodeIDs: layout.nodeIDs,
+            positions: layout.positions,
+          }
         }),
     }),
     graphTool({
@@ -208,19 +311,19 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          const current = yield* graph.load(input.resourceID)
+          const current = yield* graph.loadLive(input.resourceID)
           const node: Architecture.Node = {
             id: input.id ?? Architecture.NodeID.create(),
             text: input.text,
             tags: input.tags ?? [],
             layout: { position: input.position ?? { x: 0, y: 0 } },
           }
-          const saved = yield* graph.patch(input.resourceID, {
-            revision: current.resource.revision,
-            digest: current.digest,
+          const saved = yield* graph.patchLive(input.resourceID, {
+            revision: current.snapshot.resource.revision,
+            digest: current.snapshot.digest,
             operations: [{ id: Architecture.OperationID.create(), type: "node.create", node }],
-          })
-          return { resourceID: input.resourceID, revision: saved.resource.revision, digest: saved.digest, node }
+          }, conflict(ArchitectureTools.names.createNode, "unknown"))
+          return { resourceID: input.resourceID, revision: saved.snapshot.resource.revision, digest: saved.snapshot.digest, source: saved.source, node }
         }),
     }),
     graphTool({
@@ -233,17 +336,17 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          const current = yield* graph.load(input.resourceID)
-          const batch = ArchitectureBatch.prepare(input, current.resource)
+          const current = yield* graph.loadLive(input.resourceID)
+          const batch = ArchitectureBatch.prepare(input, current.snapshot.resource)
           if (!batch.ok) return yield* batch.error
           const saved =
             batch.operations.length > 0
-              ? yield* graph.patch(input.resourceID, {
-                  revision: current.resource.revision,
-                  digest: current.digest,
+              ? (yield* graph.patchLive(input.resourceID, {
+                  revision: current.snapshot.resource.revision,
+                  digest: current.snapshot.digest,
                   operations: batch.operations,
-                })
-              : current
+                }, conflict(ArchitectureTools.names.batchEdit, "partial"))).snapshot
+              : current.snapshot
           return {
             resourceID: input.resourceID,
             revision: saved.resource.revision,
@@ -266,8 +369,8 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          const current = yield* graph.load(input.resourceID)
-          const node = current.resource.nodes.find((candidate) => candidate.id === input.nodeID)
+          const current = yield* graph.loadLive(input.resourceID)
+          const node = current.snapshot.resource.nodes.find((candidate) => candidate.id === input.nodeID)
           if (!node) return yield* Effect.fail(new Error(`Graph node not found: ${input.nodeID}`))
           const updated: Architecture.Node = {
             ...node,
@@ -290,12 +393,12 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
                   position: updated.layout.position,
                   expectedDigest: input.expectedDigest,
                 }
-          const saved = yield* graph.patch(input.resourceID, {
-            revision: current.resource.revision,
-            digest: current.digest,
+          const saved = yield* graph.patchLive(input.resourceID, {
+            revision: current.snapshot.resource.revision,
+            digest: current.snapshot.digest,
             operations: [operation],
-          })
-          return { resourceID: input.resourceID, revision: saved.resource.revision, digest: saved.digest, node: updated }
+          }, conflict(ArchitectureTools.names.updateNode, true))
+          return { resourceID: input.resourceID, revision: saved.snapshot.resource.revision, digest: saved.snapshot.digest, source: saved.source, node: updated }
         }),
     }),
     graphTool({
@@ -312,18 +415,19 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          const current = yield* graph.load(input.resourceID)
-          const saved = yield* graph.patch(input.resourceID, {
-            revision: current.resource.revision,
-            digest: current.digest,
+          const current = yield* graph.loadLive(input.resourceID)
+          const saved = yield* graph.patchLive(input.resourceID, {
+            revision: current.snapshot.resource.revision,
+            digest: current.snapshot.digest,
             operations: [
               { id: Architecture.OperationID.create(), type: "tag.color", tag: input.tag, color: input.color },
             ],
-          })
+          }, conflict(ArchitectureTools.names.setTagColor, true))
           return {
             resourceID: input.resourceID,
-            revision: saved.resource.revision,
-            digest: saved.digest,
+            revision: saved.snapshot.resource.revision,
+            digest: saved.snapshot.digest,
+            source: saved.source,
             tag: input.tag,
             color: input.color,
           }
@@ -342,13 +446,13 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          const current = yield* graph.load(input.resourceID)
-          const removedEdgeIDs = current.resource.edges
+          const current = yield* graph.loadLive(input.resourceID)
+          const removedEdgeIDs = current.snapshot.resource.edges
             .filter((edge) => edge.source === input.nodeID || edge.target === input.nodeID)
             .map((edge) => edge.id)
-          const saved = yield* graph.patch(input.resourceID, {
-            revision: current.resource.revision,
-            digest: current.digest,
+          const saved = yield* graph.patchLive(input.resourceID, {
+            revision: current.snapshot.resource.revision,
+            digest: current.snapshot.digest,
             operations: [
               {
                 id: Architecture.OperationID.create(),
@@ -358,11 +462,12 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
                 expectedDigest: input.expectedDigest,
               },
             ],
-          })
+          }, conflict(ArchitectureTools.names.deleteNode, "unknown"))
           return {
             resourceID: input.resourceID,
-            revision: saved.resource.revision,
-            digest: saved.digest,
+            revision: saved.snapshot.resource.revision,
+            digest: saved.snapshot.digest,
+            source: saved.source,
             nodeID: input.nodeID,
             removedEdgeIDs,
           }
@@ -378,7 +483,7 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          const current = yield* graph.load(input.resourceID)
+          const current = yield* graph.loadLive(input.resourceID)
           const edge: Architecture.Edge = {
             id: input.id ?? Architecture.EdgeID.create(),
             source: input.source,
@@ -387,12 +492,12 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
             targetHandle: input.targetHandle ?? "left",
             style: input.style ?? "rectangular",
           }
-          const saved = yield* graph.patch(input.resourceID, {
-            revision: current.resource.revision,
-            digest: current.digest,
+          const saved = yield* graph.patchLive(input.resourceID, {
+            revision: current.snapshot.resource.revision,
+            digest: current.snapshot.digest,
             operations: [{ id: Architecture.OperationID.create(), type: "edge.create", edge }],
-          })
-          return { resourceID: input.resourceID, revision: saved.resource.revision, digest: saved.digest, edge }
+          }, conflict(ArchitectureTools.names.connectNodes, "unknown"))
+          return { resourceID: input.resourceID, revision: saved.snapshot.resource.revision, digest: saved.snapshot.digest, source: saved.source, edge }
         }),
     }),
     graphTool({
@@ -405,8 +510,8 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          const current = yield* graph.load(input.resourceID)
-          const edge = current.resource.edges.find((candidate) => candidate.id === input.edgeID)
+          const current = yield* graph.loadLive(input.resourceID)
+          const edge = current.snapshot.resource.edges.find((candidate) => candidate.id === input.edgeID)
           if (!edge) return yield* Effect.fail(new Error(`Graph connection not found: ${input.edgeID}`))
           const updated: Architecture.Edge = {
             ...edge,
@@ -416,9 +521,9 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
             targetHandle: input.targetHandle ?? edge.targetHandle ?? "left",
             style: input.style ?? edge.style ?? "rectangular",
           }
-          const saved = yield* graph.patch(input.resourceID, {
-            revision: current.resource.revision,
-            digest: current.digest,
+          const saved = yield* graph.patchLive(input.resourceID, {
+            revision: current.snapshot.resource.revision,
+            digest: current.snapshot.digest,
             operations: [
               {
                 id: Architecture.OperationID.create(),
@@ -427,8 +532,8 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
                 expectedDigest: input.expectedDigest,
               },
             ],
-          })
-          return { resourceID: input.resourceID, revision: saved.resource.revision, digest: saved.digest, edge: updated }
+          }, conflict(ArchitectureTools.names.updateConnection, "partial"))
+          return { resourceID: input.resourceID, revision: saved.snapshot.resource.revision, digest: saved.snapshot.digest, source: saved.source, edge: updated }
         }),
     }),
     graphTool({
@@ -445,9 +550,9 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          const current = yield* graph.load(input.resourceID)
+          const current = yield* graph.loadLive(input.resourceID)
           const nodeOperations = yield* Effect.forEach(input.nodes ?? [], (item) => {
-            const node = current.resource.nodes.find((candidate) => candidate.id === item.nodeID)
+            const node = current.snapshot.resource.nodes.find((candidate) => candidate.id === item.nodeID)
             if (!node) return Effect.fail(new Error(`Graph node not found: ${item.nodeID}`))
             return Effect.succeed({
               id: Architecture.OperationID.create(),
@@ -457,7 +562,7 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
             })
           })
           const edgeOperations = yield* Effect.forEach(input.edges ?? [], (item) => {
-            const edge = current.resource.edges.find((candidate) => candidate.id === item.edgeID)
+            const edge = current.snapshot.resource.edges.find((candidate) => candidate.id === item.edgeID)
             if (!edge) return Effect.fail(new Error(`Graph connection not found: ${item.edgeID}`))
             return Effect.succeed({
               id: Architecture.OperationID.create(),
@@ -473,16 +578,17 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
           const operations: Architecture.Operation[] = [...nodeOperations, ...edgeOperations]
           const saved =
             operations.length > 0
-              ? yield* graph.patch(input.resourceID, {
-                  revision: current.resource.revision,
-                  digest: current.digest,
+              ? yield* graph.patchLive(input.resourceID, {
+                  revision: current.snapshot.resource.revision,
+                  digest: current.snapshot.digest,
                   operations,
-                })
+                }, conflict(ArchitectureTools.names.updateLayout, true))
               : current
           return {
             resourceID: input.resourceID,
-            revision: saved.resource.revision,
-            digest: saved.digest,
+            revision: saved.snapshot.resource.revision,
+            digest: saved.snapshot.digest,
+            source: saved.source,
             nodeIDs: (input.nodes ?? []).map((item) => item.nodeID),
             edgeIDs: (input.edges ?? []).map((item) => item.edgeID),
           }
@@ -497,10 +603,10 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          const current = yield* graph.load(input.resourceID)
-          const saved = yield* graph.patch(input.resourceID, {
-            revision: current.resource.revision,
-            digest: current.digest,
+          const current = yield* graph.loadLive(input.resourceID)
+          const saved = yield* graph.patchLive(input.resourceID, {
+            revision: current.snapshot.resource.revision,
+            digest: current.snapshot.digest,
             operations: [
               {
                 id: Architecture.OperationID.create(),
@@ -509,8 +615,8 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
                 expectedDigest: input.expectedDigest,
               },
             ],
-          })
-          return { resourceID: input.resourceID, revision: saved.resource.revision, digest: saved.digest, edgeID: input.edgeID }
+          }, conflict(ArchitectureTools.names.disconnectNodes, "unknown"))
+          return { resourceID: input.resourceID, revision: saved.snapshot.resource.revision, digest: saved.snapshot.digest, source: saved.source, edgeID: input.edgeID }
         }),
     }),
     graphTool({
@@ -519,11 +625,11 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
       input: GetContextInput,
       output: Schema.String,
       description:
-        "Native graph_get_context. Return a bounded text summary of selected or all saved Graph editor resources, including exact managed file paths and layout fields.",
+        "Native graph_get_context. Return a bounded text summary of selected or all live Graph editor resources, including exact managed file paths, layout fields, and source metadata in the text.",
       run: (input) =>
         Effect.gen(function* () {
           const graph = yield* ArchitectureGraph.Service
-          return yield* graph.context(input.resourceIDs)
+          return yield* graph.contextLive(input.resourceIDs)
         }),
     }),
   ]
@@ -567,4 +673,14 @@ function graphPatterns(input: unknown) {
 
 function resourcePath(resourceID: string) {
   return `${root}/${resourceID}.json`
+}
+
+function conflictError(details: ArchitectureConflict.Details) {
+  return Object.assign(new Error(ArchitectureConflict.describe(details)), {
+    conflict: ArchitectureConflict.payload(details),
+  })
+}
+
+function conflict(operation: string, safeToRetry: ArchitectureConflict.SafeToRetry) {
+  return { operation, safeToRetry }
 }

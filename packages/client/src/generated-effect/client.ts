@@ -75,26 +75,88 @@ const Endpoint3_3 = (raw: RawClient["server.architecture"]) => (input: Endpoint3
     payload: { revision: input["revision"], digest: input["digest"], operations: input["operations"] },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint3_4Request = Parameters<RawClient["server.architecture"]["architecture.resource.remove"]>[0]
+type Endpoint3_4Request = Parameters<RawClient["server.architecture"]["architecture.resource.draft.get"]>[0]
 type Endpoint3_4Input = {
   readonly resourceID: Endpoint3_4Request["params"]["resourceID"]
   readonly location?: Endpoint3_4Request["query"]["location"]
-  readonly revision: Endpoint3_4Request["payload"]["revision"]
-  readonly digest: Endpoint3_4Request["payload"]["digest"]
 }
 const Endpoint3_4 = (raw: RawClient["server.architecture"]) => (input: Endpoint3_4Input) =>
+  raw["architecture.resource.draft.get"]({
+    params: { resourceID: input["resourceID"] },
+    query: { location: input["location"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint3_5Request = Parameters<RawClient["server.architecture"]["architecture.resource.draft.patch"]>[0]
+type Endpoint3_5Input = {
+  readonly resourceID: Endpoint3_5Request["params"]["resourceID"]
+  readonly location?: Endpoint3_5Request["query"]["location"]
+  readonly revision: Endpoint3_5Request["payload"]["revision"]
+  readonly digest: Endpoint3_5Request["payload"]["digest"]
+  readonly operations: Endpoint3_5Request["payload"]["operations"]
+}
+const Endpoint3_5 = (raw: RawClient["server.architecture"]) => (input: Endpoint3_5Input) =>
+  raw["architecture.resource.draft.patch"]({
+    params: { resourceID: input["resourceID"] },
+    query: { location: input["location"] },
+    payload: { revision: input["revision"], digest: input["digest"], operations: input["operations"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint3_6Request = Parameters<RawClient["server.architecture"]["architecture.resource.draft.commit"]>[0]
+type Endpoint3_6Input = {
+  readonly resourceID: Endpoint3_6Request["params"]["resourceID"]
+  readonly location?: Endpoint3_6Request["query"]["location"]
+  readonly revision: Endpoint3_6Request["payload"]["revision"]
+  readonly digest: Endpoint3_6Request["payload"]["digest"]
+}
+const Endpoint3_6 = (raw: RawClient["server.architecture"]) => (input: Endpoint3_6Input) =>
+  raw["architecture.resource.draft.commit"]({
+    params: { resourceID: input["resourceID"] },
+    query: { location: input["location"] },
+    payload: { revision: input["revision"], digest: input["digest"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint3_7Request = Parameters<RawClient["server.architecture"]["architecture.resource.draft.discard"]>[0]
+type Endpoint3_7Input = {
+  readonly resourceID: Endpoint3_7Request["params"]["resourceID"]
+  readonly location?: Endpoint3_7Request["query"]["location"]
+}
+const Endpoint3_7 = (raw: RawClient["server.architecture"]) => (input: Endpoint3_7Input) =>
+  raw["architecture.resource.draft.discard"]({
+    params: { resourceID: input["resourceID"] },
+    query: { location: input["location"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint3_8Request = Parameters<RawClient["server.architecture"]["architecture.resource.draft.reload"]>[0]
+type Endpoint3_8Input = {
+  readonly resourceID: Endpoint3_8Request["params"]["resourceID"]
+  readonly location?: Endpoint3_8Request["query"]["location"]
+}
+const Endpoint3_8 = (raw: RawClient["server.architecture"]) => (input: Endpoint3_8Input) =>
+  raw["architecture.resource.draft.reload"]({
+    params: { resourceID: input["resourceID"] },
+    query: { location: input["location"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint3_9Request = Parameters<RawClient["server.architecture"]["architecture.resource.remove"]>[0]
+type Endpoint3_9Input = {
+  readonly resourceID: Endpoint3_9Request["params"]["resourceID"]
+  readonly location?: Endpoint3_9Request["query"]["location"]
+  readonly revision: Endpoint3_9Request["payload"]["revision"]
+  readonly digest: Endpoint3_9Request["payload"]["digest"]
+}
+const Endpoint3_9 = (raw: RawClient["server.architecture"]) => (input: Endpoint3_9Input) =>
   raw["architecture.resource.remove"]({
     params: { resourceID: input["resourceID"] },
     query: { location: input["location"] },
     payload: { revision: input["revision"], digest: input["digest"] },
   }).pipe(Effect.mapError(mapClientError))
 
-type Endpoint3_5Request = Parameters<RawClient["server.architecture"]["architecture.resource.reset"]>[0]
-type Endpoint3_5Input = {
-  readonly resourceID: Endpoint3_5Request["params"]["resourceID"]
-  readonly location?: Endpoint3_5Request["query"]["location"]
+type Endpoint3_10Request = Parameters<RawClient["server.architecture"]["architecture.resource.reset"]>[0]
+type Endpoint3_10Input = {
+  readonly resourceID: Endpoint3_10Request["params"]["resourceID"]
+  readonly location?: Endpoint3_10Request["query"]["location"]
 }
-const Endpoint3_5 = (raw: RawClient["server.architecture"]) => (input: Endpoint3_5Input) =>
+const Endpoint3_10 = (raw: RawClient["server.architecture"]) => (input: Endpoint3_10Input) =>
   raw["architecture.resource.reset"]({
     params: { resourceID: input["resourceID"] },
     query: { location: input["location"] },
@@ -105,8 +167,13 @@ const adaptGroup3 = (raw: RawClient["server.architecture"]) => ({
   createResource: Endpoint3_1(raw),
   getResource: Endpoint3_2(raw),
   patchResource: Endpoint3_3(raw),
-  removeResource: Endpoint3_4(raw),
-  resetResource: Endpoint3_5(raw),
+  getDraft: Endpoint3_4(raw),
+  patchDraft: Endpoint3_5(raw),
+  commitDraft: Endpoint3_6(raw),
+  discardDraft: Endpoint3_7(raw),
+  reloadSaved: Endpoint3_8(raw),
+  removeResource: Endpoint3_9(raw),
+  resetResource: Endpoint3_10(raw),
 })
 
 type Endpoint4_0Request = Parameters<RawClient["server.session"]["session.list"]>[0]

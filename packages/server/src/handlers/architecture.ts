@@ -1,6 +1,7 @@
 import { ArchitectureGraph } from "@opencode-ai/core/architecture/graph"
 import { ArchitecturePatch } from "@opencode-ai/core/architecture/patch"
 import { ArchitectureRoot } from "@opencode-ai/core/architecture/root"
+import { ArchitectureConflict } from "@opencode-ai/core/architecture/conflict"
 import {
   ArchitectureConflictError,
   ArchitectureInvalidGraphError,
@@ -27,6 +28,25 @@ export const ArchitectureHandler = HttpApiBuilder.group(Api, "server.architectur
       .handle("architecture.resource.patch", (ctx) =>
         response(ArchitectureGraph.Service.use((graph) => mapError(graph.patch(ctx.params.resourceID, ctx.payload)))),
       )
+      .handle("architecture.resource.draft.get", (ctx) =>
+        response(ArchitectureGraph.Service.use((graph) => mapError(graph.loadDraft(ctx.params.resourceID)))),
+      )
+      .handle("architecture.resource.draft.patch", (ctx) =>
+        response(
+          ArchitectureGraph.Service.use((graph) => mapError(graph.patchDraft(ctx.params.resourceID, ctx.payload))),
+        ),
+      )
+      .handle("architecture.resource.draft.commit", (ctx) =>
+        response(
+          ArchitectureGraph.Service.use((graph) => mapError(graph.commitDraft(ctx.params.resourceID, ctx.payload))),
+        ),
+      )
+      .handle("architecture.resource.draft.discard", (ctx) =>
+        response(ArchitectureGraph.Service.use((graph) => mapError(graph.discardDraft(ctx.params.resourceID)))),
+      )
+      .handle("architecture.resource.draft.reload", (ctx) =>
+        response(ArchitectureGraph.Service.use((graph) => mapError(graph.reloadSaved(ctx.params.resourceID)))),
+      )
       .handle("architecture.resource.remove", (ctx) =>
         response(ArchitectureGraph.Service.use((graph) => mapError(graph.remove(ctx.params.resourceID, ctx.payload)))),
       )
@@ -46,16 +66,13 @@ function mapError<A, E, R>(effect: Effect.Effect<A, E, R>) {
           message: `${error.entity} not found: ${error.id}`,
         })
       if (error instanceof ArchitecturePatch.ConflictError)
-        return new ArchitectureConflictError({ message: error.message, operationIDs: error.operationIDs })
-      if (error instanceof ArchitectureGraph.ConflictError)
         return new ArchitectureConflictError({
+          error: "GraphConflictError",
           message: error.message,
-          operationIDs: [],
-          expectedRevision: error.expectedRevision,
-          expectedDigest: error.expectedDigest,
-          currentRevision: error.currentRevision,
-          currentDigest: error.currentDigest,
+          operationIDs: error.operationIDs,
         })
+      if (error instanceof ArchitectureGraph.ConflictError)
+        return new ArchitectureConflictError(ArchitectureConflict.payload(error))
       if (error instanceof ArchitecturePatch.InvalidGraphError)
         return new ArchitectureInvalidGraphError({ message: error.message })
       if (error instanceof ArchitectureGraph.UnsupportedVersionError)

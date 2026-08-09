@@ -1,5 +1,6 @@
 import { describe, expect } from "bun:test"
 import { ArchitectureGraph } from "@opencode-ai/core/architecture/graph"
+import { ArchitectureLayout } from "@opencode-ai/core/architecture/layout"
 import { ArchitectureTools } from "@opencode-ai/core/architecture/tools"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
@@ -50,6 +51,7 @@ const call = (name: string, input: unknown, id = `call-${name}`) => ({
   call: { type: "tool-call" as const, id, name, input },
 })
 const resourceID = Architecture.ResourceID.make("product")
+const layoutResourceID = Architecture.ResourceID.make("layout-sample")
 describe("ArchitectureTools", () => {
   it.effect("lets agents create, edit, query, and connect graph nodes", () =>
     Effect.gen(function* () {
@@ -142,6 +144,7 @@ describe("ArchitectureTools", () => {
         }),
       )
       expect(connected.output?.structured).toMatchObject({
+        source: "live",
         edge: { id: "a-to-b", source: "a", target: "b", sourceHandle: "bottom", targetHandle: "top", style: "curved" },
       })
 
@@ -172,33 +175,6 @@ describe("ArchitectureTools", () => {
         edgeIDs: ["a-to-b"],
       })
 
-      const reloaded = yield* settleTool(registry, call(ArchitectureTools.names.reloadResource, { resourceID }))
-      expect(reloaded.output?.structured).toMatchObject({
-        resource: {
-          id: "product",
-          tagColors: { interaction: "#4c82ff" },
-          nodes: [
-            {
-              id: "a",
-              text: "Updated conversation",
-              tags: ["interaction", "planned"],
-              layout: { position: { x: -160, y: 80 } },
-            },
-            { id: "b", text: "Memory", tags: ["implemented"], layout: { position: { x: 0, y: 0 } } },
-          ],
-          edges: [
-            {
-              id: "a-to-b",
-              source: "a",
-              target: "b",
-              sourceHandle: "right",
-              targetHandle: "left",
-              style: "rectangular",
-            },
-          ],
-        },
-      })
-
       const queried = yield* settleTool(
         registry,
         call(ArchitectureTools.names.query, {
@@ -220,8 +196,178 @@ describe("ArchitectureTools", () => {
       expect(context.output?.structured).toContain(".opencode/architecture/resources/product.json")
       expect(context.output?.structured).toContain("a.right -> b.left (style: rectangular)")
       expect(context.output?.structured).toContain("details")
+
+      const reloaded = yield* settleTool(registry, call(ArchitectureTools.names.reloadResource, { resourceID }))
+      expect(reloaded.output?.structured).toMatchObject({
+        source: "saved",
+        resource: { id: "product", nodes: [], edges: [] },
+      })
       expect(assertions.every((item) => item.resources[0]?.startsWith(".opencode/architecture/resources"))).toBe(true)
       expect(assertions.every((item) => item.source?.type === "tool")).toBe(true)
+    }),
+  )
+
+  it.effect("validates all managed resources and auto-layout can dry-run then persist", () =>
+    Effect.gen(function* () {
+      assertions.length = 0
+      deny = false
+      const registry = yield* ToolRegistry.Service
+      const graph = yield* ArchitectureGraph.Service
+
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createResource, {
+          id: "validation-a",
+          name: "Validation A",
+        }),
+      )
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createNode, {
+          resourceID: "validation-a",
+          text: "Conversation",
+          tags: ["planned"],
+        }),
+      )
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.setTagColor, {
+          resourceID: "validation-a",
+          tag: "planned",
+          color: "#4c82ff",
+        }),
+      )
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createResource, {
+          id: "validation-b",
+          name: "Validation B",
+        }),
+      )
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createNode, {
+          resourceID: "validation-b",
+          text: "Memory",
+          tags: ["implemented"],
+        }),
+      )
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.setTagColor, {
+          resourceID: "validation-b",
+          tag: "implemented",
+          color: "#16a34a",
+        }),
+      )
+
+      const validation = yield* settleTool(registry, call(ArchitectureTools.names.validate, {}))
+      expect(validation.output?.structured).toMatchObject({
+        valid: true,
+        summary: { checked: 2, invalid: 0 },
+        resources: expect.arrayContaining([
+          expect.objectContaining({ resourceID: "validation-a", valid: true }),
+          expect.objectContaining({ resourceID: "validation-b", valid: true }),
+        ]),
+      })
+
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createResource, {
+          id: layoutResourceID,
+          name: "Layout sample",
+        }),
+      )
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createNode, {
+          resourceID: layoutResourceID,
+          id: "a",
+          text: "A",
+        }),
+      )
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createNode, {
+          resourceID: layoutResourceID,
+          id: "b",
+          text: "B",
+        }),
+      )
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createNode, {
+          resourceID: layoutResourceID,
+          id: "c",
+          text: "C",
+        }),
+      )
+
+      const before = yield* graph.load(layoutResourceID)
+      const dryRun = yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.autoLayout, {
+          resourceID: layoutResourceID,
+          mode: "columns",
+          columns: [
+            { nodeIDs: ["a", "b"] },
+            { nodeIDs: ["c"] },
+          ],
+          origin: { x: 0, y: 0 },
+          spacing: { x: 120, y: 60 },
+          dryRun: true,
+        }),
+      )
+      const dryRunOutput = dryRun.output?.structured as ArchitectureLayout.Output | undefined
+      expect(dryRunOutput).toMatchObject({
+        resourceID: "layout-sample",
+        dryRun: true,
+        mode: "columns",
+        nodeIDs: ["a", "b", "c"],
+        positions: [
+          { nodeID: "a", position: { x: 0, y: 0 } },
+          { nodeID: "b", position: { x: 0, y: 60 } },
+          { nodeID: "c", position: { x: 120, y: 0 } },
+        ],
+      })
+      expect(dryRunOutput?.revision).toBeUndefined()
+      expect(dryRunOutput?.digest).toBeUndefined()
+      expect((yield* graph.load(layoutResourceID)).resource).toEqual(before.resource)
+
+      const applied = yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.autoLayout, {
+          resourceID: layoutResourceID,
+          mode: "columns",
+          columns: [
+            { nodeIDs: ["a", "b"] },
+            { nodeIDs: ["c"] },
+          ],
+          origin: { x: 0, y: 0 },
+          spacing: { x: 120, y: 60 },
+        }),
+      )
+      expect(applied.output?.structured).toMatchObject({
+        resourceID: "layout-sample",
+        dryRun: false,
+        mode: "columns",
+        nodeIDs: ["a", "b", "c"],
+        positions: [
+          { nodeID: "a", position: { x: 0, y: 0 } },
+          { nodeID: "b", position: { x: 0, y: 60 } },
+          { nodeID: "c", position: { x: 120, y: 0 } },
+        ],
+      })
+
+      const reloaded = yield* graph.loadLive(layoutResourceID)
+      expect(reloaded.source).toBe("live")
+      expect(reloaded.snapshot.resource.nodes.map((node) => ({ id: node.id, position: node.layout.position }))).toEqual([
+        { id: Architecture.NodeID.make("a"), position: { x: 0, y: 0 } },
+        { id: Architecture.NodeID.make("b"), position: { x: 0, y: 60 } },
+        { id: Architecture.NodeID.make("c"), position: { x: 120, y: 0 } },
+      ])
+      expect(reloaded.snapshot.resource.revision).toBeGreaterThan(before.resource.revision)
+      expect((yield* graph.load(layoutResourceID)).resource).toEqual(before.resource)
     }),
   )
 
@@ -230,6 +376,7 @@ describe("ArchitectureTools", () => {
       assertions.length = 0
       deny = false
       const registry = yield* ToolRegistry.Service
+      const graph = yield* ArchitectureGraph.Service
 
       yield* settleTool(
         registry,
@@ -294,9 +441,10 @@ describe("ArchitectureTools", () => {
         updatedTagColors: ["interaction", "implemented"],
       })
 
-      const reloaded = yield* settleTool(registry, call(ArchitectureTools.names.reloadResource, { resourceID }))
-      expect(reloaded.output?.structured).toMatchObject({
-        resource: {
+      const reloaded = yield* graph.loadLive(resourceID)
+      expect(reloaded).toMatchObject({
+        source: "live",
+        snapshot: { resource: {
           tagColors: { interaction: "#c084fc", planned: "#4c82ff" },
           nodes: [
             {
@@ -317,7 +465,7 @@ describe("ArchitectureTools", () => {
               style: "curved",
             },
           ],
-        },
+        } },
       })
     }),
   )

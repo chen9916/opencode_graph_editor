@@ -1,5 +1,10 @@
-import type { ArchitectureGetResourceOutput, ArchitecturePatchResourceInput } from "@opencode-ai/client/promise"
+import type {
+  ArchitectureGetDraftOutput,
+  ArchitectureGetResourceOutput,
+  ArchitecturePatchResourceInput,
+} from "@opencode-ai/client/promise"
 import type { Direction } from "@/context/language"
+import type { ArchitectureCommandAction } from "./commands"
 import type { ArchitectureConflict } from "./journal"
 
 export type ArchitectureSnapshot = ArchitectureGetResourceOutput["data"]
@@ -11,10 +16,47 @@ export type ArchitectureOperation = ArchitecturePatchResourceInput["operations"]
 export type ArchitectureViewport = { readonly x: number; readonly y: number; readonly zoom: number }
 export type ArchitectureEdgeStyle = "rectangular" | "curved" | "straight"
 
+export type ArchitectureDraftSnapshot = ArchitectureGetDraftOutput["data"]
+export type ArchitectureLiveDraft = Omit<ArchitectureDraftSnapshot, "source"> & { readonly source: "live" }
+export type ArchitectureLiveDraftCache = ArchitectureLiveDraft | null
+
 export type ArchitectureDraft = {
   readonly base: ArchitectureSnapshot
+  readonly origin?: ArchitectureSnapshot
+  readonly journalBase?: ArchitectureResource
   readonly operations: ReadonlyArray<ArchitectureOperation>
   readonly conflicts: ReadonlyArray<ArchitectureConflict>
+  readonly live?: ArchitectureLiveDraft
+}
+
+export type ArchitectureDraftChange = {
+  readonly base: ArchitectureSnapshot
+  readonly origin: ArchitectureSnapshot
+  readonly resource: ArchitectureResource
+  readonly operations: ReadonlyArray<ArchitectureOperation>
+  readonly conflicts: ReadonlyArray<ArchitectureConflict>
+}
+
+export type ArchitectureSelectionPrompt = {
+  readonly message: string
+  readonly resourceID: string
+  readonly resourceName: string
+  readonly nodeIDs: ReadonlyArray<string>
+  readonly edgeIDs: ReadonlyArray<string>
+  readonly nodes: ReadonlyArray<{
+    readonly id: string
+    readonly text: string
+    readonly tags: ReadonlyArray<string>
+    readonly position: { readonly x: number; readonly y: number }
+  }>
+  readonly edges: ReadonlyArray<{
+    readonly id: string
+    readonly source: string
+    readonly target: string
+    readonly sourceHandle: ArchitectureConnectionSide | undefined
+    readonly targetHandle: ArchitectureConnectionSide | undefined
+    readonly style: ArchitectureEdgeStyle | undefined
+  }>
 }
 
 export type ArchitectureLabels = {
@@ -53,6 +95,10 @@ export type ArchitectureLabels = {
   readonly delete: string
   readonly duplicate: string
   readonly exportPatch: string
+  readonly askSelection: string
+  readonly askSelectionPlaceholder: string
+  readonly send: string
+  readonly cancel: string
   readonly conflicts: string
   readonly dirty: string
   readonly clean: string
@@ -65,6 +111,7 @@ export type ArchitectureLabels = {
   readonly deleteSelectionConfirm: string
   readonly copied: string
   readonly saveFailed: string
+  readonly askSelectionFailed: string
   readonly conflictReasons: Record<ArchitectureConflict["reason"], string>
 }
 
@@ -75,14 +122,12 @@ export type ArchitecturePanelProps = {
   readonly draft?: ArchitectureDraft
   readonly viewport?: ArchitectureViewport
   readonly busy: boolean
-  readonly action?: {
-    readonly id: number
-    readonly type: "save" | "reload" | "fitView" | "addNode" | "undo" | "redo" | "delete"
-  }
+  readonly action?: ArchitectureCommandAction
   readonly labels: ArchitectureLabels
-  readonly onJournal: (operations: ReadonlyArray<ArchitectureOperation>) => void
+  readonly onJournal: (change: ArchitectureDraftChange) => void
   readonly onViewport: (viewport: ArchitectureViewport) => void
-  readonly onSave: (operations: ReadonlyArray<ArchitectureOperation>) => void
+  readonly onSave: (change: ArchitectureDraftChange) => void
+  readonly onAskSelection?: (input: ArchitectureSelectionPrompt) => void
   readonly onReload: () => void
   readonly onExport: (operations: ReadonlyArray<ArchitectureOperation>) => void
   readonly onConfirm: (message: string, confirmLabel: string, action: () => void) => void

@@ -24,6 +24,7 @@ import { disposeAllInstances } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { AppNodeBuilderV1 } from "@/effect/app-node-builder-v1"
 
 afterEach(async () => {
   await disposeAllInstances()
@@ -35,7 +36,7 @@ const ref = {
 }
 
 const layer = (flags: Partial<RuntimeFlags.Info> = {}) =>
-  LayerNode.compile(
+  AppNodeBuilderV1.build(
     LayerNode.group([
       Agent.node,
       BackgroundJob.node,

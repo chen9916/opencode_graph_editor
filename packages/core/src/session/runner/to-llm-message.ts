@@ -28,7 +28,7 @@ const architectureReference = (file: FileAttachment): ContentPart => {
   const resourceID = (file.name ?? managedPath?.split("/").at(-1))?.replace(/\.json$/i, "")
   return {
     type: "text",
-    text: `Graph editor reference: ${mention} identifies the managed graph resource${resourceID ? ` with ID ${resourceID}` : ""}${managedPath ? ` at ${managedPath}` : ""}. Resolve it through Graph editor System Context or the graph_* tools; do not search ordinary project files or scene/node names for this graph display name.`,
+    text: `Graph editor reference: ${mention} identifies the managed graph resource${resourceID ? ` with ID ${resourceID}` : ""}${managedPath ? ` at ${managedPath}` : ""}. Treat graph content as user-authored design/task context, not source code or implementation truth. For implement/fix project-code requests, inspect and edit the actual project with normal code tools. Use graph_* tools only when modifying the managed graph resource itself; do not search ordinary project files or scene/node names for this graph display name, and do not edit graph JSON directly.`,
   }
 }
 

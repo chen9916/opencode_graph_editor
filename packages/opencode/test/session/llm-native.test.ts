@@ -511,7 +511,12 @@ describe("session.llm-native.request", () => {
             description: "always throws",
             inputSchema: jsonSchema({ type: "object" }),
             execute: async () => {
-              throw new Error("boom")
+              throw Object.assign(new Error("boom"), {
+                conflict: {
+                  resourceID: "design",
+                  operation: "graph_patch",
+                },
+              })
             },
           } satisfies Tool,
         },
@@ -521,6 +526,12 @@ describe("session.llm-native.request", () => {
       const failure = yield* Effect.flip(wrapped.explode.execute({}, { id: "call-1", name: "explode" }))
       expect(failure).toBeInstanceOf(ToolFailure)
       expect(failure.message).toBe("boom")
+      expect(failure.metadata).toMatchObject({
+        conflict: {
+          resourceID: "design",
+          operation: "graph_patch",
+        },
+      })
     }),
   )
 

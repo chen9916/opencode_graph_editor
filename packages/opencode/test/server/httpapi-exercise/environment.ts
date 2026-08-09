@@ -26,7 +26,7 @@ export const original = {
   OPENCODE_SERVER_USERNAME: Flag.OPENCODE_SERVER_USERNAME,
 }
 
-export const cleanupExercisePaths = Effect.promise(async () => {
+export const cleanupExerciseDatabase = Effect.promise(async () => {
   const fs = await import("fs/promises")
   if (!preserveExerciseDatabase) {
     await Promise.all(
@@ -35,6 +35,13 @@ export const cleanupExercisePaths = Effect.promise(async () => {
       ),
     )
   }
+})
+
+export const cleanupExercisePaths = Effect.gen(function* () {
+  yield* cleanupExerciseDatabase
   if (!preserveExerciseGlobalRoot)
-    await fs.rm(exerciseGlobalRoot, { recursive: true, force: true }).catch(() => undefined)
+    yield* Effect.promise(async () => {
+      const fs = await import("fs/promises")
+      await fs.rm(exerciseGlobalRoot, { recursive: true, force: true }).catch(() => undefined)
+    })
 })

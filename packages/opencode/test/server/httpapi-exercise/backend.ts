@@ -17,13 +17,17 @@ export function call(scenario: ActiveScenario, ctx: SeededContext<unknown>, opti
   )
 }
 
-export function callAuthProbe(scenario: ActiveScenario, credentials: "missing" | "valid" = "missing") {
+export function callAuthProbe(
+  scenario: ActiveScenario,
+  ctx: Pick<SeededContext<unknown>, "headers">,
+  credentials: "missing" | "valid" = "missing",
+) {
   return Effect.promise(async () => {
     const controller = new AbortController()
     return Promise.race([
       Promise.resolve(
         app(await runtime(), { auth: { password: "secret" } }).request(
-          toAuthProbeRequest(scenario, credentials, controller.signal),
+          toAuthProbeRequest(scenario, ctx, credentials, controller.signal),
         ),
       ).then((response) => capture(response, scenario.capture)),
       Bun.sleep(1_000).then(() => {
@@ -86,7 +90,12 @@ function toRequest(scenario: ActiveScenario, ctx: SeededContext<unknown>) {
   })
 }
 
-function toAuthProbeRequest(scenario: ActiveScenario, credentials: "missing" | "valid", signal: AbortSignal) {
+function toAuthProbeRequest(
+  scenario: ActiveScenario,
+  ctx: Pick<SeededContext<unknown>, "headers">,
+  credentials: "missing" | "valid",
+  signal: AbortSignal,
+) {
   const spec = scenario.authProbe ?? {
     path: authProbePath(scenario.path),
     body: scenario.method === "GET" ? undefined : {},
@@ -94,6 +103,7 @@ function toAuthProbeRequest(scenario: ActiveScenario, credentials: "missing" | "
   const headers = {
     ...(spec.body === undefined ? {} : { "content-type": "application/json" }),
     ...spec.headers,
+    ...ctx.headers(),
     ...(credentials === "valid" ? { authorization: basic("opencode", "secret") } : {}),
   }
   return new Request(new URL(spec.path, "http://localhost"), {

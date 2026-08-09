@@ -29,6 +29,8 @@ describe("ArchitectureContext", () => {
       const empty = yield* SystemContext.initialize(yield* registry.load())
       expect(empty.baseline).toContain("Graph editor resources are lightweight communication artifacts")
       expect(empty.baseline).toContain("A bare @graph mention")
+      expect(empty.baseline).toContain("selected or quoted as an implementation brief")
+      expect(empty.baseline).toContain("inspect the actual project with normal code tools")
       expect(empty.baseline).toContain("create a managed graph resource")
       expect(empty.baseline).toContain("plan a readable layout")
       expect(empty.baseline).toContain("No Graph editor resources exist yet.")

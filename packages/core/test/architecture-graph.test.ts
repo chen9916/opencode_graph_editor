@@ -1,10 +1,13 @@
 import { $ } from "bun"
 import { describe, expect, test } from "bun:test"
+import { ArchitectureConflict } from "@opencode-ai/core/architecture/conflict"
+import { ArchitectureDraft } from "@opencode-ai/core/architecture/draft"
 import { ArchitectureGraph } from "@opencode-ai/core/architecture/graph"
 import { ArchitecturePatch } from "@opencode-ai/core/architecture/patch"
 import { ArchitectureRoot } from "@opencode-ai/core/architecture/root"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { EventV2 } from "@opencode-ai/core/event"
 import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { Architecture } from "@opencode-ai/schema/architecture"
@@ -16,9 +19,16 @@ import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
 const it = testEffect(
-  AppNodeBuilder.build(LayerNode.group([ArchitectureGraph.node, ArchitectureRoot.node, Location.node]), [
-    [Location.node, tempLocationLayer],
-  ]),
+  AppNodeBuilder.build(
+    LayerNode.group([
+      ArchitectureGraph.node,
+      ArchitectureDraft.node,
+      ArchitectureRoot.node,
+      EventV2.node,
+      Location.node,
+    ]),
+    [[Location.node, tempLocationLayer]],
+  ),
 )
 
 const node = (id: string) => ({
@@ -109,14 +119,370 @@ describe("ArchitectureGraph storage", () => {
         .pipe(Effect.flip)
 
       expect(stale).toMatchObject({
+        resourceID: base.resource.id,
+        resourceName: "Design",
+        operation: "graph_patch",
+        expectedRevision: base.resource.revision,
+        currentRevision: saved.resource.revision,
+        expectedDigest: base.digest,
+        currentDigest: saved.digest,
+        safeToRetry: "unknown",
+        retryHint: "Reload the graph resource and retry the edit against the latest digest.",
+        expected: { revision: base.resource.revision, digest: base.digest },
+        actual: { revision: saved.resource.revision, digest: saved.digest },
+        operationIDs: [],
+      })
+      expect(stale.message).toContain("expected revision 0")
+      expect(stale.message).toContain("current revision 1")
+      expect(stale.message).toContain("resourceID=design")
+      expect(ArchitectureConflict.payload(stale as ArchitectureGraph.ConflictError)).toMatchObject({
+        message: "Graph resource changed before this edit could be applied.",
+        resourceID: base.resource.id,
+      })
+      expect((yield* graph.load(base.resource.id)).digest).toBe(saved.digest)
+    }),
+  )
+
+  it.live("keeps live draft patches out of persisted resource files", () =>
+    Effect.gen(function* () {
+      const graph = yield* ArchitectureGraph.Service
+      const base = yield* graph.create({ id: Architecture.ResourceID.make("drafted"), name: "Drafted" })
+      const live = yield* graph.patchLive(base.resource.id, {
+        revision: base.resource.revision,
+        digest: base.digest,
+        operations: [
+          { id: Architecture.OperationID.make("draft-node"), type: "node.create", node: node("draft-node") },
+        ],
+      })
+      const saved = yield* graph.load(base.resource.id)
+      const raw = yield* Effect.promise(() => fs.readFile(path.join(saved.storage.root, saved.storage.path), "utf8"))
+
+      expect(live.source).toBe("live")
+      expect(live.snapshot.resource.nodes.map((item) => item.id)).toEqual([Architecture.NodeID.make("draft-node")])
+      expect((yield* graph.loadLive(base.resource.id)).snapshot.digest).toBe(live.snapshot.digest)
+      expect(saved.resource.nodes).toEqual([])
+      expect(JSON.parse(raw).nodes).toEqual([])
+    }),
+  )
+
+  it.live("commits multiple live draft patches as one saved revision", () =>
+    Effect.gen(function* () {
+      const graph = yield* ArchitectureGraph.Service
+      const base = yield* graph.create({ id: Architecture.ResourceID.make("commit-draft"), name: "Commit draft" })
+      const first = yield* graph.patchDraft(base.resource.id, {
+        revision: base.resource.revision,
+        digest: base.digest,
+        operations: [
+          { id: Architecture.OperationID.make("first-node"), type: "node.create", node: node("first-node") },
+        ],
+      })
+      const live = yield* graph.patchDraft(base.resource.id, {
+        revision: first.snapshot.resource.revision,
+        digest: first.snapshot.digest,
+        operations: [
+          { id: Architecture.OperationID.make("second-node"), type: "node.create", node: node("second-node") },
+        ],
+      })
+      const committed = yield* graph.commitDraft(base.resource.id, {
+        revision: live.snapshot.resource.revision,
+        digest: live.snapshot.digest,
+      })
+      const raw = yield* Effect.promise(() =>
+        fs.readFile(path.join(committed.storage.root, committed.storage.path), "utf8"),
+      )
+
+      expect(live.source).toBe("live")
+      expect(live.snapshot.resource.revision).toBe(base.resource.revision + 2)
+      expect(committed.resource.revision).toBe(base.resource.revision + 1)
+      expect(committed.digest).not.toBe(live.snapshot.digest)
+      expect((yield* graph.loadDraft(base.resource.id)).source).toBe("saved")
+      expect(JSON.parse(raw)).toMatchObject({
+        revision: base.resource.revision + 1,
+        nodes: [{ id: "first-node" }, { id: "second-node" }],
+      })
+    }),
+  )
+
+  it.live("rejects a changed or missing expected live draft", () =>
+    Effect.gen(function* () {
+      const graph = yield* ArchitectureGraph.Service
+      const drafts = yield* ArchitectureDraft.Service
+      const base = yield* graph.create({ id: Architecture.ResourceID.make("expected-draft"), name: "Expected draft" })
+      const first = yield* graph.patchDraft(base.resource.id, {
+        revision: base.resource.revision,
+        digest: base.digest,
+        operations: [
+          { id: Architecture.OperationID.make("first-node"), type: "node.create", node: node("first-node") },
+        ],
+      })
+      const second = yield* graph.patchDraft(base.resource.id, {
+        revision: first.snapshot.resource.revision,
+        digest: first.snapshot.digest,
+        operations: [
+          { id: Architecture.OperationID.make("second-node"), type: "node.create", node: node("second-node") },
+        ],
+      })
+
+      expect(
+        yield* graph
+          .commitDraft(base.resource.id, {
+            revision: first.snapshot.resource.revision,
+            digest: first.snapshot.digest,
+          })
+          .pipe(Effect.flip),
+      ).toMatchObject({
+        operation: "graph_draft_commit",
+        conflictKind: "draft_changed",
+        expected: { revision: first.snapshot.resource.revision, digest: first.snapshot.digest },
+        actual: { revision: second.snapshot.resource.revision, digest: second.snapshot.digest },
+      })
+      expect((yield* drafts.get(base.resource.id))?.resource).toEqual(second.snapshot.resource)
+
+      yield* graph.discardDraft(base.resource.id)
+      expect(
+        yield* graph
+          .commitDraft(base.resource.id, {
+            revision: second.snapshot.resource.revision,
+            digest: second.snapshot.digest,
+          })
+          .pipe(Effect.flip),
+      ).toMatchObject({
+        operation: "graph_draft_commit",
+        conflictKind: "draft_missing",
+        expected: { revision: second.snapshot.resource.revision, digest: second.snapshot.digest },
+        actual: { revision: base.resource.revision, digest: base.digest },
+      })
+      expect((yield* graph.load(base.resource.id)).digest).toBe(base.digest)
+    }),
+  )
+
+  it.live("discards live draft patches without changing the saved resource file", () =>
+    Effect.gen(function* () {
+      const graph = yield* ArchitectureGraph.Service
+      const base = yield* graph.create({ id: Architecture.ResourceID.make("discard-draft"), name: "Discard draft" })
+      yield* graph.patchDraft(base.resource.id, {
+        revision: base.resource.revision,
+        digest: base.digest,
+        operations: [
+          { id: Architecture.OperationID.make("draft-node"), type: "node.create", node: node("draft-node") },
+        ],
+      })
+      const discarded = yield* graph.discardDraft(base.resource.id)
+      const saved = yield* graph.load(base.resource.id)
+      const raw = yield* Effect.promise(() => fs.readFile(path.join(saved.storage.root, saved.storage.path), "utf8"))
+
+      expect(discarded.source).toBe("saved")
+      expect(discarded.snapshot.digest).toBe(base.digest)
+      expect(saved.resource.nodes).toEqual([])
+      expect(JSON.parse(raw).nodes).toEqual([])
+    }),
+  )
+
+  it.live("rejects live draft mutation when the saved base changed", () =>
+    Effect.gen(function* () {
+      const graph = yield* ArchitectureGraph.Service
+      const drafts = yield* ArchitectureDraft.Service
+      const base = yield* graph.create({ id: Architecture.ResourceID.make("stale-draft"), name: "Stale draft" })
+      const live = yield* graph.patchLive(base.resource.id, {
+        revision: base.resource.revision,
+        digest: base.digest,
+        operations: [
+          { id: Architecture.OperationID.make("draft-node"), type: "node.create", node: node("draft-node") },
+        ],
+      })
+      const saved = yield* graph.patch(base.resource.id, {
+        revision: base.resource.revision,
+        digest: base.digest,
+        operations: [
+          { id: Architecture.OperationID.make("saved-node"), type: "node.create", node: node("saved-node") },
+        ],
+      })
+      const stale = yield* graph
+        .patchLive(base.resource.id, {
+          revision: live.snapshot.resource.revision,
+          digest: live.snapshot.digest,
+          operations: [
+            { id: Architecture.OperationID.make("second-draft"), type: "node.create", node: node("second-draft") },
+          ],
+        })
+        .pipe(Effect.flip)
+
+      expect(stale).toMatchObject({
+        resourceID: base.resource.id,
         expectedRevision: base.resource.revision,
         currentRevision: saved.resource.revision,
         expectedDigest: base.digest,
         currentDigest: saved.digest,
       })
-      expect(stale.message).toContain("expected revision 0")
-      expect(stale.message).toContain("current revision 1")
-      expect((yield* graph.load(base.resource.id)).digest).toBe(saved.digest)
+      expect(yield* drafts.get(base.resource.id)).toMatchObject({
+        baseRevision: base.resource.revision,
+        baseDigest: base.digest,
+        resource: live.snapshot.resource,
+      })
+      expect(yield* graph.loadLive(base.resource.id).pipe(Effect.flip)).toMatchObject({
+        operation: "graph_draft_load",
+        expected: { revision: base.resource.revision, digest: base.digest },
+        actual: { revision: saved.resource.revision, digest: saved.digest },
+      })
+      expect(
+        yield* graph
+          .commitDraft(base.resource.id, {
+            revision: live.snapshot.resource.revision,
+            digest: live.snapshot.digest,
+          })
+          .pipe(Effect.flip),
+      ).toMatchObject({
+        operation: "graph_draft_commit",
+        expected: { revision: base.resource.revision, digest: base.digest },
+        actual: { revision: saved.resource.revision, digest: saved.digest },
+      })
+      yield* graph.discardDraft(base.resource.id)
+      expect((yield* graph.loadLive(base.resource.id)).source).toBe("saved")
+    }),
+  )
+
+  it.live("settles draft state before commit lifecycle events", () =>
+    Effect.gen(function* () {
+      const graph = yield* ArchitectureGraph.Service
+      const events = yield* EventV2.Service
+      const base = yield* graph.create({ id: Architecture.ResourceID.make("commit-events"), name: "Commit events" })
+      const live = yield* graph.patchDraft(base.resource.id, {
+        revision: base.resource.revision,
+        digest: base.digest,
+        operations: [
+          { id: Architecture.OperationID.make("draft-node"), type: "node.create", node: node("draft-node") },
+        ],
+      })
+      const observed = new Array<string>()
+      const unsubscribe = yield* events.listen((event) => {
+        if (
+          event.type !== Architecture.Event.ResourceUpdated.type &&
+          event.type !== Architecture.Event.ResourceDraftDiscarded.type
+        )
+          return Effect.void
+        return graph.loadDraft(base.resource.id).pipe(
+          Effect.tap((current) =>
+            Effect.sync(() => {
+              observed.push(`${event.type}:${current.source}`)
+            }),
+          ),
+          Effect.orDie,
+          Effect.asVoid,
+        )
+      })
+
+      yield* graph.commitDraft(base.resource.id, {
+        revision: live.snapshot.resource.revision,
+        digest: live.snapshot.digest,
+      })
+      yield* unsubscribe
+
+      expect(observed).toEqual([
+        `${Architecture.Event.ResourceUpdated.type}:saved`,
+        `${Architecture.Event.ResourceDraftDiscarded.type}:saved`,
+      ])
+    }),
+  )
+
+  it.live("settles draft state before the discard lifecycle event", () =>
+    Effect.gen(function* () {
+      const graph = yield* ArchitectureGraph.Service
+      const events = yield* EventV2.Service
+      const base = yield* graph.create({ id: Architecture.ResourceID.make("discard-events"), name: "Discard events" })
+      yield* graph.patchDraft(base.resource.id, {
+        revision: base.resource.revision,
+        digest: base.digest,
+        operations: [
+          { id: Architecture.OperationID.make("draft-node"), type: "node.create", node: node("draft-node") },
+        ],
+      })
+      const observed = new Array<string>()
+      const unsubscribe = yield* events.listen((event) =>
+        event.type !== Architecture.Event.ResourceDraftDiscarded.type
+          ? Effect.void
+          : graph.loadDraft(base.resource.id).pipe(
+              Effect.tap((current) =>
+                Effect.sync(() => {
+                  observed.push(`${event.type}:${current.source}`)
+                }),
+              ),
+              Effect.orDie,
+              Effect.asVoid,
+            ),
+      )
+
+      yield* graph.discardDraft(base.resource.id)
+      yield* unsubscribe
+
+      expect(observed).toEqual([`${Architecture.Event.ResourceDraftDiscarded.type}:saved`])
+    }),
+  )
+
+  it.live("clears process-local drafts before remove and reset lifecycle events", () =>
+    Effect.gen(function* () {
+      const graph = yield* ArchitectureGraph.Service
+      const drafts = yield* ArchitectureDraft.Service
+      const events = yield* EventV2.Service
+      const removedID = Architecture.ResourceID.make("removed-draft")
+      const removed = yield* graph.create({ id: removedID, name: "Removed draft" })
+      yield* graph.patchDraft(removedID, {
+        revision: removed.resource.revision,
+        digest: removed.digest,
+        operations: [
+          { id: Architecture.OperationID.make("draft-node"), type: "node.create", node: node("draft-node") },
+        ],
+      })
+      const removeObserved = new Array<boolean>()
+      const unsubscribeRemove = yield* events.listen((event) =>
+        event.type !== Architecture.Event.ResourceRemoved.type
+          ? Effect.void
+          : drafts.get(removedID).pipe(
+              Effect.tap((entry) =>
+                Effect.sync(() => {
+                  removeObserved.push(entry !== undefined)
+                }),
+              ),
+              Effect.asVoid,
+            ),
+      )
+
+      yield* graph.remove(removedID, { revision: removed.resource.revision, digest: removed.digest })
+      yield* unsubscribeRemove
+      const recreated = yield* graph.create({ id: removedID, name: "Removed draft" })
+
+      expect(removeObserved).toEqual([false])
+      expect((yield* graph.loadLive(recreated.resource.id)).source).toBe("saved")
+      expect(recreated.resource.nodes).toEqual([])
+
+      const resetID = Architecture.ResourceID.make("reset-draft")
+      const resetBase = yield* graph.create({ id: resetID, name: "Reset draft" })
+      yield* graph.patchDraft(resetID, {
+        revision: resetBase.resource.revision,
+        digest: resetBase.digest,
+        operations: [
+          { id: Architecture.OperationID.make("draft-node"), type: "node.create", node: node("draft-node") },
+        ],
+      })
+      const resetObserved = new Array<boolean>()
+      const unsubscribeReset = yield* events.listen((event) =>
+        event.type !== Architecture.Event.ResourceUpdated.type
+          ? Effect.void
+          : drafts.get(resetID).pipe(
+              Effect.tap((entry) =>
+                Effect.sync(() => {
+                  resetObserved.push(entry !== undefined)
+                }),
+              ),
+              Effect.asVoid,
+            ),
+      )
+
+      const reset = yield* graph.reset(resetID)
+      yield* unsubscribeReset
+
+      expect(resetObserved).toEqual([false])
+      expect((yield* graph.loadLive(resetID)).source).toBe("saved")
+      expect(reset.resource.nodes).toEqual([])
     }),
   )
 

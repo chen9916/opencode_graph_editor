@@ -185,7 +185,14 @@ export function nativeTools(tools: Record<string, Tool>, input: Pick<StreamInput
                 abortSignal: input.abort,
               })
             },
-            catch: (error) => new ToolFailure({ message: errorMessage(error), error }),
+            catch: (error) => {
+              const metadata = toolFailureMetadata(error)
+              return new ToolFailure({
+                message: errorMessage(error),
+                error,
+                ...(metadata ? { metadata } : {}),
+              })
+            },
           }),
       }),
     ]),
@@ -193,3 +200,10 @@ export function nativeTools(tools: Record<string, Tool>, input: Pick<StreamInput
 }
 
 export * as LLMNativeRuntime from "./native-runtime"
+
+function toolFailureMetadata(error: unknown) {
+  if (!isRecord(error)) return undefined
+  if (isRecord(error.metadata)) return error.metadata
+  if (isRecord(error.conflict)) return { conflict: error.conflict }
+  return undefined
+}

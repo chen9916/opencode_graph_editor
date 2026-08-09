@@ -13,6 +13,7 @@ import { LocationServiceMap } from "@opencode-ai/core/location-services"
 import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
+import { graphLocation } from "./graph-location"
 
 export const CODE_MODE_TOOL = "execute"
 
@@ -251,10 +252,12 @@ export const CodeModeTool = Tool.define(
               const args = input && typeof input === "object" && !Array.isArray(input) ? input : {}
               const patterns = entry.patterns(input)
               const locationLayer = locations.get(
-                Location.Ref.make({
-                  directory: AbsolutePath.make(session.directory),
-                  ...(session.workspaceID ? { workspaceID: session.workspaceID } : {}),
-                }),
+                entry.key.startsWith("graph_")
+                  ? graphLocation(session.directory)
+                  : Location.Ref.make({
+                      directory: AbsolutePath.make(session.directory),
+                      ...(session.workspaceID ? { workspaceID: session.workspaceID } : {}),
+                    }),
               )
               yield* plugin.trigger(
                 "tool.execute.before",

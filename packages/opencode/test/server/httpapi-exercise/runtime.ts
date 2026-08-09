@@ -2,6 +2,7 @@ export type Runtime = {
   PublicApi: (typeof import("../../../src/server/routes/instance/httpapi/public"))["PublicApi"]
   HttpApiApp: (typeof import("../../../src/server/routes/instance/httpapi/server"))["HttpApiApp"]
   AppLayer: (typeof import("../../../src/effect/app-runtime"))["AppLayer"]
+  disposeAppRuntime: (typeof import("../../../src/effect/app-runtime"))["AppRuntime"]["dispose"]
   memoMap: import("effect").Layer.MemoMap
   InstanceRef: (typeof import("../../../src/effect/instance-ref"))["InstanceRef"]
   InstanceStore: (typeof import("../../../src/project/instance-store"))["InstanceStore"]
@@ -10,9 +11,8 @@ export type Runtime = {
   Worktree: (typeof import("../../../src/worktree"))["Worktree"]
   Project: (typeof import("../../../src/project/project"))["Project"]
   Tui: typeof import("../../../src/server/shared/tui-control")
-  disposeAllInstances: (typeof import("../../fixture/fixture"))["disposeAllInstances"]
   tmpdir: (typeof import("../../fixture/fixture"))["tmpdir"]
-  resetDatabase: (typeof import("../../fixture/db"))["resetDatabase"]
+  disposeLocationServiceMap: (typeof import("../../../src/effect/location-service-map"))["dispose"]
 }
 
 let runtimePromise: Promise<Runtime> | undefined
@@ -31,11 +31,12 @@ export function runtime() {
     const project = await import("../../../src/project/project")
     const tui = await import("../../../src/server/shared/tui-control")
     const fixture = await import("../../fixture/fixture")
-    const db = await import("../../fixture/db")
+    const processLocationServiceMap = await import("../../../src/effect/location-service-map")
     return {
       PublicApi: publicApi.PublicApi,
       HttpApiApp: httpApiServer.HttpApiApp,
       AppLayer: appRuntime.AppLayer,
+      disposeAppRuntime: appRuntime.AppRuntime.dispose,
       memoMap: Layer.makeMemoMapUnsafe(),
       InstanceRef: instanceRef.InstanceRef,
       InstanceStore: instanceStore.InstanceStore,
@@ -44,9 +45,8 @@ export function runtime() {
       Worktree: worktree.Worktree,
       Project: project.Project,
       Tui: tui,
-      disposeAllInstances: fixture.disposeAllInstances,
       tmpdir: fixture.tmpdir,
-      resetDatabase: db.resetDatabase,
+      disposeLocationServiceMap: processLocationServiceMap.dispose,
     }
   })())
 }

@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
+import type { ArchitectureLiveDraft } from "./contract"
 import {
   architectureResourceEventInfo,
+  architectureResourceDraftEventCache,
+  architectureResourceDraftEventInfo,
+  architectureSnapshotCoversEvent,
   architectureSnapshotMatchesEvent,
   architectureSummaryMatchesEvent,
   beginArchitectureLocalSave,
@@ -48,32 +52,42 @@ describe("architecture resource events", () => {
         event,
       ),
     ).toBe(true)
+    expect(
+      architectureSnapshotCoversEvent(
+        {
+          resource: { version: 2, id: "design", name: "Design", revision: 3, nodes: [], edges: [] },
+          digest: "newer",
+          storage: { root: "/repo/.opencode/architecture", path: ".opencode/architecture/resources/design.json" },
+        },
+        event,
+      ),
+    ).toBe(true)
   })
 
-  test("tracks in-flight local saves by server directory resource and revision", () => {
+  test("retains the newest concurrent saved event suppressed during a local save", () => {
     const finish = beginArchitectureLocalSave({
       server: "http://127.0.0.1:4096",
       directory: "C:/repo",
       resourceID: "design",
-      revision: 2,
     })
 
     expect(
       isArchitectureLocalSaveEvent({
         server: "http://127.0.0.1:4096",
         directory: "C:/repo",
-        event: { resourceID: "design", revision: 2, digest: "abc" },
+        event: { resourceID: "design", revision: 2, digest: "s1" },
       }),
     ).toBe(true)
     expect(
       isArchitectureLocalSaveEvent({
         server: "http://127.0.0.1:4096",
         directory: "C:/repo",
-        event: { resourceID: "design", revision: 3, digest: "abc" },
+        event: { resourceID: "design", revision: 3, digest: "s2" },
       }),
-    ).toBe(false)
+    ).toBe(true)
 
-    finish()
+    expect(finish()).toEqual({ resourceID: "design", revision: 3, digest: "s2" })
+    expect(finish()).toBeUndefined()
 
     expect(
       isArchitectureLocalSaveEvent({
@@ -82,5 +96,34 @@ describe("architecture resource events", () => {
         event: { resourceID: "design", revision: 2, digest: "abc" },
       }),
     ).toBe(false)
+  })
+
+  test("reads live draft update events with inline or nested draft payloads", () => {
+    const draft: ArchitectureLiveDraft = {
+      source: "live",
+      snapshot: {
+        digest: "live",
+        storage: { root: "/repo/.opencode/architecture", path: ".opencode/architecture/resources/design.json" },
+        resource: { version: 2, revision: 4, id: "design", name: "Design draft", nodes: [], edges: [] },
+      },
+    }
+
+    expect(
+      architectureResourceDraftEventInfo({
+        type: "architecture.resource.draft.updated",
+        data: { resourceID: "design", ...draft },
+      }),
+    ).toEqual({ resourceID: "design", action: "updated", draft })
+
+    expect(
+      architectureResourceDraftEventInfo({
+        type: "architecture.resource.draft.discarded",
+        properties: { resourceID: "design", draft },
+      }),
+    ).toEqual({ resourceID: "design", action: "discarded", draft })
+  })
+
+  test("maps discard events to an explicit empty draft cache value", () => {
+    expect(architectureResourceDraftEventCache({ resourceID: "design", action: "discarded" })).toBeNull()
   })
 })

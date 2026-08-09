@@ -10,6 +10,7 @@ import type {
   AppLogResponses,
   AppSkillsErrors,
   AppSkillsResponses,
+  ArchitectureDraftCommitInput,
   ArchitecturePatchInput,
   ArchitectureResourceCreateInput,
   ArchitectureResourceRemoveInput,
@@ -270,6 +271,16 @@ import type {
   V2AgentListResponses,
   V2ArchitectureResourceCreateErrors,
   V2ArchitectureResourceCreateResponses,
+  V2ArchitectureResourceDraftCommitErrors,
+  V2ArchitectureResourceDraftCommitResponses,
+  V2ArchitectureResourceDraftDiscardErrors,
+  V2ArchitectureResourceDraftDiscardResponses,
+  V2ArchitectureResourceDraftGetErrors,
+  V2ArchitectureResourceDraftGetResponses,
+  V2ArchitectureResourceDraftPatchErrors,
+  V2ArchitectureResourceDraftPatchResponses,
+  V2ArchitectureResourceDraftReloadErrors,
+  V2ArchitectureResourceDraftReloadResponses,
   V2ArchitectureResourceGetErrors,
   V2ArchitectureResourceGetResponses,
   V2ArchitectureResourceListErrors,
@@ -5098,6 +5109,207 @@ export class Agent extends HeyApiClient {
   }
 }
 
+export class Draft extends HeyApiClient {
+  /**
+   * Get graph draft
+   *
+   * Load the live draft snapshot for one graph resource, falling back to the saved resource.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters: {
+      resourceID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "resourceID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      V2ArchitectureResourceDraftGetResponses,
+      V2ArchitectureResourceDraftGetErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource/{resourceID}/draft",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Update graph draft
+   *
+   * Apply graph edits to the live draft without writing the saved graph resource file.
+   */
+  public patch<ThrowOnError extends boolean = false>(
+    parameters: {
+      resourceID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      architecturePatchInput: ArchitecturePatchInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "resourceID" },
+            { in: "query", key: "location" },
+            { key: "architecturePatchInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<
+      V2ArchitectureResourceDraftPatchResponses,
+      V2ArchitectureResourceDraftPatchErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource/{resourceID}/draft",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Commit graph draft
+   *
+   * Write the expected live graph draft to the saved graph resource file.
+   */
+  public commit<ThrowOnError extends boolean = false>(
+    parameters: {
+      resourceID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      architectureDraftCommitInput: ArchitectureDraftCommitInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "resourceID" },
+            { in: "query", key: "location" },
+            { key: "architectureDraftCommitInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      V2ArchitectureResourceDraftCommitResponses,
+      V2ArchitectureResourceDraftCommitErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource/{resourceID}/draft/commit",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Discard graph draft
+   *
+   * Discard the live graph draft and return the saved graph resource snapshot.
+   */
+  public discard<ThrowOnError extends boolean = false>(
+    parameters: {
+      resourceID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "resourceID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      V2ArchitectureResourceDraftDiscardResponses,
+      V2ArchitectureResourceDraftDiscardErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource/{resourceID}/draft/discard",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Reload saved graph
+   *
+   * Drop the live graph draft and reload the saved graph resource snapshot from disk.
+   */
+  public reload<ThrowOnError extends boolean = false>(
+    parameters: {
+      resourceID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "resourceID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      V2ArchitectureResourceDraftReloadResponses,
+      V2ArchitectureResourceDraftReloadErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource/{resourceID}/draft/reload",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Resource2 extends HeyApiClient {
   /**
    * List graph resources
@@ -5327,6 +5539,11 @@ export class Resource2 extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  private _draft?: Draft
+  get draft(): Draft {
+    return (this._draft ??= new Draft({ client: this.client }))
   }
 }
 

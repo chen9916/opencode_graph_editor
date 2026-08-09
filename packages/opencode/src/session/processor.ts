@@ -186,6 +186,7 @@ const layer = Layer.effect(
       const failToolCall = Effect.fn("SessionProcessor.failToolCall")(function* (toolCallID: string, error: unknown) {
         const match = yield* readToolCall(toolCallID)
         if (!match || match.part.state.status !== "running") return false
+        const metadata = toolErrorMetadata(error)
         yield* session.updatePart({
           ...match.part,
           state: {
@@ -193,7 +194,7 @@ const layer = Layer.effect(
             input: match.part.state.input,
             error: errorMessage(error),
             // Keep metadata streamed while running so failures retain progress detail (e.g. execute's child calls).
-            metadata: match.part.state.metadata,
+            metadata: metadata ? { ...(match.part.state.metadata ?? {}), ...metadata } : match.part.state.metadata,
             time: { start: match.part.state.time.start, end: Date.now() },
           },
         })
@@ -203,6 +204,14 @@ const layer = Layer.effect(
         yield* settleToolCall(toolCallID)
         return true
       })
+
+      function toolErrorMetadata(error: unknown) {
+        if (!isRecord(error)) return undefined
+        if (isRecord(error.metadata)) return error.metadata
+        if (isRecord(error.error) && isRecord(error.error.conflict)) return { conflict: error.error.conflict }
+        if (isRecord(error.conflict)) return { conflict: error.conflict }
+        return undefined
+      }
 
       const finishReasoning = Effect.fn("SessionProcessor.finishReasoning")(function* (reasoningID: string) {
         if (!(reasoningID in ctx.reasoningMap)) return

@@ -8,7 +8,7 @@ import type { Config } from "../../../src/config/config"
 import type { MessageV2 } from "../../../src/session/message-v2"
 import { MessageID, PartID } from "../../../src/session/schema"
 import { call, callAuthProbe, disposeApps } from "./backend"
-import { original } from "./environment"
+import { cleanupExerciseDatabase, original } from "./environment"
 import { runtime } from "./runtime"
 import type { ActiveScenario, Options, ProjectOptions, Result, Scenario, ScenarioContext, SeededContext } from "./types"
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -25,14 +25,15 @@ export function runScenario(options: Options) {
       Effect.as({ status: "pass", scenario } as Result),
       Effect.catchCause((cause) => Effect.succeed({ status: "fail" as const, scenario, message: Cause.pretty(cause) })),
       Effect.scoped,
+      Effect.ensuring(scenario.reset ? resetState : Effect.void),
     )
   }
 }
 
 function runActive(options: Options, scenario: ActiveScenario) {
-  if (options.mode === "auth") return runAuth(scenario)
+  if (options.mode === "auth") return runAuth(options, scenario)
 
-  return withContext(options, scenario, "shared", (ctx) =>
+  return withScenarioContext(options, scenario, "shared", (ctx) =>
     Effect.gen(function* () {
       yield* trace(options, scenario, "request start")
       const result = yield* call(scenario, ctx)
@@ -44,26 +45,35 @@ function runActive(options: Options, scenario: ActiveScenario) {
   )
 }
 
-function runAuth(scenario: ActiveScenario) {
-  return Effect.gen(function* () {
-    const result = yield* callAuthProbe(scenario, "missing")
-    if (scenario.auth === "protected") {
-      if (result.status !== 401) throw new Error(`auth expected 401, got ${result.status}`)
-      const authed = yield* callAuthProbe(scenario, "valid")
-      if (authed.status === 401) throw new Error("auth rejected valid credentials")
-      return
-    }
+function runAuth(options: Options, scenario: ActiveScenario) {
+  return withScenarioContext(
+    options,
+    scenario,
+    "auth",
+    (ctx) =>
+      Effect.gen(function* () {
+        const result = yield* callAuthProbe(scenario, ctx, "missing")
+        if (scenario.auth === "protected") {
+          if (result.status !== 401) throw new Error(`auth expected 401, got ${result.status}`)
+          const authed = yield* callAuthProbe(scenario, ctx, "valid")
+          if (authed.status === 401) throw new Error("auth rejected valid credentials")
+          return
+        }
 
-    if (result.status === 401) throw new Error("auth expected public access, got 401")
-    if (result.timedOut) throw new Error("auth expected public access, probe timed out")
-  })
+        if (result.status === 401) throw new Error("auth expected public access, got 401")
+        if (result.timedOut) throw new Error("auth expected public access, probe timed out")
+      }),
+    // Synthetic auth requests do not use seeded state, and some seeds create secondary fixtures such as worktrees.
+    false,
+  )
 }
 
-function withContext<A, E>(
+export function withScenarioContext<A, E>(
   options: Options,
   scenario: ActiveScenario,
   label: string,
   use: (ctx: SeededContext<unknown>) => Effect.Effect<A, E>,
+  seed = true,
 ) {
   return Effect.acquireRelease(
     Effect.gen(function* () {
@@ -184,16 +194,21 @@ function withContext<A, E>(
           llmWait: (count) => Effect.suspend(() => llm().wait(count)),
           tuiRequest: (request) => Effect.sync(() => modules.Tui.submitTuiRequest(request)),
         }
-        yield* trace(options, scenario, `${label} seed start`)
-        const state = yield* scenario.seed(base)
-        yield* trace(options, scenario, `${label} seed done`)
+        if (seed) yield* trace(options, scenario, `${label} seed start`)
+        const state = seed ? yield* scenario.seed(base) : undefined
+        if (seed) yield* trace(options, scenario, `${label} seed done`)
         yield* trace(options, scenario, `${label} use start`)
-        const result = yield* use({ ...base, state })
+        const result = yield* use({ ...base, state }).pipe(
+          Effect.ensuring(
+            instance
+              ? run(modules.InstanceStore.Service.use((store) => store.dispose(instance))).pipe(Effect.ignore)
+              : Effect.void,
+          ),
+        )
         yield* trace(options, scenario, `${label} use done`)
         return result
       }).pipe(Effect.ensuring(context.llm ? context.llm.reset : Effect.void)),
     ),
-    Effect.ensuring(scenario.reset ? resetState : Effect.void),
   )
 }
 
@@ -257,11 +272,9 @@ function fakeLlmConfig(url: string): Partial<ConfigV1.Info> {
 }
 
 const resetState = Effect.promise(async () => {
-  const modules = await runtime()
   Flag.OPENCODE_SERVER_PASSWORD = original.OPENCODE_SERVER_PASSWORD
   Flag.OPENCODE_SERVER_USERNAME = original.OPENCODE_SERVER_USERNAME
   await disposeApps()
-  await modules.disposeAllInstances()
-  await modules.resetDatabase()
+  await Effect.runPromise(cleanupExerciseDatabase)
   await Bun.sleep(25)
 })

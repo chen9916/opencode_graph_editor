@@ -10,8 +10,11 @@ import { ToolRegistry } from "../tool/registry"
 import { Tool } from "../tool/tool"
 import { Tools } from "../tool/tools"
 import { ArchitectureBatch } from "./batch"
+import { ArchitectureConflict } from "./conflict"
 import { ArchitectureGraph } from "./graph"
+import { ArchitectureLayout } from "./layout"
 import { ArchitecturePatch } from "./patch"
+import { ArchitectureValidation } from "./validation"
 
 export const names = {
   listResources: "graph_list_resources",
@@ -20,6 +23,8 @@ export const names = {
   updateResource: "graph_update_resource",
   deleteResource: "graph_delete_resource",
   query: "graph_query",
+  validate: "graph_validate",
+  autoLayout: "graph_auto_layout",
   createNode: "graph_create_node",
   updateNode: "graph_update_node",
   setTagColor: "graph_set_tag_color",
@@ -33,11 +38,26 @@ export const names = {
 } as const
 
 const root = ".opencode/architecture/resources"
+const Source = Schema.Literals(["live", "saved", "mixed"])
+const SingleSource = Schema.Literals(["live", "saved"])
+const SourcedResourceSummary = Schema.Struct({
+  ...Architecture.ResourceSummary.fields,
+  source: SingleSource,
+})
+const SourcedResourceSnapshot = Schema.Struct({
+  ...Architecture.ResourceSnapshot.fields,
+  source: SingleSource,
+})
+const SourcedQueryResult = Schema.Struct({
+  ...Architecture.QueryResult.fields,
+  source: Source,
+})
 
 const MutationOutput = Schema.Struct({
   resourceID: Architecture.ResourceID,
   revision: NonNegativeInt,
   digest: Schema.String,
+  source: SingleSource,
 })
 
 const ExpectedDigest = Schema.String.pipe(Schema.optional)
@@ -66,11 +86,12 @@ const layer = Layer.effectDiscard(
           description:
             "List the project's saved Graph editor resources, including the resource IDs that correspond to @graph mentions. Use this instead of searching workspace files for graph display names.",
           input: Schema.Struct({}),
-          output: Schema.Array(Architecture.ResourceSummary),
+          output: Schema.Array(SourcedResourceSummary),
           toModelOutput: ({ output }) => [{ type: "text", text: JSON.stringify(output) }],
           execute: (_input, context) =>
             authorize("read", context).pipe(
-              Effect.andThen(graph.list()),
+              Effect.andThen(graph.listLive()),
+              Effect.map((output) => output.resources),
               Effect.mapError((error) => failure("Unable to list graph resources", error)),
             ),
         }),
@@ -95,9 +116,9 @@ const layer = Layer.effectDiscard(
       [names.reloadResource]: Tool.withPermission(
         Tool.make({
           description:
-            "Reload one managed Graph editor resource by resourceID after creating, editing, or laying out a graph. Use this to inspect the latest saved graph state instead of reading JSON files directly.",
+            "Reload one managed Graph editor resource from saved storage by resourceID, discarding any live draft for that resource. Use this for explicit reload/discard, not for inspecting unsaved live edits.",
           input: Schema.Struct({ resourceID: Architecture.ResourceID }),
-          output: Architecture.ResourceSnapshot,
+          output: SourcedResourceSnapshot,
           toModelOutput: ({ output }) => [
             {
               type: "text",
@@ -109,7 +130,8 @@ const layer = Layer.effectDiscard(
           ],
           execute: (input, context) =>
             authorize("read", context, input.resourceID).pipe(
-              Effect.andThen(graph.load(input.resourceID)),
+              Effect.andThen(graph.reloadSaved(input.resourceID)),
+              Effect.map((output) => ({ ...output.snapshot, source: output.source })),
               Effect.mapError((error) => failure(`Unable to reload graph resource ${input.resourceID}`, error)),
             ),
         }),
@@ -119,15 +141,15 @@ const layer = Layer.effectDiscard(
         Tool.make({
           description: "Rename one Graph editor resource.",
           input: Schema.Struct({ resourceID: Architecture.ResourceID, name: Schema.NonEmptyString }),
-          output: Architecture.ResourceSnapshot,
+          output: SourcedResourceSnapshot,
           toModelOutput: ({ output }) => [{ type: "text", text: `Renamed graph resource ${output.resource.id}` }],
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* authorize("edit", context, input.resourceID)
-              const current = yield* graph.load(input.resourceID)
-              return yield* graph.patch(input.resourceID, {
-                revision: current.resource.revision,
-                digest: current.digest,
+              const current = yield* graph.loadLive(input.resourceID)
+              const saved = yield* graph.patchLive(input.resourceID, {
+                revision: current.snapshot.resource.revision,
+                digest: current.snapshot.digest,
                 operations: [
                   {
                     id: Architecture.OperationID.create(),
@@ -135,7 +157,8 @@ const layer = Layer.effectDiscard(
                     name: input.name,
                   },
                 ],
-              })
+              }, conflict(names.updateResource, true))
+              return { ...saved.snapshot, source: saved.source }
             }).pipe(
               Effect.mapError((error) => failure(`Unable to rename graph resource ${input.resourceID}`, error)),
             ),
@@ -153,12 +176,33 @@ const layer = Layer.effectDiscard(
               const current = yield* graph.load(input.resourceID)
               if (current.digest !== input.expectedDigest)
                 return yield* new ToolFailure({
-                  message: `Graph resource ${input.resourceID} changed: expected digest ${input.expectedDigest}, current revision ${current.resource.revision}, current digest ${current.digest}`,
+                  message: ArchitectureConflict.describe(
+                    ArchitectureConflict.make({
+                      resourceID: input.resourceID,
+                      resourceName: current.resource.name,
+                      operation: names.deleteResource,
+                      expected: { digest: input.expectedDigest },
+                      actual: { revision: current.resource.revision, digest: current.digest },
+                      safeToRetry: "unknown",
+                    }),
+                  ),
+                  metadata: {
+                    conflict: ArchitectureConflict.payload(
+                      ArchitectureConflict.make({
+                        resourceID: input.resourceID,
+                        resourceName: current.resource.name,
+                        operation: names.deleteResource,
+                        expected: { digest: input.expectedDigest },
+                        actual: { revision: current.resource.revision, digest: current.digest },
+                        safeToRetry: "unknown",
+                      }),
+                    ),
+                  },
                 })
               yield* graph.remove(input.resourceID, {
                 revision: current.resource.revision,
                 digest: current.digest,
-              })
+              }, conflict(names.deleteResource, "unknown"))
             }).pipe(
               Effect.mapError((error) => failure(`Unable to delete graph resource ${input.resourceID}`, error)),
             ),
@@ -170,15 +214,102 @@ const layer = Layer.effectDiscard(
           description:
             "Query saved Graph editor resources by resource ID, node ID, text, or node tags. Use this for user mentions like @Graph 1 after resolving the resource ID/path from Graph editor context, rather than reading JSON files directly.",
           input: Architecture.QueryInput,
-          output: Architecture.QueryResult,
+          output: SourcedQueryResult,
           toModelOutput: ({ output }) => [{ type: "text", text: JSON.stringify(output) }],
           execute: (input, context) =>
             authorize("read", context).pipe(
-              Effect.andThen(graph.query(input)),
+              Effect.andThen(graph.queryLive(input)),
               Effect.mapError((error) => failure("Unable to query graph resources", error)),
             ),
         }),
         "read",
+      ),
+      [names.validate]: Tool.withPermission(
+        Tool.make({
+          description:
+            "Validate one or more managed Graph editor resources without mutating them. Check for broken edges, duplicate IDs, missing tag colors, empty node text, invalid handles or styles, overlapping nodes, and isolated nodes.",
+          input: ArchitectureValidation.Input,
+          output: ArchitectureValidation.Output,
+          toModelOutput: ({ output }) => [{ type: "text", text: JSON.stringify(output) }],
+          execute: (input, context) =>
+            authorize("read", context).pipe(
+              Effect.andThen(
+                Effect.gen(function* () {
+                  const selected = input.resourceIDs && input.resourceIDs.length > 0 ? Array.from(new Set(input.resourceIDs)) : undefined
+                  const resources = selected
+                    ? yield* Effect.forEach(selected, (resourceID) => graph.loadLive(resourceID), { concurrency: 8 })
+                    : yield* Effect.forEach(
+                        (yield* graph.listLive()).resources,
+                        (resource) => graph.loadLive(resource.id),
+                        { concurrency: 8 },
+                      )
+                  return ArchitectureValidation.validateResources(
+                    resources.map((item) => ({ resource: item.snapshot.resource, digest: item.snapshot.digest })),
+                    input.checks,
+                  )
+                }),
+              ),
+              Effect.mapError((error) => failure("Unable to validate graph resources", error)),
+            ),
+        }),
+        "read",
+      ),
+      [names.autoLayout]: Tool.withPermission(
+        Tool.make({
+          description:
+            "Reorganize one managed Graph editor resource into columns, grids, trees, or tag-group layouts. The tool computes new positions and saves them through the normal optimistic update path.",
+          input: ArchitectureLayout.Input,
+          output: ArchitectureLayout.Output,
+          toModelOutput: ({ output }) => [{ type: "text", text: JSON.stringify(output) }],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.loadLive(input.resourceID)
+              const referenced = new Set(ArchitectureLayout.referencedNodeIDs(input))
+              const missing = [...referenced].find((nodeID) =>
+                !current.snapshot.resource.nodes.some((node) => node.id === nodeID)
+              )
+              if (missing) return yield* new ArchitecturePatch.NotFoundError({ entity: "node", id: missing })
+              const layout = ArchitectureLayout.plan(current.snapshot.resource, input)
+              const operations = layout.positions
+                .filter((item) => {
+                  const node = current.snapshot.resource.nodes.find((candidate) => candidate.id === item.nodeID)
+                  return node && (node.layout.position.x !== item.position.x || node.layout.position.y !== item.position.y)
+                })
+                .map(
+                  (item): Architecture.Operation => ({
+                    id: Architecture.OperationID.create(),
+                    type: "node.position",
+                    nodeID: item.nodeID,
+                    position: item.position,
+                  }),
+                )
+              const saved =
+                input.dryRun || operations.length === 0
+                  ? current.snapshot
+                  : (yield* graph.patchLive(
+                      input.resourceID,
+                      {
+                        revision: current.snapshot.resource.revision,
+                        digest: current.snapshot.digest,
+                        operations,
+                      },
+                      { operation: names.autoLayout, safeToRetry: true },
+                    )).snapshot
+              return {
+                resourceID: input.resourceID,
+                revision: input.dryRun ? undefined : saved.resource.revision,
+                digest: input.dryRun ? undefined : saved.digest,
+                mode: input.mode,
+                dryRun: input.dryRun ?? false,
+                nodeIDs: layout.nodeIDs,
+                positions: layout.positions,
+              }
+            }).pipe(
+              Effect.mapError((error) => failure(`Unable to auto-layout graph resource ${input.resourceID}`, error)),
+            ),
+        }),
+        "edit",
       ),
       [names.createNode]: Tool.withPermission(
         Tool.make({
@@ -196,22 +327,23 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* authorize("edit", context, input.resourceID)
-              const current = yield* graph.load(input.resourceID)
+              const current = yield* graph.loadLive(input.resourceID)
               const node: Architecture.Node = {
                 id: input.id ?? Architecture.NodeID.create(),
                 text: input.text,
                 tags: input.tags ?? [],
                 layout: { position: input.position ?? { x: 0, y: 0 } },
               }
-              const saved = yield* graph.patch(input.resourceID, {
-                revision: current.resource.revision,
-                digest: current.digest,
+              const saved = yield* graph.patchLive(input.resourceID, {
+                revision: current.snapshot.resource.revision,
+                digest: current.snapshot.digest,
                 operations: [{ id: Architecture.OperationID.create(), type: "node.create", node }],
-              })
+              }, conflict(names.createNode, "unknown"))
               return {
                 resourceID: input.resourceID,
-                revision: saved.resource.revision,
-                digest: saved.digest,
+                revision: saved.snapshot.resource.revision,
+                digest: saved.snapshot.digest,
+                source: saved.source,
                 node,
               }
             }).pipe(
@@ -235,17 +367,17 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* authorize("edit", context, input.resourceID)
-              const current = yield* graph.load(input.resourceID)
-              const batch = ArchitectureBatch.prepare(input, current.resource)
+              const current = yield* graph.loadLive(input.resourceID)
+              const batch = ArchitectureBatch.prepare(input, current.snapshot.resource)
               if (!batch.ok) return yield* batch.error
               const saved =
                 batch.operations.length > 0
-                  ? yield* graph.patch(input.resourceID, {
-                      revision: current.resource.revision,
-                      digest: current.digest,
+                  ? (yield* graph.patchLive(input.resourceID, {
+                      revision: current.snapshot.resource.revision,
+                      digest: current.snapshot.digest,
                       operations: batch.operations,
-                    })
-                  : current
+                    }, conflict(names.batchEdit, "partial"))).snapshot
+                  : current.snapshot
               return {
                 resourceID: input.resourceID,
                 revision: saved.resource.revision,
@@ -279,8 +411,8 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* authorize("edit", context, input.resourceID)
-              const current = yield* graph.load(input.resourceID)
-              const node = current.resource.nodes.find((candidate) => candidate.id === input.nodeID)
+              const current = yield* graph.loadLive(input.resourceID)
+              const node = current.snapshot.resource.nodes.find((candidate) => candidate.id === input.nodeID)
               if (!node) return yield* new ArchitecturePatch.NotFoundError({ entity: "node", id: input.nodeID })
               const updated: Architecture.Node = {
                 ...node,
@@ -303,15 +435,16 @@ const layer = Layer.effectDiscard(
                       position: updated.layout.position,
                       expectedDigest: input.expectedDigest,
                     }
-              const saved = yield* graph.patch(input.resourceID, {
-                revision: current.resource.revision,
-                digest: current.digest,
+              const saved = yield* graph.patchLive(input.resourceID, {
+                revision: current.snapshot.resource.revision,
+                digest: current.snapshot.digest,
                 operations: [operation],
-              })
+              }, conflict(names.updateNode, true))
               return {
                 resourceID: input.resourceID,
-                revision: saved.resource.revision,
-                digest: saved.digest,
+                revision: saved.snapshot.resource.revision,
+                digest: saved.snapshot.digest,
+                source: saved.source,
                 node: updated,
               }
             }).pipe(Effect.mapError((error) => failure(`Unable to update graph node ${input.nodeID}`, error))),
@@ -343,10 +476,10 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* authorize("edit", context, input.resourceID)
-              const current = yield* graph.load(input.resourceID)
-              const saved = yield* graph.patch(input.resourceID, {
-                revision: current.resource.revision,
-                digest: current.digest,
+              const current = yield* graph.loadLive(input.resourceID)
+              const saved = yield* graph.patchLive(input.resourceID, {
+                revision: current.snapshot.resource.revision,
+                digest: current.snapshot.digest,
                 operations: [
                   {
                     id: Architecture.OperationID.create(),
@@ -355,11 +488,12 @@ const layer = Layer.effectDiscard(
                     color: input.color,
                   },
                 ],
-              })
+              }, conflict(names.setTagColor, true))
               return {
                 resourceID: input.resourceID,
-                revision: saved.resource.revision,
-                digest: saved.digest,
+                revision: saved.snapshot.resource.revision,
+                digest: saved.snapshot.digest,
+                source: saved.source,
                 tag: input.tag,
                 color: input.color,
               }
@@ -387,13 +521,13 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* authorize("edit", context, input.resourceID)
-              const current = yield* graph.load(input.resourceID)
-              const removedEdgeIDs = current.resource.edges
+              const current = yield* graph.loadLive(input.resourceID)
+              const removedEdgeIDs = current.snapshot.resource.edges
                 .filter((edge) => edge.source === input.nodeID || edge.target === input.nodeID)
                 .map((edge) => edge.id)
-              const saved = yield* graph.patch(input.resourceID, {
-                revision: current.resource.revision,
-                digest: current.digest,
+              const saved = yield* graph.patchLive(input.resourceID, {
+                revision: current.snapshot.resource.revision,
+                digest: current.snapshot.digest,
                 operations: [
                   {
                     id: Architecture.OperationID.create(),
@@ -403,11 +537,12 @@ const layer = Layer.effectDiscard(
                     expectedDigest: input.expectedDigest,
                   },
                 ],
-              })
+              }, conflict(names.deleteNode, "unknown"))
               return {
                 resourceID: input.resourceID,
-                revision: saved.resource.revision,
-                digest: saved.digest,
+                revision: saved.snapshot.resource.revision,
+                digest: saved.snapshot.digest,
+                source: saved.source,
                 nodeID: input.nodeID,
                 removedEdgeIDs,
               }
@@ -435,7 +570,7 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* authorize("edit", context, input.resourceID)
-              const current = yield* graph.load(input.resourceID)
+              const current = yield* graph.loadLive(input.resourceID)
               const edge: Architecture.Edge = {
                 id: input.id ?? Architecture.EdgeID.create(),
                 source: input.source,
@@ -444,15 +579,16 @@ const layer = Layer.effectDiscard(
                 targetHandle: input.targetHandle ?? "left",
                 style: input.style ?? "rectangular",
               }
-              const saved = yield* graph.patch(input.resourceID, {
-                revision: current.resource.revision,
-                digest: current.digest,
+              const saved = yield* graph.patchLive(input.resourceID, {
+                revision: current.snapshot.resource.revision,
+                digest: current.snapshot.digest,
                 operations: [{ id: Architecture.OperationID.create(), type: "edge.create", edge }],
-              })
+              }, conflict(names.connectNodes, "unknown"))
               return {
                 resourceID: input.resourceID,
-                revision: saved.resource.revision,
-                digest: saved.digest,
+                revision: saved.snapshot.resource.revision,
+                digest: saved.snapshot.digest,
+                source: saved.source,
                 edge,
               }
             }).pipe(Effect.mapError((error) => failure("Unable to connect graph nodes", error))),
@@ -483,8 +619,8 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* authorize("edit", context, input.resourceID)
-              const current = yield* graph.load(input.resourceID)
-              const edge = current.resource.edges.find((candidate) => candidate.id === input.edgeID)
+              const current = yield* graph.loadLive(input.resourceID)
+              const edge = current.snapshot.resource.edges.find((candidate) => candidate.id === input.edgeID)
               if (!edge) return yield* new ArchitecturePatch.NotFoundError({ entity: "edge", id: input.edgeID })
               const updated: Architecture.Edge = {
                 ...edge,
@@ -494,9 +630,9 @@ const layer = Layer.effectDiscard(
                 targetHandle: input.targetHandle ?? edge.targetHandle ?? "left",
                 style: input.style ?? edge.style ?? "rectangular",
               }
-              const saved = yield* graph.patch(input.resourceID, {
-                revision: current.resource.revision,
-                digest: current.digest,
+              const saved = yield* graph.patchLive(input.resourceID, {
+                revision: current.snapshot.resource.revision,
+                digest: current.snapshot.digest,
                 operations: [
                   {
                     id: Architecture.OperationID.create(),
@@ -505,11 +641,12 @@ const layer = Layer.effectDiscard(
                     expectedDigest: input.expectedDigest,
                   },
                 ],
-              })
+              }, conflict(names.updateConnection, "partial"))
               return {
                 resourceID: input.resourceID,
-                revision: saved.resource.revision,
-                digest: saved.digest,
+                revision: saved.snapshot.resource.revision,
+                digest: saved.snapshot.digest,
+                source: saved.source,
                 edge: updated,
               }
             }).pipe(
@@ -553,10 +690,10 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* authorize("edit", context, input.resourceID)
-              const current = yield* graph.load(input.resourceID)
+              const current = yield* graph.loadLive(input.resourceID)
               const nodeOperations: Architecture.Operation[] = []
               for (const item of input.nodes ?? []) {
-                const node = current.resource.nodes.find((candidate) => candidate.id === item.nodeID)
+                const node = current.snapshot.resource.nodes.find((candidate) => candidate.id === item.nodeID)
                 if (!node) return yield* new ArchitecturePatch.NotFoundError({ entity: "node", id: item.nodeID })
                 nodeOperations.push({
                   id: Architecture.OperationID.create(),
@@ -567,7 +704,7 @@ const layer = Layer.effectDiscard(
               }
               const edgeOperations: Architecture.Operation[] = []
               for (const item of input.edges ?? []) {
-                const edge = current.resource.edges.find((candidate) => candidate.id === item.edgeID)
+                const edge = current.snapshot.resource.edges.find((candidate) => candidate.id === item.edgeID)
                 if (!edge) return yield* new ArchitecturePatch.NotFoundError({ entity: "edge", id: item.edgeID })
                 edgeOperations.push({
                   id: Architecture.OperationID.create(),
@@ -583,16 +720,17 @@ const layer = Layer.effectDiscard(
               const operations = [...nodeOperations, ...edgeOperations]
               const saved =
                 operations.length > 0
-                  ? yield* graph.patch(input.resourceID, {
-                      revision: current.resource.revision,
-                      digest: current.digest,
+                  ? yield* graph.patchLive(input.resourceID, {
+                      revision: current.snapshot.resource.revision,
+                      digest: current.snapshot.digest,
                       operations,
-                    })
+                    }, conflict(names.updateLayout, true))
                   : current
               return {
                 resourceID: input.resourceID,
-                revision: saved.resource.revision,
-                digest: saved.digest,
+                revision: saved.snapshot.resource.revision,
+                digest: saved.snapshot.digest,
+                source: saved.source,
                 nodeIDs: (input.nodes ?? []).map((item) => item.nodeID),
                 edgeIDs: (input.edges ?? []).map((item) => item.edgeID),
               }
@@ -613,10 +751,10 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               yield* authorize("edit", context, input.resourceID)
-              const current = yield* graph.load(input.resourceID)
-              const saved = yield* graph.patch(input.resourceID, {
-                revision: current.resource.revision,
-                digest: current.digest,
+              const current = yield* graph.loadLive(input.resourceID)
+              const saved = yield* graph.patchLive(input.resourceID, {
+                revision: current.snapshot.resource.revision,
+                digest: current.snapshot.digest,
                 operations: [
                   {
                     id: Architecture.OperationID.create(),
@@ -625,11 +763,12 @@ const layer = Layer.effectDiscard(
                     expectedDigest: input.expectedDigest,
                   },
                 ],
-              })
+              }, conflict(names.disconnectNodes, "unknown"))
               return {
                 resourceID: input.resourceID,
-                revision: saved.resource.revision,
-                digest: saved.digest,
+                revision: saved.snapshot.resource.revision,
+                digest: saved.snapshot.digest,
+                source: saved.source,
                 edgeID: input.edgeID,
               }
             }).pipe(
@@ -646,7 +785,7 @@ const layer = Layer.effectDiscard(
           output: Schema.String,
           execute: (input, context) =>
             authorize("read", context).pipe(
-              Effect.andThen(graph.context(input.resourceIDs)),
+              Effect.andThen(graph.contextLive(input.resourceIDs)),
               Effect.mapError((error) => failure("Unable to load graph context", error)),
             ),
         }),
@@ -666,5 +805,14 @@ export const node = makeLocationNode({
 
 function failure(message: string, error: unknown) {
   if (error instanceof ToolFailure) return error
+  if (error instanceof ArchitectureGraph.ConflictError)
+    return new ToolFailure({
+      message: error.message,
+      metadata: { conflict: ArchitectureConflict.payload(error) },
+    })
   return new ToolFailure({ message: `${message}: ${error instanceof Error ? error.message : String(error)}` })
+}
+
+function conflict(operation: string, safeToRetry: ArchitectureConflict.SafeToRetry) {
+  return { operation, safeToRetry }
 }

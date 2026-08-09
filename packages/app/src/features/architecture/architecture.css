@@ -509,6 +509,35 @@
   background: color-mix(in srgb, var(--architecture-accent) 12%, transparent);
 }
 
+.architecture-editor__ask-popover {
+  z-index: 32;
+  position: absolute;
+  inline-size: 308px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+  border-radius: 9px;
+  background: var(--color-v2-background-bg-raised, var(--color-background-stronger));
+  box-shadow: 0 16px 42px rgb(0 0 0 / 34%);
+}
+
+.architecture-editor__ask-title {
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  font-size: 12px;
+}
+
+.architecture-editor__ask-popover textarea {
+  min-block-size: 84px;
+  resize: vertical;
+}
+
+.architecture-editor__ask-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .architecture-editor__danger {
   color: var(--color-v2-text-critical, #dc2626) !important;
 }

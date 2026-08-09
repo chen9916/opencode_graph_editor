@@ -57,6 +57,7 @@ import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { AppNodeBuilderV1 } from "@/effect/app-node-builder-v1"
 
 const summary = Layer.succeed(
   SessionSummary.Service,
@@ -216,9 +217,9 @@ function makePrompt(input?: { mcpInstructions?: MCP.ServerInstructions[]; proces
     [RuntimeFlags.node, runtimeFlags],
   ] as const
   if (input?.processor === "blocking") {
-    return LayerNode.compile(promptRoot, [...replacements, [SessionProcessor.node, blockingProcessor]])
+    return AppNodeBuilderV1.build(promptRoot, [...replacements, [SessionProcessor.node, blockingProcessor]])
   }
-  return LayerNode.compile(promptRoot, replacements)
+  return AppNodeBuilderV1.build(promptRoot, replacements)
 }
 
 function makeHttp(input?: { mcpInstructions?: MCP.ServerInstructions[]; processor?: "blocking" }) {
@@ -230,9 +231,9 @@ function makeHttp(input?: { mcpInstructions?: MCP.ServerInstructions[]; processo
     [RuntimeFlags.node, runtimeFlags],
   ] as const
   if (input?.processor === "blocking") {
-    return LayerNode.compile(root, [...replacements, [SessionProcessor.node, blockingProcessor]])
+    return AppNodeBuilderV1.build(root, [...replacements, [SessionProcessor.node, blockingProcessor]])
   }
-  return LayerNode.compile(root, replacements)
+  return AppNodeBuilderV1.build(root, replacements)
 }
 
 function makeHttpNoLLMServer(input?: { mcpInstructions?: MCP.ServerInstructions[]; processor?: "blocking" }) {

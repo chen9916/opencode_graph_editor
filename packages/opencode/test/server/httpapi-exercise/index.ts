@@ -758,6 +758,145 @@ const scenarios: Scenario[] = [
       }),
     ),
   http.protected
+    .get("/api/architecture/resource/{resourceID}/draft", "v2.architecture.resource.draft.get")
+    .inProject({ git: false })
+    .seeded((ctx) => {
+      const resource = ArchitecturePatch.empty({ id: Architecture.ResourceID.make("draft-get"), name: "Draft get" })
+      return ctx.file(".opencode/architecture/resources/draft-get.json", JSON.stringify(resource, null, 2) + "\n")
+    })
+    .at((ctx) => ({
+      path: route("/api/architecture/resource/{resourceID}/draft", { resourceID: "draft-get" }),
+      headers: ctx.headers(),
+    }))
+    .json(
+      200,
+      locationData((value) => {
+        object(value)
+        object(value.snapshot)
+        object(value.snapshot.resource)
+        check(value.source === "saved", "architecture draft get should fall back to saved state")
+        check(value.snapshot.resource.id === "draft-get", "architecture draft get should return requested resource")
+      }),
+    ),
+  http.protected
+    .patch("/api/architecture/resource/{resourceID}/draft", "v2.architecture.resource.draft.patch")
+    .inProject({ git: false })
+    .mutating()
+    .seeded((ctx) => {
+      const resource = ArchitecturePatch.empty({ id: Architecture.ResourceID.make("draft-patch"), name: "Draft patch" })
+      return ctx
+        .file(".opencode/architecture/resources/draft-patch.json", JSON.stringify(resource, null, 2) + "\n")
+        .pipe(Effect.as({ resource, digest: ArchitecturePatch.digest(resource) }))
+    })
+    .at((ctx) => ({
+      path: route("/api/architecture/resource/{resourceID}/draft", { resourceID: "draft-patch" }),
+      headers: ctx.headers(),
+      body: {
+        revision: ctx.state.resource.revision,
+        digest: ctx.state.digest,
+        operations: [
+          {
+            id: "httpapi-draft-node",
+            type: "node.create",
+            node: {
+              id: "draft-node",
+              text: "Draft node",
+              tags: ["draft"],
+              layout: { position: { x: 10, y: 20 } },
+            },
+          },
+        ],
+      },
+    }))
+    .jsonEffect(200, (body, ctx) =>
+      Effect.gen(function* () {
+        locationData((value) => {
+          object(value)
+          object(value.snapshot)
+          object(value.snapshot.resource)
+          array(value.snapshot.resource.nodes)
+          check(value.source === "live", "architecture draft patch should return live source")
+          check(value.snapshot.resource.nodes.length === 1, "architecture draft patch should update draft resource")
+        })(body)
+        if (!ctx.directory) throw new Error("architecture draft patch scenario needs a project directory")
+        const saved = yield* Effect.promise(() =>
+          Bun.file(path.join(ctx.directory!, ".opencode", "architecture", "resources", "draft-patch.json")).json(),
+        )
+        object(saved)
+        array(saved.nodes)
+        check(saved.nodes.length === 0, "architecture draft patch should not write the saved resource file")
+      }),
+    ),
+  http.protected
+    .post("/api/architecture/resource/{resourceID}/draft/commit", "v2.architecture.resource.draft.commit")
+    .inProject({ git: false })
+    .mutating()
+    .seeded((ctx) => {
+      const resource = ArchitecturePatch.empty({
+        id: Architecture.ResourceID.make("draft-commit"),
+        name: "Draft commit",
+      })
+      return ctx
+        .file(".opencode/architecture/resources/draft-commit.json", JSON.stringify(resource, null, 2) + "\n")
+        .pipe(Effect.as({ resource, digest: ArchitecturePatch.digest(resource) }))
+    })
+    .at((ctx) => ({
+      path: route("/api/architecture/resource/{resourceID}/draft/commit", { resourceID: "draft-commit" }),
+      headers: ctx.headers(),
+      body: { revision: ctx.state.resource.revision, digest: ctx.state.digest },
+    }))
+    .json(409, (value) => {
+      object(value)
+      check(value.error === "GraphConflictError", "architecture draft commit should return a typed conflict")
+      check(value.conflictKind === "draft_missing", "architecture draft commit should reject a missing live draft")
+    }),
+  http.protected
+    .post("/api/architecture/resource/{resourceID}/draft/discard", "v2.architecture.resource.draft.discard")
+    .inProject({ git: false })
+    .mutating()
+    .seeded((ctx) => {
+      const resource = ArchitecturePatch.empty({
+        id: Architecture.ResourceID.make("draft-discard"),
+        name: "Draft discard",
+      })
+      return ctx.file(".opencode/architecture/resources/draft-discard.json", JSON.stringify(resource, null, 2) + "\n")
+    })
+    .at((ctx) => ({
+      path: route("/api/architecture/resource/{resourceID}/draft/discard", { resourceID: "draft-discard" }),
+      headers: ctx.headers(),
+    }))
+    .json(
+      200,
+      locationData((value) => {
+        object(value)
+        object(value.snapshot)
+        check(value.source === "saved", "architecture draft discard should return saved source")
+      }),
+    ),
+  http.protected
+    .post("/api/architecture/resource/{resourceID}/draft/reload", "v2.architecture.resource.draft.reload")
+    .inProject({ git: false })
+    .mutating()
+    .seeded((ctx) => {
+      const resource = ArchitecturePatch.empty({
+        id: Architecture.ResourceID.make("draft-reload"),
+        name: "Draft reload",
+      })
+      return ctx.file(".opencode/architecture/resources/draft-reload.json", JSON.stringify(resource, null, 2) + "\n")
+    })
+    .at((ctx) => ({
+      path: route("/api/architecture/resource/{resourceID}/draft/reload", { resourceID: "draft-reload" }),
+      headers: ctx.headers(),
+    }))
+    .json(
+      200,
+      locationData((value) => {
+        object(value)
+        object(value.snapshot)
+        check(value.source === "saved", "architecture draft reload should return saved source")
+      }),
+    ),
+  http.protected
     .delete("/api/architecture/resource/{resourceID}", "v2.architecture.resource.remove")
     .inProject({ git: false })
     .mutating()
@@ -1888,7 +2027,14 @@ const llmScenarios = new Set([
 ])
 
 const main = Effect.gen(function* () {
-  yield* Effect.addFinalizer(() => Effect.promise(() => disposeApps()).pipe(Effect.andThen(cleanupExercisePaths)))
+  yield* Effect.addFinalizer(() =>
+    Effect.promise(async () => {
+      await disposeApps()
+      const modules = await runtime()
+      await modules.disposeAppRuntime()
+      await modules.disposeLocationServiceMap()
+    }).pipe(Effect.andThen(cleanupExercisePaths)),
+  )
   const options = parseOptions(Bun.argv.slice(2))
   const modules = yield* Effect.promise(() => runtime())
   const effectRoutes = routeKeys(OpenApi.fromApi(modules.PublicApi))

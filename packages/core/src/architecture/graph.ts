@@ -10,6 +10,8 @@ import { FSUtil } from "../fs-util"
 import { Location } from "../location"
 import { NonNegativeInt, RelativePath, optional } from "../schema"
 import { EffectFlock } from "../util/effect-flock"
+import { ArchitectureConflict } from "./conflict"
+import { ArchitectureDraft } from "./draft"
 import { ArchitecturePatch } from "./patch"
 import { ArchitectureRoot } from "./root"
 
@@ -31,10 +33,19 @@ export class StorageError extends Schema.TaggedErrorClass<StorageError>()("Archi
 
 export class ConflictError extends Schema.TaggedErrorClass<ConflictError>()("Architecture.GraphConflictError", {
   message: Schema.String,
-  expectedRevision: Schema.Int,
+  resourceID: Architecture.ResourceID,
+  resourceName: Schema.String.pipe(optional),
+  operation: Schema.String,
+  expected: ArchitectureConflict.Expected.pipe(optional),
+  actual: ArchitectureConflict.Actual,
+  expectedRevision: Schema.Int.pipe(optional),
   currentRevision: Schema.Int,
-  expectedDigest: Schema.String,
+  expectedDigest: Schema.String.pipe(optional),
   currentDigest: Schema.String,
+  safeToRetry: ArchitectureConflict.SafeToRetry,
+  conflictKind: ArchitectureConflict.Kind.pipe(optional),
+  retryHint: Schema.String,
+  operationIDs: Schema.Array(Architecture.OperationID),
 }) {}
 
 export type Error =
@@ -47,19 +58,67 @@ export type Error =
 
 export interface Interface {
   readonly list: () => Effect.Effect<ReadonlyArray<Architecture.ResourceSummary>, Error>
+  readonly listLive: () => Effect.Effect<SourcedSummaries, Error>
   readonly create: (input: Architecture.ResourceCreateInput) => Effect.Effect<Architecture.ResourceSnapshot, Error>
   readonly load: (id: Architecture.ResourceID) => Effect.Effect<Architecture.ResourceSnapshot, Error>
+  readonly loadLive: (id: Architecture.ResourceID) => Effect.Effect<SourcedSnapshot, Error>
+  readonly loadDraft: (id: Architecture.ResourceID) => Effect.Effect<Architecture.DraftSnapshot, Error>
   readonly patch: (
     id: Architecture.ResourceID,
     input: Architecture.PatchInput,
+    conflict?: ConflictContext,
   ) => Effect.Effect<Architecture.ResourceSnapshot, Error>
-  readonly remove: (id: Architecture.ResourceID, input: Architecture.ResourceRemoveInput) => Effect.Effect<void, Error>
+  readonly patchLive: (
+    id: Architecture.ResourceID,
+    input: Architecture.PatchInput,
+    conflict?: ConflictContext,
+  ) => Effect.Effect<SourcedSnapshot, Error>
+  readonly patchDraft: (
+    id: Architecture.ResourceID,
+    input: Architecture.PatchInput,
+    conflict?: ConflictContext,
+  ) => Effect.Effect<Architecture.DraftSnapshot, Error>
+  readonly commitDraft: (
+    id: Architecture.ResourceID,
+    input: Architecture.DraftCommitInput,
+    conflict?: ConflictContext,
+  ) => Effect.Effect<Architecture.ResourceSnapshot, Error>
+  readonly discardDraft: (id: Architecture.ResourceID) => Effect.Effect<Architecture.DraftSnapshot, Error>
+  readonly reloadSaved: (id: Architecture.ResourceID) => Effect.Effect<Architecture.DraftSnapshot, Error>
+  readonly remove: (
+    id: Architecture.ResourceID,
+    input: Architecture.ResourceRemoveInput,
+    conflict?: ConflictContext,
+  ) => Effect.Effect<void, Error>
   readonly reset: (id: Architecture.ResourceID) => Effect.Effect<Architecture.ResourceSnapshot, Error>
   readonly query: (input: Architecture.QueryInput) => Effect.Effect<Architecture.QueryResult, Error>
+  readonly queryLive: (input: Architecture.QueryInput) => Effect.Effect<SourcedQueryResult, Error>
   readonly context: (ids?: ReadonlyArray<Architecture.ResourceID>) => Effect.Effect<string, Error>
+  readonly contextLive: (ids?: ReadonlyArray<Architecture.ResourceID>) => Effect.Effect<string, Error>
+}
+
+export type Source = "live" | "saved" | "mixed"
+export interface SourcedSnapshot {
+  readonly snapshot: Architecture.ResourceSnapshot
+  readonly source: Exclude<Source, "mixed">
+}
+export interface SourcedSummary extends Architecture.ResourceSummary {
+  readonly source: Exclude<Source, "mixed">
+}
+export interface SourcedSummaries {
+  readonly resources: ReadonlyArray<SourcedSummary>
+  readonly source: Source
+}
+export interface SourcedQueryResult extends Architecture.QueryResult {
+  readonly source: Source
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/ArchitectureGraph") {}
+
+type ConflictContext = {
+  readonly operation?: string
+  readonly safeToRetry?: ArchitectureConflict.SafeToRetry
+}
 
 const LegacyNode = Schema.Struct({
   id: Architecture.NodeID,
@@ -100,6 +159,7 @@ const layer = Layer.effect(
     const flock = yield* EffectFlock.Service
     const events = yield* EventV2.Service
     const location = yield* Location.Service
+    const drafts = yield* ArchitectureDraft.Service
     const locks = KeyedMutex.makeUnsafe<string>()
     const decodeJson = Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)
     const decodeLegacy = Schema.decodeUnknownEffect(LegacyGraph)
@@ -139,8 +199,7 @@ const layer = Layer.effect(
       const raw = yield* fs.readFileString(storage.legacyFile).pipe(
         Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(undefined)),
         Effect.mapError(
-          (cause) =>
-            new StorageError({ operation: "read", message: "Unable to read legacy graph", cause }),
+          (cause) => new StorageError({ operation: "read", message: "Unable to read legacy graph", cause }),
         ),
       )
       if (raw === undefined) return
@@ -156,8 +215,7 @@ const layer = Layer.effect(
         return yield* new UnsupportedVersionError({ version: String(value.version) })
       const graph = yield* decodeLegacy(value).pipe(
         Effect.mapError(
-          (cause) =>
-            new ArchitecturePatch.InvalidGraphError({ message: `Legacy graph is invalid: ${cause}` }),
+          (cause) => new ArchitecturePatch.InvalidGraphError({ message: `Legacy graph is invalid: ${cause}` }),
         ),
       )
       return yield* ArchitecturePatch.validate({
@@ -178,8 +236,7 @@ const layer = Layer.effect(
       const raw = yield* fs.readFileString(source).pipe(
         Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed(undefined)),
         Effect.mapError(
-          (cause) =>
-            new StorageError({ operation: "read", message: `Unable to read graph resource ${id}`, cause }),
+          (cause) => new StorageError({ operation: "read", message: `Unable to read graph resource ${id}`, cause }),
         ),
       )
       if (raw !== undefined) return { resource: yield* parse(raw, id), source }
@@ -190,8 +247,7 @@ const layer = Layer.effect(
       return yield* new ArchitecturePatch.NotFoundError({ entity: "resource", id })
     })
 
-    const resourcePath = (resourceID: Architecture.ResourceID) =>
-      `.opencode/architecture/resources/${resourceID}.json`
+    const resourcePath = (resourceID: Architecture.ResourceID) => `.opencode/architecture/resources/${resourceID}.json`
 
     const snapshot = (storage: ArchitectureRoot.Info, resource: Architecture.Resource) => ({
       resource: ArchitecturePatch.normalize(resource),
@@ -211,6 +267,11 @@ const layer = Layer.effect(
       edges: resource.edges.length,
     })
 
+    const sourcedSummary = (resource: Architecture.Resource, source: Exclude<Source, "mixed">): SourcedSummary => ({
+      ...summary(resource),
+      source,
+    })
+
     const publish = (value: Architecture.ResourceSnapshot) =>
       events
         .publish(
@@ -226,10 +287,47 @@ const layer = Layer.effect(
         )
         .pipe(Effect.asVoid)
 
+    const publishDraftUpdated = (
+      value: Architecture.ResourceSnapshot,
+      base: { readonly revision: number; readonly digest: string },
+    ) =>
+      events
+        .publish(
+          Architecture.Event.ResourceDraftUpdated,
+          {
+            resourceID: value.resource.id,
+            revision: value.resource.revision,
+            digest: value.digest,
+            baseRevision: base.revision,
+            baseDigest: base.digest,
+          },
+          {
+            location: Location.Ref.make({ directory: location.directory, workspaceID: location.workspaceID }),
+          },
+        )
+        .pipe(Effect.asVoid)
+
+    const publishDraftDiscarded = (value: Architecture.ResourceSnapshot) =>
+      events
+        .publish(
+          Architecture.Event.ResourceDraftDiscarded,
+          {
+            resourceID: value.resource.id,
+            revision: value.resource.revision,
+            digest: value.digest,
+          },
+          {
+            location: Location.Ref.make({ directory: location.directory, workspaceID: location.workspaceID }),
+          },
+        )
+        .pipe(Effect.asVoid)
+
     const write = Effect.fn("ArchitectureGraph.write")(function* (
       storage: ArchitectureRoot.Info,
       resource: Architecture.Resource,
       expected?: { readonly revision: number; readonly digest: string },
+      conflict?: ConflictContext,
+      settle?: Effect.Effect<void>,
     ) {
       const encoded = JSON.stringify(ArchitecturePatch.normalize(resource), null, 2) + "\n"
       const target = file(storage, resource.id)
@@ -238,8 +336,7 @@ const layer = Layer.effect(
         .ensureDir(storage.resources)
         .pipe(
           Effect.mapError(
-            (cause) =>
-              new StorageError({ operation: "mkdir", message: "Unable to create graph resources", cause }),
+            (cause) => new StorageError({ operation: "mkdir", message: "Unable to create graph resources", cause }),
           ),
         )
       yield* fs.writeFileString(temporary, encoded, { flag: "wx" }).pipe(
@@ -258,13 +355,14 @@ const layer = Layer.effect(
                   const currentDigest = ArchitecturePatch.digest(current.resource)
                   if (current.resource.revision === expected.revision && currentDigest === expected.digest)
                     return Effect.void
-                  return new ConflictError({
-                    message: conflictMessage(expected.revision, current.resource.revision, expected.digest, currentDigest),
-                    expectedRevision: expected.revision,
-                    currentRevision: current.resource.revision,
-                    expectedDigest: expected.digest,
-                    currentDigest,
-                  })
+                  return graphConflict(
+                    resource.id,
+                    current.resource.name,
+                    { revision: expected.revision, digest: expected.digest },
+                    { revision: current.resource.revision, digest: currentDigest },
+                    conflict,
+                    "graph_patch",
+                  )
                 }),
               )
             : Effect.void,
@@ -279,6 +377,8 @@ const layer = Layer.effect(
                   cause,
                 }),
             ),
+            Effect.andThen(settle ?? Effect.void),
+            Effect.uninterruptible,
           ),
         ),
         Effect.ensuring(fs.remove(temporary, { force: true }).pipe(Effect.ignore)),
@@ -317,6 +417,39 @@ const layer = Layer.effect(
       )
     })
 
+    const liveResource = Effect.fn("ArchitectureGraph.liveResource")(function* (
+      storage: ArchitectureRoot.Info,
+      saved: Architecture.Resource,
+      source: Exclude<Source, "mixed"> = "saved",
+    ) {
+      const entry = yield* drafts.get(saved.id)
+      if (!entry) return { resource: saved, source }
+      const savedDigest = ArchitecturePatch.digest(saved)
+      if (entry.baseRevision === saved.revision && entry.baseDigest === savedDigest)
+        return { resource: entry.resource, source: "live" as const }
+      return yield* graphConflict(
+        saved.id,
+        saved.name,
+        { revision: entry.baseRevision, digest: entry.baseDigest },
+        { revision: saved.revision, digest: savedDigest },
+        undefined,
+        "graph_draft_load",
+      )
+    })
+
+    const readLive = Effect.fn("ArchitectureGraph.readLive")(function* (
+      storage: ArchitectureRoot.Info,
+      id: Architecture.ResourceID,
+    ) {
+      const saved = (yield* read(storage, id)).resource
+      return yield* liveResource(storage, saved)
+    })
+
+    const readAllLive = Effect.fn("ArchitectureGraph.readAllLive")(function* (storage: ArchitectureRoot.Info) {
+      const resources = yield* readAll(storage)
+      return yield* Effect.forEach(resources, (resource) => liveResource(storage, resource), { concurrency: 8 })
+    })
+
     const migrateLegacy = Effect.fn("ArchitectureGraph.migrateLegacy")(function* (storage: ArchitectureRoot.Info) {
       if (yield* fs.existsSafe(file(storage, Architecture.ResourceID.make("overview")))) return
       const resource = yield* legacy(storage)
@@ -325,6 +458,13 @@ const layer = Layer.effect(
 
     const list = Effect.fn("ArchitectureGraph.list")(function* () {
       return (yield* readAll(yield* roots.get)).map(summary).toSorted((a, b) => a.name.localeCompare(b.name))
+    })
+
+    const listLive = Effect.fn("ArchitectureGraph.listLive")(function* () {
+      const resources = (yield* readAllLive(yield* roots.get))
+        .map((item) => sourcedSummary(item.resource, item.source))
+        .toSorted((a, b) => a.name.localeCompare(b.name))
+      return { resources, source: mixedSource(resources.map((item) => item.source)) }
     })
 
     const create = Effect.fn("ArchitectureGraph.create")(function* (input: Architecture.ResourceCreateInput) {
@@ -349,9 +489,20 @@ const layer = Layer.effect(
       return snapshot(storage, (yield* read(storage, id)).resource)
     })
 
+    const loadLive = Effect.fn("ArchitectureGraph.loadLive")(function* (id: Architecture.ResourceID) {
+      const storage = yield* roots.get
+      const current = yield* readLive(storage, id)
+      return { snapshot: snapshot(storage, current.resource), source: current.source }
+    })
+
+    const loadDraft = Effect.fn("ArchitectureGraph.loadDraft")(function* (id: Architecture.ResourceID) {
+      return yield* loadLive(id)
+    })
+
     const patch = Effect.fn("ArchitectureGraph.patch")(function* (
       id: Architecture.ResourceID,
       input: Architecture.PatchInput,
+      conflict?: ConflictContext,
     ) {
       const storage = yield* roots.get
       return yield* locked(
@@ -360,24 +511,193 @@ const layer = Layer.effect(
           const current = (yield* read(storage, id)).resource
           const currentDigest = ArchitecturePatch.digest(current)
           if (current.revision !== input.revision || currentDigest !== input.digest)
-            return yield* new ConflictError({
-              message: conflictMessage(input.revision, current.revision, input.digest, currentDigest),
-              expectedRevision: input.revision,
-              currentRevision: current.revision,
-              expectedDigest: input.digest,
-              currentDigest,
-            })
-          return yield* write(storage, yield* ArchitecturePatch.apply(current, input.operations), {
-            revision: current.revision,
-            digest: currentDigest,
-          })
+            return yield* graphConflict(
+              id,
+              current.name,
+              { revision: input.revision, digest: input.digest },
+              { revision: current.revision, digest: currentDigest },
+              conflict,
+              "graph_patch",
+            )
+          const patched = yield* ArchitecturePatch.apply(current, input.operations).pipe(
+            Effect.mapError((error) =>
+              error instanceof ArchitecturePatch.ConflictError
+                ? graphConflict(
+                    id,
+                    current.name,
+                    { revision: input.revision, digest: input.digest },
+                    { revision: current.revision, digest: currentDigest },
+                    conflict,
+                    "graph_patch",
+                    error.operationIDs,
+                  )
+                : error,
+            ),
+          )
+          return yield* write(
+            storage,
+            patched,
+            {
+              revision: current.revision,
+              digest: currentDigest,
+            },
+            conflict,
+          )
         }),
       )
+    })
+
+    const patchLive = Effect.fn("ArchitectureGraph.patchLive")(function* (
+      id: Architecture.ResourceID,
+      input: Architecture.PatchInput,
+      conflict?: ConflictContext,
+    ) {
+      const storage = yield* roots.get
+      return yield* locked(
+        storage,
+        Effect.gen(function* () {
+          const saved = (yield* read(storage, id)).resource
+          const savedDigest = ArchitecturePatch.digest(saved)
+          const entry = yield* drafts.get(id)
+          if (entry && (entry.baseRevision !== saved.revision || entry.baseDigest !== savedDigest)) {
+            return yield* graphConflict(
+              id,
+              saved.name,
+              { revision: entry.baseRevision, digest: entry.baseDigest },
+              { revision: saved.revision, digest: savedDigest },
+              conflict,
+              "graph_draft_patch",
+            )
+          }
+          const current = entry?.resource ?? saved
+          const currentDigest = ArchitecturePatch.digest(current)
+          if (current.revision !== input.revision || currentDigest !== input.digest)
+            return yield* graphConflict(
+              id,
+              current.name,
+              { revision: input.revision, digest: input.digest },
+              { revision: current.revision, digest: currentDigest },
+              conflict,
+              "graph_draft_patch",
+            )
+          const patched = yield* ArchitecturePatch.apply(current, input.operations).pipe(
+            Effect.mapError((error) =>
+              error instanceof ArchitecturePatch.ConflictError
+                ? graphConflict(
+                    id,
+                    current.name,
+                    { revision: input.revision, digest: input.digest },
+                    { revision: current.revision, digest: currentDigest },
+                    conflict,
+                    "graph_draft_patch",
+                    error.operationIDs,
+                  )
+                : error,
+            ),
+          )
+          yield* drafts.set(id, {
+            baseRevision: entry?.baseRevision ?? saved.revision,
+            baseDigest: entry?.baseDigest ?? savedDigest,
+            resource: patched,
+          })
+          const result = snapshot(storage, patched)
+          yield* publishDraftUpdated(result, {
+            revision: entry?.baseRevision ?? saved.revision,
+            digest: entry?.baseDigest ?? savedDigest,
+          })
+          return { snapshot: result, source: "live" as const }
+        }),
+      )
+    })
+
+    const patchDraft = Effect.fn("ArchitectureGraph.patchDraft")(function* (
+      id: Architecture.ResourceID,
+      input: Architecture.PatchInput,
+      conflict?: ConflictContext,
+    ) {
+      return yield* patchLive(id, input, conflict)
+    })
+
+    const commitDraft = Effect.fn("ArchitectureGraph.commitDraft")(function* (
+      id: Architecture.ResourceID,
+      input: Architecture.DraftCommitInput,
+      conflict?: ConflictContext,
+    ) {
+      const storage = yield* roots.get
+      return yield* locked(
+        storage,
+        Effect.gen(function* () {
+          const saved = (yield* read(storage, id)).resource
+          const savedDigest = ArchitecturePatch.digest(saved)
+          const entry = yield* drafts.get(id)
+          if (!entry)
+            return yield* graphConflict(
+              id,
+              saved.name,
+              input,
+              { revision: saved.revision, digest: savedDigest },
+              conflict,
+              "graph_draft_commit",
+              [],
+              "draft_missing",
+            )
+          const draftDigest = ArchitecturePatch.digest(entry.resource)
+          if (entry.resource.revision !== input.revision || draftDigest !== input.digest)
+            return yield* graphConflict(
+              id,
+              saved.name,
+              input,
+              { revision: entry.resource.revision, digest: draftDigest },
+              conflict,
+              "graph_draft_commit",
+              [],
+              "draft_changed",
+            )
+          if (entry.baseRevision !== saved.revision || entry.baseDigest !== savedDigest) {
+            return yield* graphConflict(
+              id,
+              saved.name,
+              { revision: entry.baseRevision, digest: entry.baseDigest },
+              { revision: saved.revision, digest: savedDigest },
+              conflict,
+              "graph_draft_commit",
+            )
+          }
+          const result = yield* write(
+            storage,
+            { ...entry.resource, revision: saved.revision + 1 },
+            { revision: entry.baseRevision, digest: entry.baseDigest },
+            conflict,
+            drafts.remove(id),
+          )
+          yield* publishDraftDiscarded(result)
+          return result
+        }),
+      )
+    })
+
+    const discardDraft = Effect.fn("ArchitectureGraph.discardDraft")(function* (id: Architecture.ResourceID) {
+      const storage = yield* roots.get
+      return yield* locked(
+        storage,
+        Effect.gen(function* () {
+          const saved = snapshot(storage, (yield* read(storage, id)).resource)
+          const entry = yield* drafts.get(id)
+          yield* drafts.remove(id)
+          if (entry) yield* publishDraftDiscarded(saved)
+          return { snapshot: saved, source: "saved" as const }
+        }),
+      )
+    })
+
+    const reloadSaved = Effect.fn("ArchitectureGraph.reloadSaved")(function* (id: Architecture.ResourceID) {
+      return yield* discardDraft(id)
     })
 
     const remove = Effect.fn("ArchitectureGraph.remove")(function* (
       id: Architecture.ResourceID,
       input: Architecture.ResourceRemoveInput,
+      conflict?: ConflictContext,
     ) {
       const storage = yield* roots.get
       return yield* locked(
@@ -386,13 +706,14 @@ const layer = Layer.effect(
           const current = yield* read(storage, id)
           const currentDigest = ArchitecturePatch.digest(current.resource)
           if (current.resource.revision !== input.revision || currentDigest !== input.digest)
-            return yield* new ConflictError({
-              message: conflictMessage(input.revision, current.resource.revision, input.digest, currentDigest),
-              expectedRevision: input.revision,
-              currentRevision: current.resource.revision,
-              expectedDigest: input.digest,
-              currentDigest,
-            })
+            return yield* graphConflict(
+              id,
+              current.resource.name,
+              { revision: input.revision, digest: input.digest },
+              { revision: current.resource.revision, digest: currentDigest },
+              conflict,
+              "graph_delete_resource",
+            )
           yield* fs.remove(current.source).pipe(
             Effect.mapError(
               (cause) =>
@@ -402,6 +723,8 @@ const layer = Layer.effect(
                   cause,
                 }),
             ),
+            Effect.andThen(drafts.remove(id)),
+            Effect.uninterruptible,
           )
           yield* events.publish(
             Architecture.Event.ResourceRemoved,
@@ -424,26 +747,30 @@ const layer = Layer.effect(
               : id === "overview" && (yield* fs.existsSafe(storage.legacyFile))
                 ? storage.legacyFile
                 : file(storage, id)
-          if (yield* fs.existsSafe(source)) {
-            yield* fs
-              .ensureDir(storage.resources)
-              .pipe(
+          const exists = yield* fs.existsSafe(source)
+          yield* Effect.gen(function* () {
+            if (exists) {
+              yield* fs
+                .ensureDir(storage.resources)
+                .pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new StorageError({ operation: "mkdir", message: "Unable to create graph resources", cause }),
+                  ),
+                )
+              yield* fs.rename(source, path.join(storage.resources, `${id}.invalid.${Date.now()}.json`)).pipe(
                 Effect.mapError(
                   (cause) =>
-                    new StorageError({ operation: "mkdir", message: "Unable to create graph resources", cause }),
+                    new StorageError({
+                      operation: "backup",
+                      message: `Unable to preserve graph resource ${id}`,
+                      cause,
+                    }),
                 ),
               )
-            yield* fs.rename(source, path.join(storage.resources, `${id}.invalid.${Date.now()}.json`)).pipe(
-              Effect.mapError(
-                (cause) =>
-                  new StorageError({
-                    operation: "backup",
-                    message: `Unable to preserve graph resource ${id}`,
-                    cause,
-                  }),
-              ),
-            )
-          }
+            }
+            yield* drafts.remove(id)
+          }).pipe(Effect.uninterruptible)
           return yield* write(
             storage,
             ArchitecturePatch.empty({
@@ -460,50 +787,21 @@ const layer = Layer.effect(
       const resources = (yield* readAll(yield* roots.get)).filter(
         (resource) => selected.size === 0 || selected.has(resource.id),
       )
-      const text = input.text?.toLowerCase()
-      const ids = new Set(input.nodeIDs)
-      const tags = new Set(input.tags)
-      const matches = (node: Architecture.Node) => {
-        if (ids.size > 0 && !ids.has(node.id)) return false
-        if (tags.size > 0 && !Array.from(tags).every((tag) => node.tags.includes(tag))) return false
-        if (!text) return true
-        return [node.id, node.text, ...node.tags].join("\n").toLowerCase().includes(text)
-      }
-      const limit = Math.min(Math.max(input.limit ?? 100, 1), 500)
-      const depth = Math.min(input.depth ?? 0, 5)
-      const results = resources.map((resource) => {
-        const matched = resource.nodes.filter(matches)
-        const traversal = traverse(
-          resource.edges,
-          new Set(matched.slice(0, limit).map((node) => node.id)),
-          depth,
-          limit,
-        )
-        return { resource, matched, traversal }
-      })
-      const nodes = results
-        .flatMap((result) =>
-          result.resource.nodes
-            .filter((node) => result.traversal.included.has(node.id))
-            .map((node) => ({ resourceID: result.resource.id, node })),
-        )
-        .slice(0, limit)
-      const included = new Set(nodes.map((item) => `${item.resourceID}\0${item.node.id}`))
+      return queryResources(resources, input, summary)
+    })
+
+    const queryLive = Effect.fn("ArchitectureGraph.queryLive")(function* (input: Architecture.QueryInput) {
+      const selected = new Set(input.resourceIDs)
+      const resources = (yield* readAllLive(yield* roots.get)).filter(
+        (item) => selected.size === 0 || selected.has(item.resource.id),
+      )
       return {
-        resources: resources.map(summary),
-        nodes,
-        edges: results.flatMap((result) =>
-          result.resource.edges
-            .filter(
-              (edge) =>
-                included.has(`${result.resource.id}\0${edge.source}`) &&
-                included.has(`${result.resource.id}\0${edge.target}`),
-            )
-            .map((edge) => ({ resourceID: result.resource.id, edge })),
+        ...queryResources(
+          resources.map((item) => item.resource),
+          input,
+          summary,
         ),
-        truncated:
-          results.some((result) => result.matched.length > limit || result.traversal.truncated) ||
-          results.reduce((count, result) => count + result.traversal.included.size, 0) > limit,
+        source: mixedSource(resources.map((item) => item.source)),
       }
     })
 
@@ -512,51 +810,51 @@ const layer = Layer.effect(
       const resources = (yield* readAll(yield* roots.get)).filter(
         (resource) => selected.size === 0 || selected.has(resource.id),
       )
-      if (resources.length === 0) return ""
-      return resources
-        .slice(0, 20)
-        .flatMap((resource) => {
-          const tagColors = Object.entries(resource.tagColors ?? {})
-            .slice(0, 50)
-            .map(([tag, color]) => `- ${tag}: ${color}`)
-          const nodes = resource.nodes
-            .slice(0, 50)
-            .map(
-              (node) =>
-                `- ${node.id}: ${node.text.replace(/\s+/g, " ")}${formatTags(resource, node)} (position: ${node.layout.position.x}, ${node.layout.position.y})`,
-            )
-          const edges = resource.edges
-            .slice(0, 75)
-            .map(
-              (edge) =>
-                `- ${edge.source}.${edge.sourceHandle ?? "right"} -> ${edge.target}.${edge.targetHandle ?? "left"} (style: ${edge.style ?? "rectangular"})`,
-            )
-          const compactMention = `@${resource.name.replace(/\s+/g, "")}`
-          const lowerCompactMention = compactMention.toLowerCase()
-          const aliases =
-            compactMention === `@${resource.name}`
-              ? ""
-              : `; mention aliases: ${compactMention}${lowerCompactMention === compactMention ? "" : `, ${lowerCompactMention}`}`
-          return [
-            `Graph resource @${resource.name} (resource ID: ${resource.id}; path: ${resourcePath(resource.id)}${aliases}; revision ${resource.revision}; digest ${ArchitecturePatch.digest(resource).slice(0, 12)})`,
-            ...(tagColors.length > 0 ? ["Tag colors:", ...tagColors] : []),
-            ...(nodes.length > 0 ? ["Elements:", ...nodes] : []),
-            ...(resource.nodes.length > nodes.length ? ["- additional elements omitted"] : []),
-            ...(edges.length > 0 ? ["Relationships:", ...edges] : []),
-            ...(resource.edges.length > edges.length ? ["- additional relationships omitted"] : []),
-          ]
-        })
-        .join("\n")
+      return formatContext(resources, resourcePath)
     })
 
-    return Service.of({ list, create, load, patch, remove, reset, query, context })
+    const contextLive = Effect.fn("ArchitectureGraph.contextLive")(function* (
+      ids?: ReadonlyArray<Architecture.ResourceID>,
+    ) {
+      const selected = new Set(ids)
+      const resources = (yield* readAllLive(yield* roots.get)).filter(
+        (item) => selected.size === 0 || selected.has(item.resource.id),
+      )
+      const context = formatContext(
+        resources.map((item) => item.resource),
+        resourcePath,
+      )
+      if (context === "") return context
+      return `Graph source: ${mixedSource(resources.map((item) => item.source))}\n${context}`
+    })
+
+    return Service.of({
+      list,
+      listLive,
+      create,
+      load,
+      loadLive,
+      loadDraft,
+      patch,
+      patchLive,
+      patchDraft,
+      commitDraft,
+      discardDraft,
+      reloadSaved,
+      remove,
+      reset,
+      query,
+      queryLive,
+      context,
+      contextLive,
+    })
   }),
 )
 
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [ArchitectureRoot.node, FSUtil.node, EffectFlock.node, EventV2.node, Location.node],
+  deps: [ArchitectureRoot.node, ArchitectureDraft.node, FSUtil.node, EffectFlock.node, EventV2.node, Location.node],
 })
 
 function migrate(resource: typeof PreviousResource.Type): Architecture.Resource {
@@ -621,13 +919,124 @@ function edgeStyle(value: unknown) {
   return undefined
 }
 
-function conflictMessage(
-  expectedRevision: number,
-  currentRevision: number,
-  expectedDigest: string,
-  currentDigest: string,
+function mixedSource(sources: ReadonlyArray<Exclude<Source, "mixed">>): Source {
+  if (sources.some((source) => source === "live") && sources.some((source) => source === "saved")) return "mixed"
+  if (sources.some((source) => source === "live")) return "live"
+  return "saved"
+}
+
+function queryResources(
+  resources: ReadonlyArray<Architecture.Resource>,
+  input: Architecture.QueryInput,
+  summary: (resource: Architecture.Resource) => Architecture.ResourceSummary,
+): Architecture.QueryResult {
+  const text = input.text?.toLowerCase()
+  const ids = new Set(input.nodeIDs)
+  const tags = new Set(input.tags)
+  const matches = (node: Architecture.Node) => {
+    if (ids.size > 0 && !ids.has(node.id)) return false
+    if (tags.size > 0 && !Array.from(tags).every((tag) => node.tags.includes(tag))) return false
+    if (!text) return true
+    return [node.id, node.text, ...node.tags].join("\n").toLowerCase().includes(text)
+  }
+  const limit = Math.min(Math.max(input.limit ?? 100, 1), 500)
+  const depth = Math.min(input.depth ?? 0, 5)
+  const results = resources.map((resource) => {
+    const matched = resource.nodes.filter(matches)
+    const traversal = traverse(resource.edges, new Set(matched.slice(0, limit).map((node) => node.id)), depth, limit)
+    return { resource, matched, traversal }
+  })
+  const nodes = results
+    .flatMap((result) =>
+      result.resource.nodes
+        .filter((node) => result.traversal.included.has(node.id))
+        .map((node) => ({ resourceID: result.resource.id, node })),
+    )
+    .slice(0, limit)
+  const included = new Set(nodes.map((item) => `${item.resourceID}\0${item.node.id}`))
+  return {
+    resources: resources.map(summary),
+    nodes,
+    edges: results.flatMap((result) =>
+      result.resource.edges
+        .filter(
+          (edge) =>
+            included.has(`${result.resource.id}\0${edge.source}`) &&
+            included.has(`${result.resource.id}\0${edge.target}`),
+        )
+        .map((edge) => ({ resourceID: result.resource.id, edge })),
+    ),
+    truncated:
+      results.some((result) => result.matched.length > limit || result.traversal.truncated) ||
+      results.reduce((count, result) => count + result.traversal.included.size, 0) > limit,
+  }
+}
+
+function formatContext(
+  resources: ReadonlyArray<Architecture.Resource>,
+  resourcePath: (resourceID: Architecture.ResourceID) => string,
 ) {
-  return `The architecture resource changed: expected revision ${expectedRevision} digest ${expectedDigest}, current revision ${currentRevision} digest ${currentDigest}`
+  if (resources.length === 0) return ""
+  return resources
+    .slice(0, 20)
+    .flatMap((resource) => {
+      const tagColors = Object.entries(resource.tagColors ?? {})
+        .slice(0, 50)
+        .map(([tag, color]) => `- ${tag}: ${color}`)
+      const nodes = resource.nodes
+        .slice(0, 50)
+        .map(
+          (node) =>
+            `- ${node.id}: ${node.text.replace(/\s+/g, " ")}${formatTags(resource, node)} (position: ${node.layout.position.x}, ${node.layout.position.y})`,
+        )
+      const edges = resource.edges
+        .slice(0, 75)
+        .map(
+          (edge) =>
+            `- ${edge.source}.${edge.sourceHandle ?? "right"} -> ${edge.target}.${edge.targetHandle ?? "left"} (style: ${edge.style ?? "rectangular"})`,
+        )
+      const compactMention = `@${resource.name.replace(/\s+/g, "")}`
+      const lowerCompactMention = compactMention.toLowerCase()
+      const aliases =
+        compactMention === `@${resource.name}`
+          ? ""
+          : `; mention aliases: ${compactMention}${lowerCompactMention === compactMention ? "" : `, ${lowerCompactMention}`}`
+      return [
+        `Graph resource @${resource.name} (resource ID: ${resource.id}; path: ${resourcePath(resource.id)}${aliases}; revision ${resource.revision}; digest ${ArchitecturePatch.digest(resource).slice(0, 12)})`,
+        ...(tagColors.length > 0 ? ["Tag colors:", ...tagColors] : []),
+        ...(nodes.length > 0 ? ["Elements:", ...nodes] : []),
+        ...(resource.nodes.length > nodes.length ? ["- additional elements omitted"] : []),
+        ...(edges.length > 0 ? ["Relationships:", ...edges] : []),
+        ...(resource.edges.length > edges.length ? ["- additional relationships omitted"] : []),
+      ]
+    })
+    .join("\n")
+}
+
+function graphConflict(
+  resourceID: Architecture.ResourceID,
+  resourceName: string | undefined,
+  expected: { readonly revision: number; readonly digest: string },
+  actual: { readonly revision: number; readonly digest: string },
+  conflict: ConflictContext | undefined,
+  operation: string,
+  operationIDs: ReadonlyArray<Architecture.OperationID> = [],
+  conflictKind?: ArchitectureConflict.Kind,
+) {
+  const details = ArchitectureConflict.make({
+    resourceID,
+    resourceName,
+    operation: conflict?.operation ?? operation,
+    expected,
+    actual,
+    safeToRetry: conflict?.safeToRetry,
+    conflictKind,
+    operationIDs,
+  })
+  return new ConflictError({
+    ...details,
+    message: ArchitectureConflict.describe(details),
+  })
 }
 
 function traverse(
