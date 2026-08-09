@@ -95,7 +95,7 @@ export function SessionSidePanel(props: {
   const dialog = useDialog()
   const sdk = useSDK()
   const architectureAvailable = useServerArchitectureAvailable()
-  const { sessionKey, tabs, view, params } = useSessionLayout()
+  const { sessionKey, tabs, view } = useSessionLayout()
   const projectDirectory = createMemo(() => sdk().directory)
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
@@ -303,7 +303,7 @@ export function SessionSidePanel(props: {
   })
 
   return (
-    <Show when={isDesktop() && !(settings.general.newLayoutDesigns() && !params.id)}>
+    <Show when={isDesktop()}>
       <aside
         id="review-panel"
         aria-label={language.t("session.panel.reviewFilesArchitecture")}

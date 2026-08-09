@@ -377,7 +377,7 @@ export default function Page() {
   const comments = useComments()
   const command = useCommand()
   const terminal = useTerminal()
-  const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
+  const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string }>()
   const location = useLocation()
   const navigate = useNavigate()
   const { params, sessionKey, workspaceKey, tabs, view } = useSessionLayout()
@@ -416,7 +416,11 @@ export default function Page() {
   })
 
   const workspaceTabs = createMemo(() => layout.tabs(workspaceKey))
-  const sessionPanelKey = createMemo(() => (params.id ? `${serverSDK().scope}\0${params.id}` : undefined))
+  const sessionPanelKey = createMemo(() =>
+    params.id
+      ? `${serverSDK().scope}\0${params.id}`
+      : `${serverSDK().scope}\0${sdk().directory}\0${searchParams.draftId ?? ""}`,
+  )
 
   createEffect(
     on(
@@ -463,7 +467,7 @@ export default function Page() {
     () => isDesktop() && architectureAvailable() === true && tabs().active() === SESSION_ARCHITECTURE_TAB,
   )
   const desktopDetailOpen = createMemo(() => desktopReviewOpen() || desktopArchitectureOpen())
-  const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen() && !!params.id)
+  const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen())
   const terminalOpen = createMemo(() => view().terminal.opened())
   const desktopTerminalOpen = createMemo(() => isDesktop() && terminalOpen())
   const desktopInlineTerminalOnlyOpen = createMemo(
@@ -2095,17 +2099,17 @@ export default function Page() {
   const sessionPanelContent = () => (
     <>
       {sessionSync() ?? ""}
-      <Show when={!isDesktop() && !!params.id && settings.general.newLayoutDesigns() && !mobileTabsBottom()}>
+      <Show when={!isDesktop() && settings.general.newLayoutDesigns() && !mobileTabsBottom()}>
         {mobileTabs(true)}
       </Show>
       <div class="flex-1 min-h-0 overflow-hidden">
         <Switch>
-          <Match when={params.id && mobileArchitecture()}>
+          <Match when={mobileArchitecture()}>
             <div class="relative h-full overflow-hidden">
               <ArchitecturePanel />
             </div>
           </Match>
-          <Match when={params.id && mobileChanges()}>
+          <Match when={mobileChanges()}>
             <div class="relative h-full overflow-hidden">
               {reviewContent({
                 diffStyle: "unified",
@@ -2167,7 +2171,7 @@ export default function Page() {
         </Switch>
       </div>
 
-      <Show when={(params.id || !newSessionDesign()) && !mobileChanges() && !mobileArchitecture()}>
+      <Show when={!mobileChanges() && !mobileArchitecture()}>
         {(_) => {
           const controller = createSessionComposerRegionController({
             state: composer,
@@ -2281,7 +2285,7 @@ export default function Page() {
           )
         }}
       </Show>
-      <Show when={!!params.id && mobileTabsBottom()}>{mobileTabs(true, true)}</Show>
+      <Show when={mobileTabsBottom()}>{mobileTabs(true, true)}</Show>
     </>
   )
 
@@ -2361,7 +2365,7 @@ export default function Page() {
         <Show when={newSessionDesign()}>
           <Show when={isDesktop() ? desktopV2PanelLayout().visible : terminalOpen()}>
             <div class="min-w-0 h-full flex flex-1 flex-col">
-              <Show when={isDesktop() && (desktopV2ReviewOpen() || desktopFileTreeOpen())}>
+              <Show when={isDesktop() && (desktopV2ReviewOpen() || desktopArchitectureOpen() || desktopFileTreeOpen())}>
                 <div class="min-h-0 flex-1">
                   <Suspense>
                     <SessionSidePanel

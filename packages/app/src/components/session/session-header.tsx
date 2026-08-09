@@ -16,6 +16,7 @@ import { useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
+import { useSDK } from "@/context/sdk"
 import { useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
@@ -144,6 +145,7 @@ export function SessionHeader() {
   const command = useCommand()
   const server = useServer()
   const platform = usePlatform()
+  const sdk = useSDK()
   const language = useLanguage()
   const settings = useSettings()
   const sync = useSync()
@@ -151,7 +153,7 @@ export function SessionHeader() {
   const { params, tabs, view } = useSessionLayout()
   const architectureAvailable = useServerArchitectureAvailable()
 
-  const projectDirectory = createMemo(() => decode64(params.dir) ?? "")
+  const projectDirectory = createMemo(() => decode64(params.dir) ?? sdk().directory)
   const project = createMemo(() => {
     const directory = projectDirectory()
     if (!directory) return

@@ -31,7 +31,6 @@ import {
   ErrorBoundary,
   For,
   type JSX,
-  lazy,
   onCleanup,
   type ParentProps,
   Show,
@@ -39,8 +38,6 @@ import {
 import { Dynamic } from "solid-js/web"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { CommandProvider, useCommand, type CommandOption } from "@/context/command"
-import { CommentsProvider } from "@/context/comments"
-import { FileProvider } from "@/context/file"
 import { ServerSDKProvider } from "@/context/server-sdk"
 import { ServerSyncProvider, useServerSync } from "@/context/server-sync"
 import { GlobalProvider, useGlobal } from "@/context/global"
@@ -51,7 +48,6 @@ import { ModelsProvider } from "@/context/models"
 import { NotificationProvider } from "@/context/notification"
 import { PermissionProvider } from "@/context/permission"
 import { usePlatform } from "@/context/platform"
-import { PromptProvider } from "@/context/prompt"
 import { ServerConnection, ServerProvider, serverName, useServer } from "@/context/server"
 import { SettingsProvider, useSettings } from "@/context/settings"
 import { TabsProvider, useTabs, type DraftTab } from "@/context/tabs"
@@ -68,8 +64,6 @@ import { createSessionLineage } from "@/pages/session/session-lineage"
 import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } from "@/pages/session"
 import { NewHome } from "@/pages/home"
 import { LegacyHome } from "@/pages/home/legacy-home"
-
-const NewSession = lazy(() => import("@/pages/new-session"))
 
 const SessionRoute = () => {
   const settings = useSettings()
@@ -219,9 +213,9 @@ function ResolvedDraftRoute(props: { draft: DraftTab }) {
           <ModelsProvider directory={directory}>
             <SDKProvider directory={directory}>
               <DirectoryDataProvider directory={directory} server={serverKey}>
-                <DraftProviders>
-                  <NewSession />
-                </DraftProviders>
+                <SessionRouteErrorBoundary>
+                  <SessionPage />
+                </SessionRouteErrorBoundary>
               </DirectoryDataProvider>
             </SDKProvider>
           </ModelsProvider>
@@ -375,18 +369,6 @@ function NewAppLayout(props: ParentProps<{ serverScoped?: JSX.Element }>) {
         <NewLayout>{props.children}</NewLayout>
       </ServerScopedProviders>
     </SelectedServerProviders>
-  )
-}
-
-// The draft page only renders the prompt composer, so it drops TerminalProvider.
-// FileProvider and CommentsProvider stay because PromptInput uses file search and comment context.
-function DraftProviders(props: ParentProps) {
-  return (
-    <FileProvider>
-      <PromptProvider>
-        <CommentsProvider>{props.children}</CommentsProvider>
-      </PromptProvider>
-    </FileProvider>
   )
 }
 
