@@ -30,6 +30,7 @@ export class StorageError extends Schema.TaggedErrorClass<StorageError>()("Archi
 }) {}
 
 export class ConflictError extends Schema.TaggedErrorClass<ConflictError>()("Architecture.GraphConflictError", {
+  message: Schema.String,
   expectedRevision: Schema.Int,
   currentRevision: Schema.Int,
   expectedDigest: Schema.String,
@@ -258,6 +259,7 @@ const layer = Layer.effect(
                   if (current.resource.revision === expected.revision && currentDigest === expected.digest)
                     return Effect.void
                   return new ConflictError({
+                    message: conflictMessage(expected.revision, current.resource.revision, expected.digest, currentDigest),
                     expectedRevision: expected.revision,
                     currentRevision: current.resource.revision,
                     expectedDigest: expected.digest,
@@ -359,6 +361,7 @@ const layer = Layer.effect(
           const currentDigest = ArchitecturePatch.digest(current)
           if (current.revision !== input.revision || currentDigest !== input.digest)
             return yield* new ConflictError({
+              message: conflictMessage(input.revision, current.revision, input.digest, currentDigest),
               expectedRevision: input.revision,
               currentRevision: current.revision,
               expectedDigest: input.digest,
@@ -384,6 +387,7 @@ const layer = Layer.effect(
           const currentDigest = ArchitecturePatch.digest(current.resource)
           if (current.resource.revision !== input.revision || currentDigest !== input.digest)
             return yield* new ConflictError({
+              message: conflictMessage(input.revision, current.resource.revision, input.digest, currentDigest),
               expectedRevision: input.revision,
               currentRevision: current.resource.revision,
               expectedDigest: input.digest,
@@ -512,6 +516,9 @@ const layer = Layer.effect(
       return resources
         .slice(0, 20)
         .flatMap((resource) => {
+          const tagColors = Object.entries(resource.tagColors ?? {})
+            .slice(0, 50)
+            .map(([tag, color]) => `- ${tag}: ${color}`)
           const nodes = resource.nodes
             .slice(0, 50)
             .map(
@@ -532,6 +539,7 @@ const layer = Layer.effect(
               : `; mention aliases: ${compactMention}${lowerCompactMention === compactMention ? "" : `, ${lowerCompactMention}`}`
           return [
             `Graph resource @${resource.name} (resource ID: ${resource.id}; path: ${resourcePath(resource.id)}${aliases}; revision ${resource.revision}; digest ${ArchitecturePatch.digest(resource).slice(0, 12)})`,
+            ...(tagColors.length > 0 ? ["Tag colors:", ...tagColors] : []),
             ...(nodes.length > 0 ? ["Elements:", ...nodes] : []),
             ...(resource.nodes.length > nodes.length ? ["- additional elements omitted"] : []),
             ...(edges.length > 0 ? ["Relationships:", ...edges] : []),
@@ -611,6 +619,15 @@ function edgeStyle(value: unknown) {
   if (value === "curved" || value === "default") return "curved"
   if (value === "straight") return "straight"
   return undefined
+}
+
+function conflictMessage(
+  expectedRevision: number,
+  currentRevision: number,
+  expectedDigest: string,
+  currentDigest: string,
+) {
+  return `The architecture resource changed: expected revision ${expectedRevision} digest ${expectedDigest}, current revision ${currentRevision} digest ${currentDigest}`
 }
 
 function traverse(

@@ -92,12 +92,9 @@ describe("ArchitecturePatch", () => {
     }),
   )
 
-  it.effect("normalizes tag colors against current node tags", () =>
+  it.effect("keeps tag colors even when tags do not exist yet", () =>
     Effect.gen(function* () {
-      const created = yield* ArchitecturePatch.apply(create(), [
-        { id: Architecture.OperationID.make("create"), type: "node.create", node: node("a", ["planned"]) },
-      ])
-      const colored = yield* ArchitecturePatch.apply(created, [
+      const colored = yield* ArchitecturePatch.apply(create(), [
         {
           id: Architecture.OperationID.make("color"),
           type: "tag.color",
@@ -105,16 +102,27 @@ describe("ArchitecturePatch", () => {
           color: Architecture.TagColor.make("#4C82FF"),
         },
       ])
-      const removed = yield* ArchitecturePatch.apply(colored, [
+      const created = yield* ArchitecturePatch.apply(colored, [
+        { id: Architecture.OperationID.make("create"), type: "node.create", node: node("a", ["planned"]) },
+      ])
+      const unused = yield* ArchitecturePatch.apply(created, [
         {
           id: Architecture.OperationID.make("remove"),
           type: "node.update",
-          node: { ...colored.nodes[0]!, tags: [] },
+          node: { ...created.nodes[0]!, tags: [] },
+        },
+      ])
+      const cleared = yield* ArchitecturePatch.apply(unused, [
+        {
+          id: Architecture.OperationID.make("clear"),
+          type: "tag.color",
+          tag: Architecture.Tag.make("planned"),
         },
       ])
 
       expect(colored.tagColors).toEqual({ planned: "#4c82ff" })
-      expect(removed).not.toHaveProperty("tagColors")
+      expect(unused.tagColors).toEqual({ planned: "#4c82ff" })
+      expect(cleared).not.toHaveProperty("tagColors")
     }),
   )
 })

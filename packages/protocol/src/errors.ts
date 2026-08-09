@@ -126,6 +126,8 @@ export class ArchitectureConflictError extends Schema.TaggedErrorClass<Architect
   {
     message: Schema.String,
     operationIDs: Schema.Array(Architecture.OperationID),
+    expectedRevision: Schema.optional(Schema.Int),
+    expectedDigest: Schema.optional(Schema.String),
     currentRevision: Schema.optional(Schema.Int),
     currentDigest: Schema.optional(Schema.String),
   },

@@ -42,6 +42,12 @@ describe("ArchitectureContext", () => {
         digest: base.digest,
         operations: [
           {
+            id: Architecture.OperationID.make("color"),
+            type: "tag.color",
+            tag: Architecture.Tag.make("planned"),
+            color: Architecture.TagColor.make("#4C82FF"),
+          },
+          {
             id: Architecture.OperationID.make("create"),
             type: "node.create",
             node: {
@@ -64,7 +70,8 @@ describe("ArchitectureContext", () => {
       expect(initialized.baseline).toContain("Valid connection styles are rectangular, curved, and straight")
       expect(initialized.baseline).toContain("Do not invent JSON fields")
       expect(initialized.baseline).toContain("Vary sides and styles for fan-out")
-      expect(initialized.baseline).toContain("Conversation [planned, user experience]")
+      expect(initialized.baseline).toContain("Tag colors:\n- planned: #4c82ff")
+      expect(initialized.baseline).toContain("Conversation [planned #4c82ff, user experience]")
       expect(initialized.baseline).toContain("(position: 0, 0)")
 
       const current = saved.resource.nodes[0]!

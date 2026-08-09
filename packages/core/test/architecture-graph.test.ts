@@ -106,9 +106,16 @@ describe("ArchitectureGraph storage", () => {
           digest: base.digest,
           operations: [{ id: Architecture.OperationID.make("second"), type: "node.create", node: node("second") }],
         })
-        .pipe(Effect.exit)
+        .pipe(Effect.flip)
 
-      expect(Exit.isFailure(stale)).toBe(true)
+      expect(stale).toMatchObject({
+        expectedRevision: base.resource.revision,
+        currentRevision: saved.resource.revision,
+        expectedDigest: base.digest,
+        currentDigest: saved.digest,
+      })
+      expect(stale.message).toContain("expected revision 0")
+      expect(stale.message).toContain("current revision 1")
       expect((yield* graph.load(base.resource.id)).digest).toBe(saved.digest)
     }),
   )

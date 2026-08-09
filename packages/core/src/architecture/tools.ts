@@ -9,6 +9,7 @@ import { NonNegativeInt } from "../schema"
 import { ToolRegistry } from "../tool/registry"
 import { Tool } from "../tool/tool"
 import { Tools } from "../tool/tools"
+import { ArchitectureBatch } from "./batch"
 import { ArchitectureGraph } from "./graph"
 import { ArchitecturePatch } from "./patch"
 
@@ -26,6 +27,7 @@ export const names = {
   connectNodes: "graph_connect_nodes",
   updateConnection: "graph_update_connection",
   updateLayout: "graph_update_layout",
+  batchEdit: "graph_batch_edit",
   disconnectNodes: "graph_disconnect_nodes",
   getContext: "graph_get_context",
 } as const
@@ -150,7 +152,9 @@ const layer = Layer.effectDiscard(
               yield* authorize("edit", context, input.resourceID)
               const current = yield* graph.load(input.resourceID)
               if (current.digest !== input.expectedDigest)
-                return yield* new ToolFailure({ message: `Graph resource ${input.resourceID} changed` })
+                return yield* new ToolFailure({
+                  message: `Graph resource ${input.resourceID} changed: expected digest ${input.expectedDigest}, current revision ${current.resource.revision}, current digest ${current.digest}`,
+                })
               yield* graph.remove(input.resourceID, {
                 revision: current.resource.revision,
                 digest: current.digest,
@@ -212,6 +216,48 @@ const layer = Layer.effectDiscard(
               }
             }).pipe(
               Effect.mapError((error) => failure(`Unable to create graph node in ${input.resourceID}`, error)),
+            ),
+        }),
+        "edit",
+      ),
+      [names.batchEdit]: Tool.withPermission(
+        Tool.make({
+          description:
+            "Batch set tag colors and create or update many graph nodes and connections in one atomic edit. Use this when creating or revising several nodes, tags, or wires together; for pure visual layout changes, use graph_update_layout.",
+          input: ArchitectureBatch.Input,
+          output: ArchitectureBatch.Output,
+          toModelOutput: ({ output }) => [
+            {
+              type: "text",
+              text: `Batch edited graph ${output.resourceID}: ${output.updatedTagColors.length} tag colors, ${output.createdNodeIDs.length} created nodes, ${output.updatedNodeIDs.length} updated nodes, ${output.createdEdgeIDs.length} created connections, ${output.updatedEdgeIDs.length} updated connections`,
+            },
+          ],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.load(input.resourceID)
+              const batch = ArchitectureBatch.prepare(input, current.resource)
+              if (!batch.ok) return yield* batch.error
+              const saved =
+                batch.operations.length > 0
+                  ? yield* graph.patch(input.resourceID, {
+                      revision: current.resource.revision,
+                      digest: current.digest,
+                      operations: batch.operations,
+                    })
+                  : current
+              return {
+                resourceID: input.resourceID,
+                revision: saved.resource.revision,
+                digest: saved.digest,
+                createdNodeIDs: batch.createdNodeIDs,
+                updatedNodeIDs: batch.updatedNodeIDs,
+                createdEdgeIDs: batch.createdEdgeIDs,
+                updatedEdgeIDs: batch.updatedEdgeIDs,
+                updatedTagColors: batch.updatedTagColors,
+              }
+            }).pipe(
+              Effect.mapError((error) => failure(`Unable to batch edit graph resource ${input.resourceID}`, error)),
             ),
         }),
         "edit",

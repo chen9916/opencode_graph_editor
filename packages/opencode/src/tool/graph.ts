@@ -1,4 +1,5 @@
 import { ArchitectureGraph } from "@opencode-ai/core/architecture/graph"
+import { ArchitectureBatch } from "@opencode-ai/core/architecture/batch"
 import { ArchitecturePatch } from "@opencode-ai/core/architecture/patch"
 import { ArchitectureTools } from "@opencode-ai/core/architecture/tools"
 import { Location } from "@opencode-ai/core/location"
@@ -201,7 +202,11 @@ export const GraphTools = Effect.gen(function* () {
               Effect.gen(function* () {
                 const current = yield* graph.load(input.resourceID)
                 if (current.digest !== input.expectedDigest)
-                  return yield* Effect.fail(new Error(`Graph resource ${input.resourceID} changed`))
+                  return yield* Effect.fail(
+                    new Error(
+                      `Graph resource ${input.resourceID} changed: expected digest ${input.expectedDigest}, current revision ${current.resource.revision}, current digest ${current.digest}`,
+                    ),
+                  )
                 yield* graph.remove(input.resourceID, {
                   revision: current.resource.revision,
                   digest: current.digest,
@@ -251,6 +256,42 @@ export const GraphTools = Effect.gen(function* () {
           ),
           Effect.map(({ saved, node }) =>
             json(`Created graph node ${node.id}`, { ...mutation(saved), node }, snapshotMetadata(saved)),
+          ),
+        ),
+    }),
+    graphTool(ArchitectureTools.names.batchEdit, {
+      description:
+        "Batch set tag colors and create or update many graph nodes and connections in one atomic edit. Use this when creating or revising several nodes, tags, or wires together.",
+      parameters: ArchitectureBatch.Input,
+      execute: (input, ctx) =>
+        authorize(ctx, "edit", input.resourceID).pipe(
+          Effect.andThen(
+            withGraph((graph) =>
+              Effect.gen(function* () {
+                const current = yield* graph.load(input.resourceID)
+                const batch = ArchitectureBatch.prepare(input, current.resource)
+                if (!batch.ok) return yield* batch.error
+                const saved =
+                  batch.operations.length > 0
+                    ? yield* graph.patch(input.resourceID, {
+                        revision: current.resource.revision,
+                        digest: current.digest,
+                        operations: batch.operations,
+                      })
+                    : current
+                return {
+                  ...mutation(saved),
+                  createdNodeIDs: batch.createdNodeIDs,
+                  updatedNodeIDs: batch.updatedNodeIDs,
+                  createdEdgeIDs: batch.createdEdgeIDs,
+                  updatedEdgeIDs: batch.updatedEdgeIDs,
+                  updatedTagColors: batch.updatedTagColors,
+                }
+              }),
+            ),
+          ),
+          Effect.map((output) =>
+            json(`Batch edited graph ${input.resourceID}`, output, { ...output, count: batchCount(output) }),
           ),
         ),
     }),
@@ -577,6 +618,16 @@ function mutation(snapshot: Architecture.ResourceSnapshot): typeof MutationMetad
     revision: snapshot.resource.revision,
     digest: snapshot.digest,
   }
+}
+
+function batchCount(output: typeof ArchitectureBatch.Output.Type) {
+  return (
+    output.createdNodeIDs.length +
+    output.updatedNodeIDs.length +
+    output.createdEdgeIDs.length +
+    output.updatedEdgeIDs.length +
+    output.updatedTagColors.length
+  )
 }
 
 function json(title: string, value: unknown, metadata: Metadata = {}): Tool.ExecuteResult<Metadata> {

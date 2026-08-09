@@ -314,6 +314,7 @@ describe("code mode execute", () => {
     const result = JSON.parse(output.output)
     expect(result.namespaces).toContain("graph")
     expect(result.graph).toContain("list_resources")
+    expect(result.graph).toContain("batch_edit")
     expect(result.graph).toContain("set_tag_color")
     expect(result.paths).toContain("tools.graph.set_tag_color")
   })

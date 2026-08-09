@@ -225,6 +225,103 @@ describe("ArchitectureTools", () => {
     }),
   )
 
+  it.effect("batch edits graph nodes and connections atomically", () =>
+    Effect.gen(function* () {
+      assertions.length = 0
+      deny = false
+      const registry = yield* ToolRegistry.Service
+
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createResource, {
+          id: resourceID,
+          name: "Product intent",
+        }),
+      )
+      const created = yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.batchEdit, {
+          resourceID,
+          setTagColors: [
+            { tag: "planned", color: "#4C82FF" },
+            { tag: "implemented", color: "#16A34A" },
+          ],
+          createNodes: [
+            { id: "a", text: "Conversation", tags: ["planned"], position: { x: 0, y: 0 } },
+            { id: "b", text: "Memory", tags: ["implemented"], position: { x: 280, y: 0 } },
+          ],
+          createEdges: [
+            {
+              id: "a-to-b",
+              source: "a",
+              target: "b",
+              sourceHandle: "right",
+              targetHandle: "left",
+              style: "rectangular",
+            },
+          ],
+        }),
+      )
+      expect(created.output?.structured).toMatchObject({
+        createdNodeIDs: ["a", "b"],
+        updatedNodeIDs: [],
+        createdEdgeIDs: ["a-to-b"],
+        updatedEdgeIDs: [],
+        updatedTagColors: ["planned", "implemented"],
+      })
+
+      const updated = yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.batchEdit, {
+          resourceID,
+          setTagColors: [{ tag: "interaction", color: "#C084FC" }, { tag: "implemented" }],
+          updateNodes: [
+            {
+              nodeID: "a",
+              text: "Updated conversation",
+              tags: ["planned", "interaction"],
+              position: { x: -160, y: 80 },
+            },
+          ],
+          updateEdges: [{ edgeID: "a-to-b", sourceHandle: "bottom", targetHandle: "top", style: "curved" }],
+        }),
+      )
+      expect(updated.output?.structured).toMatchObject({
+        createdNodeIDs: [],
+        updatedNodeIDs: ["a"],
+        createdEdgeIDs: [],
+        updatedEdgeIDs: ["a-to-b"],
+        updatedTagColors: ["interaction", "implemented"],
+      })
+
+      const reloaded = yield* settleTool(registry, call(ArchitectureTools.names.reloadResource, { resourceID }))
+      expect(reloaded.output?.structured).toMatchObject({
+        resource: {
+          tagColors: { interaction: "#c084fc", planned: "#4c82ff" },
+          nodes: [
+            {
+              id: "a",
+              text: "Updated conversation",
+              tags: ["interaction", "planned"],
+              layout: { position: { x: -160, y: 80 } },
+            },
+            { id: "b", text: "Memory", tags: ["implemented"], layout: { position: { x: 280, y: 0 } } },
+          ],
+          edges: [
+            {
+              id: "a-to-b",
+              source: "a",
+              target: "b",
+              sourceHandle: "bottom",
+              targetHandle: "top",
+              style: "curved",
+            },
+          ],
+        },
+      })
+    }),
+  )
+
   it.effect("does not read or mutate resources after permission denial", () =>
     Effect.gen(function* () {
       assertions.length = 0

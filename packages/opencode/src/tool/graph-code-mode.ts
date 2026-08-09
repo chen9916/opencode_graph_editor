@@ -1,4 +1,5 @@
 import { Tool } from "@opencode-ai/codemode"
+import { ArchitectureBatch } from "@opencode-ai/core/architecture/batch"
 import { ArchitectureGraph } from "@opencode-ai/core/architecture/graph"
 import { ArchitectureTools } from "@opencode-ai/core/architecture/tools"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
@@ -173,7 +174,11 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
           const graph = yield* ArchitectureGraph.Service
           const current = yield* graph.load(input.resourceID)
           if (current.digest !== input.expectedDigest)
-            return yield* Effect.fail(new Error(`Graph resource ${input.resourceID} changed`))
+            return yield* Effect.fail(
+              new Error(
+                `Graph resource ${input.resourceID} changed: expected digest ${input.expectedDigest}, current revision ${current.resource.revision}, current digest ${current.digest}`,
+              ),
+            )
           return yield* graph.remove(input.resourceID, {
             revision: current.resource.revision,
             digest: current.digest,
@@ -216,6 +221,39 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
             operations: [{ id: Architecture.OperationID.create(), type: "node.create", node }],
           })
           return { resourceID: input.resourceID, revision: saved.resource.revision, digest: saved.digest, node }
+        }),
+    }),
+    graphTool({
+      key: ArchitectureTools.names.batchEdit,
+      permission: "edit",
+      input: ArchitectureBatch.Input,
+      output: ArchitectureBatch.Output,
+      description:
+        "Native graph_batch_edit. Batch set tag colors and create or update many graph nodes and connections in one atomic edit. Use this for multi-node, tag-color, or multi-wire graph edits.",
+      run: (input) =>
+        Effect.gen(function* () {
+          const graph = yield* ArchitectureGraph.Service
+          const current = yield* graph.load(input.resourceID)
+          const batch = ArchitectureBatch.prepare(input, current.resource)
+          if (!batch.ok) return yield* batch.error
+          const saved =
+            batch.operations.length > 0
+              ? yield* graph.patch(input.resourceID, {
+                  revision: current.resource.revision,
+                  digest: current.digest,
+                  operations: batch.operations,
+                })
+              : current
+          return {
+            resourceID: input.resourceID,
+            revision: saved.resource.revision,
+            digest: saved.digest,
+            createdNodeIDs: batch.createdNodeIDs,
+            updatedNodeIDs: batch.updatedNodeIDs,
+            createdEdgeIDs: batch.createdEdgeIDs,
+            updatedEdgeIDs: batch.updatedEdgeIDs,
+            updatedTagColors: batch.updatedTagColors,
+          }
         }),
     }),
     graphTool({

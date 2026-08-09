@@ -49,8 +49,10 @@ function mapError<A, E, R>(effect: Effect.Effect<A, E, R>) {
         return new ArchitectureConflictError({ message: error.message, operationIDs: error.operationIDs })
       if (error instanceof ArchitectureGraph.ConflictError)
         return new ArchitectureConflictError({
-          message: "The architecture resource changed",
+          message: error.message,
           operationIDs: [],
+          expectedRevision: error.expectedRevision,
+          expectedDigest: error.expectedDigest,
           currentRevision: error.currentRevision,
           currentDigest: error.currentDigest,
         })

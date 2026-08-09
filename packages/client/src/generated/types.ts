@@ -25,6 +25,8 @@ export type ArchitectureConflictError = {
   readonly _tag: "ArchitectureConflictError"
   readonly message: string
   readonly operationIDs: ReadonlyArray<string>
+  readonly expectedRevision?: number | undefined
+  readonly expectedDigest?: string | undefined
   readonly currentRevision?: number | undefined
   readonly currentDigest?: string | undefined
 }

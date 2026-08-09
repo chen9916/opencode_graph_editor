@@ -2704,6 +2704,8 @@ export type ArchitectureConflictError = {
   _tag: "ArchitectureConflictError"
   message: string
   operationIDs: Array<string>
+  expectedRevision?: number
+  expectedDigest?: string
   currentRevision?: number
   currentDigest?: string
 }
@@ -3964,6 +3966,8 @@ export type ArchitectureResourceCreateInput = {
 
 export type ArchitectureTag = string
 
+export type ArchitectureTagColor = string
+
 export type ArchitecturePosition = {
   x: number
   y: number
@@ -3996,6 +4000,9 @@ export type ArchitectureResource = {
   revision: number
   id: string
   name: string
+  tagColors?: {
+    [key: string]: ArchitectureTagColor
+  }
   nodes: Array<ArchitectureNode>
   edges: Array<ArchitectureEdge>
 }
@@ -4016,6 +4023,12 @@ export type ArchitectureOperation =
       id: string
       type: "resource.update"
       name: string
+    }
+  | {
+      id: string
+      type: "tag.color"
+      tag: ArchitectureTag
+      color?: ArchitectureTagColor
     }
   | {
       id: string

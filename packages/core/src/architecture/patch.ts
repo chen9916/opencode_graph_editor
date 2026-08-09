@@ -114,9 +114,13 @@ function conflict(operation: Architecture.Operation, message: string) {
 
 function checkExpected(operation: Architecture.Operation, current: Architecture.Node | Architecture.Edge) {
   if (!("expectedDigest" in operation) || !operation.expectedDigest) return Effect.void
-  return operation.expectedDigest === entityDigest(current)
+  const currentDigest = entityDigest(current)
+  return operation.expectedDigest === currentDigest
     ? Effect.void
-    : conflict(operation, `The target of ${operation.id} changed`)
+    : conflict(
+        operation,
+        `The target of ${operation.id} changed: expected digest ${operation.expectedDigest}, current digest ${currentDigest}`,
+      )
 }
 
 export const apply = Effect.fn("ArchitecturePatch.apply")(function* (
@@ -135,8 +139,6 @@ export const apply = Effect.fn("ArchitecturePatch.apply")(function* (
       continue
     }
     if (operation.type === "tag.color") {
-      if (operation.color && !draft.nodes.some((node) => node.tags.includes(operation.tag)))
-        return yield* conflict(operation, `Tag does not exist: ${operation.tag}`)
       const tagColors = { ...(draft.tagColors ?? {}) }
       if (operation.color) tagColors[operation.tag] = operation.color
       else delete tagColors[operation.tag]
@@ -212,9 +214,7 @@ export const apply = Effect.fn("ArchitecturePatch.apply")(function* (
 })
 
 function normalizeTagColors(resource: Architecture.Resource) {
-  const tags = new Set(resource.nodes.flatMap((node) => node.tags))
   const entries = Object.entries(resource.tagColors ?? {})
-    .filter(([tag]) => tags.has(tag as Architecture.Tag))
     .map(([tag, color]) => [tag, color.toLowerCase() as Architecture.TagColor] as const)
     .toSorted(([left], [right]) => left.localeCompare(right))
   return entries.length ? (Object.fromEntries(entries) as NonNullable<Architecture.Resource["tagColors"]>) : undefined

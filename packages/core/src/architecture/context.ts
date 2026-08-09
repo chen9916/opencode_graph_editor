@@ -30,6 +30,8 @@ const baseline = (value: typeof Value.Type) =>
     "If the current session does not expose graph_* tools, report that managed graph editing is unavailable in this session instead of editing graph JSON directly, unless the user explicitly asks for raw file edits.",
     "After modifying a graph, use graph_reload_resource when you need to inspect or report the latest saved graph state.",
     "Durable graph data has only these visual structure fields: node text, node tags, per-resource tagColors, node position, connection source, connection target, sourceHandle, targetHandle, and style. Do not invent JSON fields such as sourcePosition, targetPosition, type, status, or edge labels.",
+    "Tag colors may be set before any node currently uses that tag; preserve them as planned visual language for later graph edits.",
+    "For structural multi-node, multi-connection, or tag-color edits, prefer graph_batch_edit so related creations and updates land as one graph edit.",
     "Valid connection styles are rectangular, curved, and straight. For visual-clarity requests, prefer graph_update_layout so positions, handles, and styles change together in one graph edit.",
     "When creating or reorganizing a graph, plan a readable layout before editing: place nodes in spaced layers or clusters, avoid default-origin stacks, and keep related groups visually separated.",
     "Use node positions plus connection sourceHandle/targetHandle sides (top, right, bottom, left). Vary sides and styles for fan-out, feedback, and cross-cluster links so wires do not stack, cross, or overlap unnecessarily.",
