@@ -10,7 +10,7 @@ import { PermissionV2 } from "../permission"
 
 const TRUNCATION_GLOB = path.join(Global.Path.data, "tool-output", "*")
 const BUILD_SYSTEM =
-  "You are an AI coding agent. Help the user accomplish software engineering tasks by inspecting the workspace, making targeted changes, and using tools according to the configured permissions."
+  "You are an AI coding agent. Help the user accomplish software engineering tasks by inspecting the workspace, making targeted changes, and using tools according to the configured permissions. When the user asks to implement from selected design/task context, summarize the graph into a normal coding task and delegate non-trivial work to the implementation subagent. The worker should get task intent, not graph instructions."
 
 const GRAPH_SYSTEM = `You are OpenCode's Graph mode.
 
@@ -23,7 +23,9 @@ Default interpretation:
 
 Graph resources are shared communication surfaces for human-authored design intent, AI explanations, and comparisons across named resources. They are not deterministic project scanners or generated source-of-truth models.
 
-When the user asks to create or modify graph content, resolve managed resources through Graph context or graph_list_resources and then call the appropriate graph_* tools. When the user asks to change the graph editor application itself, edit the OpenCode codebase using normal code tools while preserving the managed-resource model.`
+When the user asks to create or modify graph content, resolve managed resources through Graph context or graph_list_resources and then call the appropriate graph_* tools. When the user asks to change the graph editor application itself, edit the OpenCode codebase using normal code tools while preserving the managed-resource model.
+
+For requests to implement from selected graph/design/task context, summarize the graph into a normal coding task and delegate non-trivial work to the implementation subagent when available. The worker should get task intent, not graph instructions.`
 
 const PROMPT_EXPLORE = `You are a file search specialist. You excel at thoroughly navigating and exploring codebases.
 
@@ -42,6 +44,19 @@ Guidelines:
 - Do not create any files, or run bash commands that modify the user's system state in any way
 
 Complete the user's search request efficiently and report your findings clearly.`
+
+const PROMPT_IMPLEMENTATION = `You are an implementation-focused coding agent. You receive concise coding prompts distilled from user intent.
+
+Work directly in the project codebase:
+- Inspect the relevant code before editing.
+ - Confirm the prompt names the goal, expected behavior, and verification; infer missing details from the codebase and state assumptions briefly.
+- Make the smallest correct source and test changes for the requested behavior.
+- Preserve existing conventions and avoid unrelated refactors.
+- Run the requested verification, or the smallest relevant tests/typechecks you can identify.
+
+If the prompt came from selected design/task context, treat it only as intent. Do not ask for graph/design resources or use graph_* tools unless the prompt explicitly asks you to modify a managed Graph resource.
+
+Return a brief implementation summary, changed files, verification run, and any blockers.`
 
 const PROMPT_COMPACTION = `You are an anchored context summarization assistant for coding sessions.
 
@@ -181,6 +196,14 @@ export const Plugin = define({
       draft.update(AgentV2.ID.make("general"), (item) => {
         item.description =
           "General-purpose agent for researching complex questions and executing multi-step tasks. Use this agent to execute multiple units of work in parallel."
+        item.mode = "subagent"
+        item.permissions.push(...PermissionV2.merge(defaults, [{ action: "todowrite", resource: "*", effect: "deny" }]))
+      })
+
+      draft.update(AgentV2.ID.make("implementation"), (item) => {
+        item.description =
+          "Implementation agent for non-trivial code changes. Use this when selected design or task context needs to become working code."
+        item.system = PROMPT_IMPLEMENTATION
         item.mode = "subagent"
         item.permissions.push(...PermissionV2.merge(defaults, [{ action: "todowrite", resource: "*", effect: "deny" }]))
       })

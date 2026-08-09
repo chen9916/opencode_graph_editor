@@ -52,6 +52,7 @@ it.instance("returns default native agents when no config", () =>
     expect(names).toContain("plan")
     expect(names).toContain("graph")
     expect(names).toContain("general")
+    expect(names).toContain("implementation")
     expect(names).toContain("explore")
     expect(names).toContain("compaction")
     expect(names).toContain("title")
@@ -68,6 +69,7 @@ it.instance("graph agent is a first-class primary Graph mode", () =>
     expect(graph?.description).toContain("Graph editor")
     expect(graph?.prompt).toContain("graph_*")
     expect(graph?.prompt).toContain("Do not use MCP")
+    expect(graph?.prompt).toContain("normal coding task")
     expect(evalPerm(graph, "edit")).toBe("allow")
   }),
 )
@@ -181,6 +183,18 @@ it.instance("general agent denies todo tools", () =>
     expect(general?.mode).toBe("subagent")
     expect(general?.hidden).toBeUndefined()
     expect(evalPerm(general, "todowrite")).toBe("deny")
+  }),
+)
+
+it.instance("implementation agent is a coding subagent", () =>
+  Effect.gen(function* () {
+    const implementation = yield* load((svc) => svc.get("implementation"))
+    expect(implementation).toBeDefined()
+    expect(implementation?.mode).toBe("subagent")
+    expect(implementation?.description).toContain("non-trivial code changes")
+    expect(implementation?.prompt).toContain("expected behavior")
+    expect(evalPerm(implementation, "edit")).toBe("allow")
+    expect(evalPerm(implementation, "todowrite")).toBe("deny")
   }),
 )
 

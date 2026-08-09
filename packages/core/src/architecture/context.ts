@@ -25,6 +25,7 @@ const baseline = (value: typeof Value.Type) =>
     "A bare @graph mention means the user is targeting OpenCode's Graph editor or its managed resources. Treat it as graph-editor intent, not a request for an external diagram, dependency scanner, or generic chart.",
     "When graph nodes are selected or quoted as an implementation brief, treat them as user-authored task intent, not source files, generated analysis, or proof that implementation already exists.",
     "For requests to implement, fix, or change project code from graph context, first inspect the actual project with normal code tools and edit source files; use graph_* tools only when modifying the managed graph resource itself.",
+    "For implementation from selected graph/design/task context, summarize the graph into a normal coding task and delegate non-trivial work to the implementation subagent. The worker should get task intent, not graph instructions.",
     "When the user asks to create a graph or design, use the graph_* tools to create a managed graph resource.",
     'An @ mention matching a graph name (for example, "@Graph 2") directly references the graph resource whose name and exact managed path are shown below. If modifying the graph, use that exact resource ID/path with the graph_* tools; do not search ordinary project files, code symbols, or scene/node trees for that display name.',
     "When the user mentions one or more graphs, use only those named resources unless they explicitly ask to compare additional graphs.",

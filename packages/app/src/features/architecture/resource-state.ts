@@ -9,6 +9,14 @@ export function resolveArchitectureResourceID(
   return selectedID ?? resources?.[0]?.id
 }
 
+export function selectedArchitectureSnapshot(
+  resourceID: string | undefined,
+  snapshot: ArchitectureSnapshot | undefined,
+) {
+  if (!resourceID || snapshot?.resource.id !== resourceID) return undefined
+  return snapshot
+}
+
 export function architectureDraftResourceID(change: ArchitectureDraftChange) {
   return change.resource.id
 }

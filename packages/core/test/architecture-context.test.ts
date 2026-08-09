@@ -31,6 +31,8 @@ describe("ArchitectureContext", () => {
       expect(empty.baseline).toContain("A bare @graph mention")
       expect(empty.baseline).toContain("selected or quoted as an implementation brief")
       expect(empty.baseline).toContain("inspect the actual project with normal code tools")
+      expect(empty.baseline).toContain("summarize the graph into a normal coding task")
+      expect(empty.baseline).toContain("task intent, not graph instructions")
       expect(empty.baseline).toContain("create a managed graph resource")
       expect(empty.baseline).toContain("plan a readable layout")
       expect(empty.baseline).toContain("No Graph editor resources exist yet.")

@@ -14,6 +14,7 @@ export function architectureSelectionText(input: ArchitectureSelectionPrompt) {
     `Graph selection in resource ${input.resourceName} (${input.resourceID}).`,
     "Treat the selected graph elements as user-authored design/task context, not source code, implementation truth, or proof that code already exists.",
     "If the user asks to implement, fix, or change the program, inspect the actual project with normal code tools before editing and scope the work to this selected intent.",
+    "For implementation, summarize this selected intent into a short normal coding task and delegate non-trivial work to the implementation subagent. The worker should get task intent, not graph instructions.",
     "Use graph_* tools only when modifying this managed graph resource itself; do not edit graph JSON directly.",
     ...(nodeLines.length > 0 ? ["Selected nodes:", ...nodeLines] : []),
     input.nodes.length > nodeLimit ? `- ${input.nodes.length - nodeLimit} additional selected nodes omitted` : undefined,

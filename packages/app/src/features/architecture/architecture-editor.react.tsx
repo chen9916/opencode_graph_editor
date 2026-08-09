@@ -38,17 +38,19 @@ import { applyOperations, flattenJournal, operationID } from "./journal"
 import { tagColorsKey, toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } from "./model"
 import { ArchitectureEdgeView } from "./architecture-edge.react"
 import { ArchitectureNodeView } from "./architecture-node.react"
+import {
+  additiveSelectionModifierAfterKeyboardChange,
+  hasAdditiveSelectionModifier,
+  selectionForGestureChange,
+  type Selection,
+  type SelectionGesture,
+} from "./selection-state"
 
 const nodeTypes = { architecture: ArchitectureNodeView }
 const edgeTypes = { architecture: ArchitectureEdgeView }
 const connectionSides = ["top", "right", "bottom", "left"] as const satisfies ReadonlyArray<ArchitectureConnectionSide>
 
 type SingleSelection = { readonly type: "node" | "edge"; readonly id: string }
-type Selection = {
-  readonly nodeIDs: ReadonlyArray<string>
-  readonly edgeIDs: ReadonlyArray<string>
-  readonly primary?: SingleSelection
-}
 type ContextMenu =
   | { readonly type: "pane"; readonly x: number; readonly y: number; readonly position: XYPosition }
   | {
@@ -93,6 +95,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const reconnectedEdgeIDs = useRef(new Set<string>())
   const selectionRef = useRef<Selection>(emptySelection)
   const pendingSelection = useRef<Selection>()
+  const selectionGesture = useRef<SelectionGesture>()
+  const additiveSelectionModifier = useRef(false)
   const handledAction = useRef<number>()
   const suppressEmptySelectionUntil = useRef(0)
   const connecting = useRef(false)
@@ -174,6 +178,13 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     applySelection(selected)
   }
 
+  const clearSelectionGesture = () => {
+    selectionGesture.current = undefined
+    additiveSelectionModifier.current = false
+  }
+
+  const clearSelectionGestureAfterReactFlow = () => queueMicrotask(clearSelectionGesture)
+
   useEffect(() => {
     const pointer = (event: PointerEvent) => {
       if (
@@ -196,6 +207,28 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     return () => {
       document.removeEventListener("pointerdown", pointer)
       document.removeEventListener("keydown", keyboard)
+    }
+  }, [])
+
+  useEffect(() => {
+    const keyboard = (event: KeyboardEvent) => {
+      additiveSelectionModifier.current = additiveSelectionModifierAfterKeyboardChange(
+        event,
+        selectionGesture.current,
+        additiveSelectionModifier.current,
+      )
+    }
+    window.addEventListener("keydown", keyboard)
+    window.addEventListener("keyup", keyboard)
+    window.addEventListener("pointerup", clearSelectionGestureAfterReactFlow)
+    window.addEventListener("pointercancel", clearSelectionGestureAfterReactFlow)
+    window.addEventListener("blur", clearSelectionGestureAfterReactFlow)
+    return () => {
+      window.removeEventListener("keydown", keyboard)
+      window.removeEventListener("keyup", keyboard)
+      window.removeEventListener("pointerup", clearSelectionGestureAfterReactFlow)
+      window.removeEventListener("pointercancel", clearSelectionGestureAfterReactFlow)
+      window.removeEventListener("blur", clearSelectionGestureAfterReactFlow)
     }
   }, [])
 
@@ -397,7 +430,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const onSelectionChange = (change: OnSelectionChangeParams<ArchitectureFlowNode, ArchitectureFlowEdge>) => {
     const next = selectionFromChange(change)
     if (isEmptySelection(next) && (connecting.current || performanceNow() < suppressEmptySelectionUntil.current)) return
-    applySelection(next)
+    if (selectionGesture.current && !additiveSelectionModifier.current) selectionGesture.current = undefined
+    applySelection(selectionForGestureChange(selectionGesture.current, additiveSelectionModifier.current, next))
   }
 
   const onConnect = (connection: Connection) => {
@@ -755,6 +789,11 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onSelectionChange={onSelectionChange}
+            onSelectionStart={(event) => {
+              additiveSelectionModifier.current = hasAdditiveSelectionModifier(event)
+              selectionGesture.current = additiveSelectionModifier.current ? { base: selectionRef.current } : undefined
+            }}
+            onSelectionEnd={clearSelectionGestureAfterReactFlow}
             onConnectStart={() => {
               connecting.current = true
               suppressEmptySelectionUntil.current = performanceNow() + 220
@@ -790,6 +829,19 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               applySelection(next)
               setAskPopover(undefined)
               setContextMenu({ type: "node", id: node.id, selection: next, ...at })
+            }}
+            onNodeClick={(event, node) => {
+              event.stopPropagation()
+              if (event.shiftKey) {
+                const next = selectionWithNode({ type: "node", id: node.id }, selectionRef.current)
+                pendingSelection.current = next
+                suppressEmptySelectionUntil.current = performanceNow() + 220
+                applySelection(next)
+              } else if (!event.ctrlKey && !event.metaKey) {
+                select({ type: "node", id: node.id })
+              }
+              setContextMenu(undefined)
+              setAskPopover(undefined)
             }}
             onEdgeClick={(event, edge) => {
               event.stopPropagation()
@@ -1529,6 +1581,14 @@ function selectionForContextTarget(target: SingleSelection, current: Selection):
     target.type === "node" ? current.nodeIDs.includes(target.id) : current.edgeIDs.includes(target.id)
   if (targetSelected && current.nodeIDs.length + current.edgeIDs.length > 1) return { ...current, primary: target }
   return selectionFromSingle(target)
+}
+
+function selectionWithNode(target: { readonly type: "node"; readonly id: string }, current: Selection): Selection {
+  return {
+    nodeIDs: current.nodeIDs.includes(target.id) ? current.nodeIDs : [...current.nodeIDs, target.id],
+    edgeIDs: current.edgeIDs,
+    primary: target,
+  }
 }
 
 function selectionFromChange(change: OnSelectionChangeParams<ArchitectureFlowNode, ArchitectureFlowEdge>): Selection {

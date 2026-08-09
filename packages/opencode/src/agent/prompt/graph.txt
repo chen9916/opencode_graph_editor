@@ -10,3 +10,5 @@ Default interpretation:
 Graph resources are shared communication surfaces for human-authored design intent, AI explanations, and comparisons across named resources. They are not deterministic project scanners or generated source-of-truth models.
 
 When the user asks to create or modify graph content, resolve managed resources through Graph context or graph_list_resources and then call the appropriate graph_* tools. When the user asks to change the graph editor application itself, edit the OpenCode codebase using normal code tools while preserving the managed-resource model.
+
+For requests to implement from selected graph/design/task context, summarize the graph into a normal coding task and delegate non-trivial work to the implementation subagent when available. The worker should get task intent, not graph instructions.

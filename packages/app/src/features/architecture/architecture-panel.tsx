@@ -68,6 +68,7 @@ import {
   latestArchitectureSnapshot,
   reconcileArchitectureSavedEvent,
   resolveArchitectureResourceID,
+  selectedArchitectureSnapshot,
   updateArchitectureResourceSummaries,
 } from "./resource-state"
 import { architectureSelectionText } from "./selection-prompt"
@@ -106,23 +107,36 @@ export default function ArchitecturePanel() {
     refetchIntervalInBackground: true,
   }))
   const resourceID = createMemo(() => resolveArchitectureResourceID(persistedState.selectedID, resources.data))
-  const resource = createQuery(() => ({
-    queryKey: architectureResourceQueryKey(sdk().url, sdk().directory, resourceID() ?? ""),
-    enabled: architectureAvailable() === true && !!resourceID(),
-    queryFn: ({ signal }) => loadArchitectureResource(serverSDK().currentApi, sdk().directory, resourceID()!, signal),
-    refetchInterval: state.busy ? false : 2_000,
-    refetchIntervalInBackground: true,
-    reconcile: latestArchitectureSnapshot,
-  }))
-  const liveDraft = createQuery(() => ({
-    queryKey: architectureResourceDraftQueryKey(sdk().url, sdk().directory, resourceID() ?? ""),
-    enabled: architectureAvailable() === true && !!resourceID(),
-    queryFn: ({ signal }) =>
-      loadArchitectureResourceDraft(serverSDK().currentApi, sdk().directory, resourceID()!, signal),
-    refetchInterval: state.busy ? false : 2_000,
-    refetchIntervalInBackground: true,
-    reconcile: latestArchitectureLiveDraftCache,
-  }))
+  const resource = createQuery(() => {
+    const id = resourceID()
+    return {
+      queryKey: architectureResourceQueryKey(sdk().url, sdk().directory, id ?? ""),
+      enabled: architectureAvailable() === true && !!id,
+      queryFn: ({ signal }) => loadArchitectureResource(serverSDK().currentApi, sdk().directory, id!, signal),
+      refetchInterval: state.busy ? false : 2_000,
+      refetchIntervalInBackground: true,
+      reconcile: latestArchitectureSnapshot,
+    }
+  })
+  const liveDraft = createQuery(() => {
+    const id = resourceID()
+    return {
+      queryKey: architectureResourceDraftQueryKey(sdk().url, sdk().directory, id ?? ""),
+      enabled: architectureAvailable() === true && !!id,
+      queryFn: ({ signal }) => loadArchitectureResourceDraft(serverSDK().currentApi, sdk().directory, id!, signal),
+      refetchInterval: state.busy ? false : 2_000,
+      refetchIntervalInBackground: true,
+      reconcile: latestArchitectureLiveDraftCache,
+    }
+  })
+  const activeSnapshot = createMemo(() => selectedArchitectureSnapshot(resourceID(), resource.data))
+  const activeLiveDraft = createMemo(() => {
+    const id = resourceID()
+    const current = liveDraft.data
+    if (!id || current === undefined || current === null) return current
+    if (current.snapshot.resource.id !== id) return undefined
+    return current
+  })
   const draftSynchronizer = (id: string) => {
     const key = draftSynchronizerKey(sdk().url, sdk().directory, id)
     const current = draftSynchronizers.get(key)
@@ -143,8 +157,8 @@ export default function ArchitecturePanel() {
   const draft = createMemo(() => {
     const id = resourceID()
     const current = id ? persistedState.drafts[id] : undefined
-    const snapshot = resource.data
-    const live = liveDraft.data
+    const snapshot = activeSnapshot()
+    const live = activeLiveDraft()
     if (live && snapshot) {
       if (!current)
         return {
@@ -544,7 +558,7 @@ export default function ArchitecturePanel() {
   }
 
   const removeResource = () => {
-    const current = resource.data
+    const current = activeSnapshot()
     if (!current || state.busy) return
     confirm(language.t("architecture.confirm.deleteResource"), labels().delete, () => {
       setState("busy", true)
@@ -651,7 +665,7 @@ export default function ArchitecturePanel() {
           <ButtonV2 variant="ghost" onClick={() => void createResource()} disabled={state.busy}>
             {language.t("architecture.resource.new")}
           </ButtonV2>
-          <ButtonV2 variant="ghost" onClick={removeResource} disabled={state.busy || !resource.data}>
+          <ButtonV2 variant="ghost" onClick={removeResource} disabled={state.busy || !activeSnapshot()}>
             {language.t("architecture.resource.delete")}
           </ButtonV2>
         </header>
@@ -669,35 +683,33 @@ export default function ArchitecturePanel() {
                 fallback={<ArchitectureMessage value={language.t("architecture.panel.empty.description")} />}
               >
                 <Show
-                  when={!resource.isPending}
-                  fallback={<ArchitectureMessage value={language.t("architecture.panel.loading")} />}
+                  when={!resource.error}
+                  fallback={<ArchitectureMessage value={language.t("architecture.panel.error")} />}
                 >
                   <Show
-                    when={!resource.error}
-                    fallback={<ArchitectureMessage value={language.t("architecture.panel.error")} />}
+                    when={activeSnapshot()}
+                    fallback={<ArchitectureMessage value={language.t("architecture.panel.loading")} />}
                   >
-                    <Show when={resource.data}>
-                      <ArchitectureIsland
-                        direction={language.direction()}
-                        mobile={mobile()}
-                        snapshot={resource.data!}
-                        draft={draft()}
-                        viewport={viewport()}
-                        busy={state.busy}
-                        action={state.action}
-                        labels={labels()}
-                        onJournal={journal}
-                        onViewport={(value) => {
-                          const id = resourceID()
-                          if (id) setPersistedState("viewports", id, value)
-                        }}
-                        onSave={(change) => void save(change)}
-                        onAskSelection={askSelection}
-                        onReload={reload}
-                        onExport={exportPatch}
-                        onConfirm={confirm}
-                      />
-                    </Show>
+                    <ArchitectureIsland
+                      direction={language.direction()}
+                      mobile={mobile()}
+                      snapshot={activeSnapshot()!}
+                      draft={draft()}
+                      viewport={viewport()}
+                      busy={state.busy}
+                      action={state.action}
+                      labels={labels()}
+                      onJournal={journal}
+                      onViewport={(value) => {
+                        const id = resourceID()
+                        if (id) setPersistedState("viewports", id, value)
+                      }}
+                      onSave={(change) => void save(change)}
+                      onAskSelection={askSelection}
+                      onReload={reload}
+                      onExport={exportPatch}
+                      onConfirm={confirm}
+                    />
                   </Show>
                 </Show>
               </Show>

@@ -77,7 +77,7 @@ function architectureReference(part: SessionV1.FilePart) {
   const mention = part.source && "text" in part.source ? part.source.text.value.trim() : ""
   const managedPath = architectureResourcePath(part)
   const resourceID = (part.filename ?? managedPath?.split("/").at(-1))?.replace(/\.json$/i, "")
-  return `Graph editor reference: ${mention || resourceID || "the referenced graph"} identifies the managed graph resource${resourceID ? ` with ID ${resourceID}` : ""}${managedPath ? ` at ${managedPath}` : ""}. Treat graph content as user-authored design/task context, not source code or implementation truth. For implement/fix project-code requests, inspect and edit the actual project with normal code tools. Use graph_* tools only when modifying the managed graph resource itself; do not search ordinary project files or scene/node names for this graph display name, and do not edit graph JSON directly.`
+  return `Graph editor reference: ${mention || resourceID || "the referenced graph"} identifies the managed graph resource${resourceID ? ` with ID ${resourceID}` : ""}${managedPath ? ` at ${managedPath}` : ""}. Treat graph content as user-authored design/task context, not source code or implementation truth. For implementation requests, summarize it into a normal coding task and delegate non-trivial work to the implementation subagent. The worker should get task intent, not graph instructions. Use graph_* tools only when modifying the managed graph resource itself; do not search ordinary project files or scene/node names for this graph display name, and do not edit graph JSON directly.`
 }
 
 export const Event = {

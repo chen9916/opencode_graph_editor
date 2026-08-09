@@ -23,6 +23,8 @@ describe("architecture selection prompt", () => {
     expect(text).toContain("user-authored design/task context")
     expect(text).toContain("not source code, implementation truth")
     expect(text).toContain("inspect the actual project with normal code tools")
+    expect(text).toContain("summarize this selected intent into a short normal coding task")
+    expect(text).toContain("task intent, not graph instructions")
     expect(text).toContain("Use graph_* tools only when modifying this managed graph resource itself")
     expect(text).toContain("selection-as-brief")
     expect(text).toContain("User request:\nImplement this")

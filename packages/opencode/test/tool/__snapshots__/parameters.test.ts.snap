@@ -314,7 +314,7 @@ exports[`tool parameters JSON Schema (wire shape) task 1`] = `
       "type": "string",
     },
     "prompt": {
-      "description": "The task for the agent to perform",
+      "description": "The task for the agent to perform. For implementation work from selected design/task context, give a short normal coding task distilled from the graph intent; do not pass graph instructions or jargon.",
       "type": "string",
     },
     "subagent_type": {

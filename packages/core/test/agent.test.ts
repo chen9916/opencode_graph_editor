@@ -120,15 +120,28 @@ describe("AgentV2", () => {
         "explore",
         "general",
         "graph",
+        "implementation",
         "plan",
         "summary",
         "title",
       ])
-      expect(yield* agent.get(AgentV2.ID.make("graph"))).toMatchObject({
+      expect(yield* agent.get(AgentV2.ID.make("build"))).toMatchObject({
+        mode: "primary",
+        system: expect.stringContaining("normal coding task"),
+      })
+      expect(yield* agent.get(AgentV2.ID.make("implementation"))).toMatchObject({
+        description: expect.stringContaining("non-trivial code changes"),
+        mode: "subagent",
+        system: expect.stringContaining("expected behavior"),
+      })
+      const graph = yield* agent.get(AgentV2.ID.make("graph"))
+      const graphSystem = String(graph?.system ?? "")
+      expect(graph).toMatchObject({
         description: expect.stringContaining("Graph editor"),
         mode: "primary",
         system: expect.stringContaining("graph_*"),
       })
+      expect(graphSystem).toContain("normal coding task")
       for (const item of agents) {
         expect(item.permissions.some((rule) => rule.action === "bash" && rule.effect !== "deny")).toBe(false)
       }

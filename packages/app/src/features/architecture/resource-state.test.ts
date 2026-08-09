@@ -7,6 +7,7 @@ import {
   latestArchitectureSnapshot,
   reconcileArchitectureSavedEvent,
   resolveArchitectureResourceID,
+  selectedArchitectureSnapshot,
   updateArchitectureResourceSummaries,
 } from "./resource-state"
 
@@ -32,6 +33,14 @@ describe("architecture resource state", () => {
     expect(optimistic.map((resource) => resource.id)).toEqual(["auth_resourceID", "new_graph"])
     expect(resolveArchitectureResourceID(created.resource.id, optimistic)).toBe("new_graph")
     expect(resolveArchitectureResourceID(created.resource.id, [auth])).toBe("new_graph")
+  })
+
+  test("ignores snapshots that do not belong to the active resource", () => {
+    const auth = snapshot("auth_resourceID", "Auth")
+    const billing = snapshot("billing_resourceID", "Billing")
+
+    expect(selectedArchitectureSnapshot("billing_resourceID", auth)).toBeUndefined()
+    expect(selectedArchitectureSnapshot("billing_resourceID", billing)).toBe(billing)
   })
 
   test("routes an Add Node journal to the graph represented by the editor change", () => {

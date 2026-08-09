@@ -13,6 +13,7 @@ import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
 import PROMPT_GRAPH from "./prompt/graph.txt"
+import PROMPT_IMPLEMENTATION from "./prompt/implementation.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
@@ -206,6 +207,21 @@ const layer = Layer.effect(
               }),
               user,
             ),
+            options: {},
+            mode: "subagent",
+            native: true,
+          },
+          implementation: {
+            name: "implementation",
+            description: `Implementation agent for non-trivial code changes. Use this when selected design or task context needs to become working code.`,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                todowrite: "deny",
+              }),
+              user,
+            ),
+            prompt: PROMPT_IMPLEMENTATION,
             options: {},
             mode: "subagent",
             native: true,
