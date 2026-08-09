@@ -13,6 +13,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
 import { ArchitectureGraph } from "@opencode-ai/core/architecture/graph"
 import { LocationServiceMap } from "@opencode-ai/core/location-services"
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { InstanceRef } from "@/effect/instance-ref"
 import {
   CallToolRequestSchema,
   LATEST_PROTOCOL_VERSION,
@@ -152,6 +153,11 @@ async function buildTool() {
     Layer.mock(Session.Service, {
       get: () => Effect.succeed({ directory: "/tmp/opencode-code-mode-integration-test", permission: [] } as any),
     }),
+    Layer.succeed(InstanceRef, {
+      directory: "/tmp/opencode-code-mode-integration-test",
+      worktree: "/",
+      project: { id: "project_test" },
+    } as any),
     Layer.mock(MCP.Service, {
       tools: () => Effect.succeed(mcpTools),
       clients: () => Effect.succeed({ [SERVER]: {} as any }),

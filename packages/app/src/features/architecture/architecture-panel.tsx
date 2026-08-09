@@ -46,6 +46,7 @@ import type {
 import {
   architectureResourceEventInfo,
   architectureResourceDraftEventCache,
+  architectureDraftEventIsStale,
   architectureResourceDraftEventInfo,
   architectureSnapshotMatchesEvent,
   architectureSummaryMatchesEvent,
@@ -53,7 +54,13 @@ import {
   isArchitectureLocalSaveEvent,
 } from "./event"
 import { rebaseOperations } from "./journal"
-import { architectureLiveDraftCache, createArchitectureDraftSynchronizer, rebaseArchitectureDraft } from "./live-draft"
+import {
+  architectureLiveDraftCache,
+  createArchitectureDraftSynchronizer,
+  discardSavedArchitectureLiveDraftCache,
+  latestArchitectureLiveDraftCache,
+  rebaseArchitectureDraft,
+} from "./live-draft"
 import { architectureResourceMention } from "./mention"
 import {
   architectureDraftResourceID,
@@ -95,18 +102,26 @@ export default function ArchitecturePanel() {
     queryKey: architectureResourcesQueryKey(sdk().url, sdk().directory),
     enabled: architectureAvailable() === true,
     queryFn: ({ signal }) => listArchitectureResources(serverSDK().currentApi, sdk().directory, signal),
+    refetchInterval: state.busy ? false : 2_000,
+    refetchIntervalInBackground: true,
   }))
   const resourceID = createMemo(() => resolveArchitectureResourceID(persistedState.selectedID, resources.data))
   const resource = createQuery(() => ({
     queryKey: architectureResourceQueryKey(sdk().url, sdk().directory, resourceID() ?? ""),
     enabled: architectureAvailable() === true && !!resourceID(),
     queryFn: ({ signal }) => loadArchitectureResource(serverSDK().currentApi, sdk().directory, resourceID()!, signal),
+    refetchInterval: state.busy ? false : 2_000,
+    refetchIntervalInBackground: true,
+    reconcile: latestArchitectureSnapshot,
   }))
   const liveDraft = createQuery(() => ({
     queryKey: architectureResourceDraftQueryKey(sdk().url, sdk().directory, resourceID() ?? ""),
     enabled: architectureAvailable() === true && !!resourceID(),
     queryFn: ({ signal }) =>
       loadArchitectureResourceDraft(serverSDK().currentApi, sdk().directory, resourceID()!, signal),
+    refetchInterval: state.busy ? false : 2_000,
+    refetchIntervalInBackground: true,
+    reconcile: latestArchitectureLiveDraftCache,
   }))
   const draftSynchronizer = (id: string) => {
     const key = draftSynchronizerKey(sdk().url, sdk().directory, id)
@@ -247,12 +262,21 @@ export default function ArchitecturePanel() {
 
   createEffect(() => {
     const current = sdk()
+    const api = serverSDK().currentApi
     const unsubscribe = serverSDK().event.on(current.directory, (event) => {
       const type = String(event.type)
       const resourcesKey = architectureResourcesQueryKey(current.url, current.directory)
       const draftEventInfo = architectureResourceDraftEventInfo({ type, properties: event.properties })
       if (draftEventInfo) {
         const draftKey = architectureResourceDraftQueryKey(current.url, current.directory, draftEventInfo.resourceID)
+        const resourceKey = architectureResourceQueryKey(current.url, current.directory, draftEventInfo.resourceID)
+        if (
+          architectureDraftEventIsStale(
+            queryClient.getQueryData<ArchitectureSnapshot>(resourceKey),
+            draftEventInfo,
+          )
+        )
+          return
         const eventDraft = architectureResourceDraftEventCache(draftEventInfo)
         if (eventDraft === null) {
           void draftSynchronizers
@@ -265,11 +289,21 @@ export default function ArchitecturePanel() {
           queryClient.setQueryData(draftKey, eventDraft)
           return
         }
-        void queryClient.refetchQueries({
-          queryKey: draftKey,
-          exact: true,
-          type: "active",
-        })
+        void loadArchitectureResourceDraftSnapshot(api, current.directory, draftEventInfo.resourceID).then(
+          (snapshot) => {
+            const next = architectureLiveDraftCache(snapshot)
+            queryClient.setQueryData(draftKey, (current: ArchitectureLiveDraftCache | undefined) =>
+              latestArchitectureLiveDraftCache(current, next),
+            )
+          },
+          () => {
+            void queryClient.refetchQueries({
+              queryKey: draftKey,
+              exact: true,
+              type: "active",
+            })
+          },
+        )
         return
       }
       const eventInfo = architectureResourceEventInfo({ type, properties: event.properties })
@@ -349,6 +383,11 @@ export default function ArchitecturePanel() {
       resourceID: id,
     })
     try {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: resourceKey, exact: true }),
+        queryClient.cancelQueries({ queryKey: draftKey, exact: true }),
+        queryClient.cancelQueries({ queryKey: resourcesKey, exact: true }),
+      ])
       const synchronized = await synchronizer.synchronizeAuthoritative(
         () => loadArchitectureResourceDraftSnapshot(serverSDK().currentApi, sdk().directory, id),
         change.resource,
@@ -359,11 +398,9 @@ export default function ArchitecturePanel() {
       const conflicts = change.conflicts
       batch(() => {
         queryClient.setQueryData(resourceKey, settled)
-        queryClient.setQueryData<ArchitectureLiveDraftCache>(draftKey, (current) => {
-          if (!current) return null
-          if (current.snapshot.resource.revision !== synchronized.resource.revision) return current
-          return current.snapshot.digest === synchronized.digest ? null : current
-        })
+        queryClient.setQueryData<ArchitectureLiveDraftCache>(draftKey, (current) =>
+          discardSavedArchitectureLiveDraftCache(current, settled),
+        )
         queryClient.setQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
           updateArchitectureResourceSummaries(current, architectureResourceSummary(settled)),
         )

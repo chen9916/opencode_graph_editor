@@ -22,6 +22,31 @@ export function architectureLiveDraftCache(draft: ArchitectureDraftSnapshot): Ar
   return null
 }
 
+export function latestArchitectureLiveDraftCache(
+  current: ArchitectureLiveDraftCache | undefined,
+  candidate: ArchitectureLiveDraftCache,
+) {
+  if (!candidate) return candidate
+  if (current?.snapshot.resource.id !== candidate.snapshot.resource.id) return candidate
+  if (current.snapshot.resource.revision > candidate.snapshot.resource.revision) return current
+  if (
+    current.snapshot.resource.revision === candidate.snapshot.resource.revision &&
+    current.snapshot.digest === candidate.snapshot.digest
+  )
+    return current
+  return candidate
+}
+
+export function discardSavedArchitectureLiveDraftCache(
+  current: ArchitectureLiveDraftCache | undefined,
+  saved: ArchitectureSnapshot,
+) {
+  if (!current) return null
+  if (current.snapshot.resource.id !== saved.resource.id) return current
+  if (current.snapshot.resource.revision <= saved.resource.revision) return null
+  return current
+}
+
 export function sameArchitectureResource(left: ArchitectureResource, right: ArchitectureResource) {
   return canonical(left) === canonical(right)
 }

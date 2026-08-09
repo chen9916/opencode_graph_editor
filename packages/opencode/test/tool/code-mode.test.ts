@@ -16,6 +16,7 @@ import { Tool } from "@/tool/tool"
 import * as Truncate from "@/tool/truncate"
 import { MessageID, SessionID } from "@/session/schema"
 import { Cause, Effect, Exit, Layer, Schema } from "effect"
+import { InstanceRef } from "@/effect/instance-ref"
 
 const ctx: Tool.Context = {
   sessionID: SessionID.make("ses_code-mode"),
@@ -49,6 +50,8 @@ function harness(input: {
   trigger?: Plugin.Interface["trigger"]
   graph?: Partial<ArchitectureGraph.Interface>
   workspaceID?: string
+  sessionDirectory?: string
+  instanceDirectory?: string | false
   location?: (ref: Location.Ref) => void
 }) {
   return Layer.mergeAll(
@@ -64,11 +67,20 @@ function harness(input: {
     Layer.mock(Session.Service, {
       get: () =>
         Effect.succeed({
-          directory: "/tmp/opencode-code-mode-test",
+          directory: input.sessionDirectory ?? "/tmp/opencode-code-mode-test",
           permission: [],
           workspaceID: input.workspaceID,
         } as any),
     }),
+    ...(input.instanceDirectory === false
+      ? []
+      : [
+          Layer.succeed(InstanceRef, {
+            directory: input.instanceDirectory ?? "/tmp/opencode-code-mode-test",
+            worktree: "/",
+            project: { id: "project_test" },
+          } as any),
+        ]),
     Layer.mock(MCP.Service, {
       tools: () => Effect.succeed(input.mcpTools),
       clients: () => Effect.succeed(Object.fromEntries(input.servers.map((name) => [name, {} as any]))),
@@ -207,6 +219,17 @@ describe("code mode execute", () => {
     )
     expect(tool.description).not.toContain("Available tools")
     expect(tool.description).not.toContain("list_issues")
+  })
+
+  test("initializes without an InstanceRef", async () => {
+    const tool = await Effect.runPromise(
+      CodeModeTool.pipe(
+        Effect.flatMap(Tool.init),
+        Effect.provide(harness({ mcpTools: {}, servers: [], instanceDirectory: false })),
+      ),
+    )
+
+    expect(tool.id).toBe(CODE_MODE_TOOL)
   })
 
   test("small catalogs inline every full signature in the appended catalog", () => {
@@ -405,6 +428,8 @@ describe("code mode execute", () => {
             mcpTools: {},
             servers: [],
             workspaceID: "wrk_test",
+            sessionDirectory: "/tmp/opencode-session-worktree",
+            instanceDirectory: "/tmp/opencode-editor-project",
             location: (ref) => refs.push(ref),
           }),
         ),
@@ -413,7 +438,7 @@ describe("code mode execute", () => {
 
     await Effect.runPromise(tool.execute({ code: "return await tools.graph.list_resources({})" }, ctx))
 
-    expect(refs).toEqual([{ directory: AbsolutePath.make("/tmp/opencode-code-mode-test"), workspaceID: undefined }])
+    expect(refs).toEqual([{ directory: AbsolutePath.make("/tmp/opencode-editor-project"), workspaceID: undefined }])
     expect(Object.hasOwn(refs[0]!, "workspaceID")).toBe(true)
   })
 

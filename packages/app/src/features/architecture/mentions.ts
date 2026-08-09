@@ -14,6 +14,8 @@ export function useArchitectureResourceMentions() {
     queryKey: architectureResourcesQueryKey(sdk().url, sdk().directory),
     enabled: available() === true,
     queryFn: ({ signal }) => listArchitectureResources(serverSDK().currentApi, sdk().directory, signal).catch(() => []),
+    refetchInterval: 2_000,
+    refetchIntervalInBackground: true,
   }))
   createEffect(() => {
     const current = sdk()

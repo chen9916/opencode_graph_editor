@@ -16,6 +16,10 @@ export type ArchitectureResourceEventInfo = {
 export type ArchitectureResourceDraftEventInfo = {
   readonly resourceID: string
   readonly action: "updated" | "discarded"
+  readonly revision?: number
+  readonly digest?: string
+  readonly baseRevision?: number
+  readonly baseDigest?: string
   readonly draft?: ArchitectureLiveDraft
 }
 
@@ -83,8 +87,20 @@ export function architectureResourceDraftEventInfo(
   const payload = architectureEventPayload(event)
   const resourceID = typeof payload?.resourceID === "string" ? payload.resourceID : undefined
   if (!resourceID) return
+  const revision = typeof payload?.revision === "number" ? payload.revision : undefined
+  const digest = typeof payload?.digest === "string" ? payload.digest : undefined
+  const baseRevision = typeof payload?.baseRevision === "number" ? payload.baseRevision : undefined
+  const baseDigest = typeof payload?.baseDigest === "string" ? payload.baseDigest : undefined
   const draft = architectureEventDraft(payload)
-  return { resourceID, action, draft }
+  return {
+    resourceID,
+    action,
+    ...(revision === undefined ? {} : { revision }),
+    ...(digest === undefined ? {} : { digest }),
+    ...(baseRevision === undefined ? {} : { baseRevision }),
+    ...(baseDigest === undefined ? {} : { baseDigest }),
+    draft,
+  }
 }
 
 export function architectureResourceDraftEventCache(event: ArchitectureResourceDraftEventInfo) {
@@ -123,6 +139,23 @@ export function architectureSnapshotCoversEvent(
   if (snapshot?.resource.id !== event.resourceID) return false
   if (snapshot.resource.revision > event.revision) return true
   return architectureSnapshotMatchesEvent(snapshot, event)
+}
+
+export function architectureDraftEventIsStale(
+  snapshot: ArchitectureSnapshot | undefined,
+  event: ArchitectureResourceDraftEventInfo,
+) {
+  if (!snapshot || snapshot.resource.id !== event.resourceID) return false
+  if (event.action === "updated") {
+    if (event.baseRevision === undefined || event.baseDigest === undefined) return false
+    if (snapshot.resource.revision > event.baseRevision) return true
+    if (snapshot.resource.revision < event.baseRevision) return false
+    return snapshot.digest !== event.baseDigest
+  }
+  if (event.revision === undefined || event.digest === undefined) return false
+  if (snapshot.resource.revision > event.revision) return true
+  if (snapshot.resource.revision < event.revision) return false
+  return snapshot.digest !== event.digest
 }
 
 function architectureEventPayload(event: ArchitectureResourceEvent) {

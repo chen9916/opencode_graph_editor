@@ -1,0 +1,519 @@
+{
+  "version": 2,
+  "revision": 3,
+  "id": "system-overview",
+  "name": "System Overview",
+  "tagColors": {
+    "ai": "#f59e0b",
+    "backend": "#2563eb",
+    "core": "#7c3aed",
+    "frontend": "#16a34a",
+    "integration": "#db2777",
+    "storage": "#64748b",
+    "tools": "#0284c7"
+  },
+  "nodes": [
+    {
+      "id": "ai-tools",
+      "text": "AI providers / tools",
+      "tags": [
+        "ai",
+        "tools"
+      ],
+      "layout": {
+        "position": {
+          "x": -80,
+          "y": 200
+        }
+      }
+    },
+    {
+      "id": "client-sdk",
+      "text": "Client SDK",
+      "tags": [
+        "backend"
+      ],
+      "layout": {
+        "position": {
+          "x": 583.3887109806745,
+          "y": -6.8183007995161375
+        }
+      }
+    },
+    {
+      "id": "desktop-ui",
+      "text": "Desktop app / UI",
+      "tags": [
+        "frontend"
+      ],
+      "layout": {
+        "position": {
+          "x": -320,
+          "y": -140
+        }
+      }
+    },
+    {
+      "id": "graph-editor",
+      "text": "Graph editor",
+      "tags": [
+        "frontend",
+        "integration"
+      ],
+      "layout": {
+        "position": {
+          "x": -320,
+          "y": 60
+        }
+      }
+    },
+    {
+      "id": "live-conflict-guard",
+      "text": "Conflict guard — if the saved base changed, commit stops instead of overwriting newer disk data.",
+      "tags": [
+        "backend",
+        "storage"
+      ],
+      "layout": {
+        "position": {
+          "x": 0,
+          "y": 740
+        }
+      }
+    },
+    {
+      "id": "live-events-sync",
+      "text": "Change events sync UI — draft updates, reloads, and discards refresh the visible canvas.",
+      "tags": [
+        "core",
+        "frontend"
+      ],
+      "layout": {
+        "position": {
+          "x": -360,
+          "y": 700
+        }
+      }
+    },
+    {
+      "id": "live-load-base",
+      "text": "Starts from saved base — loads the disk resource with its revision and digest.",
+      "tags": [
+        "core",
+        "storage"
+      ],
+      "layout": {
+        "position": {
+          "x": 142.21057703828615,
+          "y": 188.30564525791746
+        }
+      }
+    },
+    {
+      "id": "live-patch-draft",
+      "text": "Patches in memory — editor and AI tools change nodes, tags, positions, and wires without writing disk.",
+      "tags": [
+        "core",
+        "tools"
+      ],
+      "layout": {
+        "position": {
+          "x": -360,
+          "y": 540
+        }
+      }
+    },
+    {
+      "id": "live-reload-discard",
+      "text": "Reload/discard — drops unsaved RAM changes and returns to the saved disk version.",
+      "tags": [
+        "core",
+        "storage"
+      ],
+      "layout": {
+        "position": {
+          "x": 360,
+          "y": 700
+        }
+      }
+    },
+    {
+      "id": "live-save-commit",
+      "text": "Save commits — the RAM draft is written as a new persisted graph revision on disk.",
+      "tags": [
+        "core",
+        "storage"
+      ],
+      "layout": {
+        "position": {
+          "x": 360,
+          "y": 540
+        }
+      }
+    },
+    {
+      "id": "live-shared-read",
+      "text": "Shared live reads — editor, API, and graph tools inspect the same current draft state.",
+      "tags": [
+        "backend",
+        "core"
+      ],
+      "layout": {
+        "position": {
+          "x": 0,
+          "y": 560
+        }
+      }
+    },
+    {
+      "id": "node_mslw55fx",
+      "text": "Live graph in RAM — temporary draft layer for one graph resource; edits are shared immediately but only become durable after Save.",
+      "tags": [
+        "core"
+      ],
+      "layout": {
+        "position": {
+          "x": 0,
+          "y": 380
+        }
+      }
+    },
+    {
+      "id": "node_mslw5ocz",
+      "text": "Saved graph on disk — durable persisted resource used after Save, Reload, or reopen.",
+      "tags": [
+        "storage"
+      ],
+      "layout": {
+        "position": {
+          "x": 522.9576815154596,
+          "y": 317.05303858697135
+        }
+      }
+    },
+    {
+      "id": "node_mslw64lx",
+      "text": "Editing tools — Graph editor and AI tools edit the live draft first; no disk write until Save.",
+      "tags": [
+        "frontend",
+        "tools"
+      ],
+      "layout": {
+        "position": {
+          "x": -459.489506883355,
+          "y": 308.2121543478855
+        }
+      }
+    },
+    {
+      "id": "open-code",
+      "text": "OpenCode",
+      "tags": [
+        "core"
+      ],
+      "layout": {
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "schema-storage",
+      "text": "Schema / storage",
+      "tags": [
+        "storage"
+      ],
+      "layout": {
+        "position": {
+          "x": 391.5139636328948,
+          "y": 49.16580592450852
+        }
+      }
+    },
+    {
+      "id": "server-api",
+      "text": "Server / API",
+      "tags": [
+        "backend"
+      ],
+      "layout": {
+        "position": {
+          "x": 320,
+          "y": -140
+        }
+      }
+    },
+    {
+      "id": "session-engine",
+      "text": "Session engine",
+      "tags": [
+        "core"
+      ],
+      "layout": {
+        "position": {
+          "x": 0,
+          "y": -220
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_fe6d220760014VyhlRpJsws0un",
+      "source": "open-code",
+      "target": "desktop-ui",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d22076002FPTxjEZTgPX1fE",
+      "source": "open-code",
+      "target": "session-engine",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d220760034shFciJOkJPFQo",
+      "source": "open-code",
+      "target": "server-api",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d22076004LOi0DBU6aNKazh",
+      "source": "open-code",
+      "target": "schema-storage",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d22076005Jfi3wHKGtw73Ep",
+      "source": "open-code",
+      "target": "ai-tools",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d22076006GumwRk6kaleCxM",
+      "source": "open-code",
+      "target": "graph-editor",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d22076007UFP4HUH0gDV2nw",
+      "source": "desktop-ui",
+      "target": "client-sdk",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d22076008aSZWsoPF7dv3dj",
+      "source": "desktop-ui",
+      "target": "graph-editor",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d22076009w7uF8o7EZjI3ac",
+      "source": "session-engine",
+      "target": "ai-tools",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d2207600aO7G3tjz3YUXoZa",
+      "source": "session-engine",
+      "target": "schema-storage",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d2207600bO0vk6VX8f01vME",
+      "source": "server-api",
+      "target": "client-sdk",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d2207600cISrrs4OzGqeRqP",
+      "source": "server-api",
+      "target": "schema-storage",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d2207600dd0c15kDNvD1gmI",
+      "source": "graph-editor",
+      "target": "server-api",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6e8c9b50019IXNH5DFWaUSTo",
+      "source": "node_mslw55fx",
+      "target": "node_mslw5ocz",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ea3a5d0010Rx8BIwDqyJSZL",
+      "source": "graph-editor",
+      "target": "node_mslw64lx",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ea3a5d002Jd4ZLq322mKWR3",
+      "source": "ai-tools",
+      "target": "node_mslw64lx",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ea3a5d003XyoLMto6LHgEpc",
+      "source": "server-api",
+      "target": "node_mslw55fx",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ea3a5d004lOJyhqI5mp1w2s",
+      "source": "schema-storage",
+      "target": "node_mslw5ocz",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ea3a5d005IWNWBlPV7ZFk8t",
+      "source": "node_mslw55fx",
+      "target": "schema-storage",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee08100011vKbEYznYT6P77",
+      "source": "node_mslw5ocz",
+      "target": "live-load-base",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee0810002gqNydnIhoLPW7d",
+      "source": "live-load-base",
+      "target": "node_mslw55fx",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee08100030EVJjgz4GytKRZ",
+      "source": "node_mslw64lx",
+      "target": "live-patch-draft",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee0810004zY7ZJFdSMwc41A",
+      "source": "live-patch-draft",
+      "target": "node_mslw55fx",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee0810005OGo1hK5MLwLmzl",
+      "source": "node_mslw55fx",
+      "target": "live-shared-read",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee0810006Nebd6AfdNObYSp",
+      "source": "node_mslw55fx",
+      "target": "live-events-sync",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee0810007itI2Hob6bK9WU4",
+      "source": "node_mslw55fx",
+      "target": "live-save-commit",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee0810008WIIfNElo0JOTpf",
+      "source": "live-save-commit",
+      "target": "node_mslw5ocz",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee0810009rUPs6obEJlcGGF",
+      "source": "node_mslw5ocz",
+      "target": "live-reload-discard",
+      "sourceHandle": "bottom",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee081000adTMQBArB1wT6Cg",
+      "source": "live-reload-discard",
+      "target": "node_mslw55fx",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee081000bNCtvVJZZFtCLMz",
+      "source": "live-save-commit",
+      "target": "live-conflict-guard",
+      "sourceHandle": "bottom",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6ee081000csy7l4qbMXMizmM",
+      "source": "live-conflict-guard",
+      "target": "node_mslw5ocz",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge_mslw65mt_ug8vpl",
+      "source": "node_mslw64lx",
+      "target": "node_mslw55fx",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    }
+  ]
+}

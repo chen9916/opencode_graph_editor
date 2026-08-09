@@ -1,0 +1,920 @@
+{
+  "version": 2,
+  "revision": 25,
+  "id": "design_fe513a612001ia936KQCShnEqD",
+  "name": "Graph Editor Grand Map",
+  "tagColors": {
+    "ai": "#f59e0b",
+    "backend": "#2563eb",
+    "bug": "#ef4444",
+    "core": "#7c3aed",
+    "fixed": "#22c55e",
+    "follow-up": "#7c3aed",
+    "frontend": "#16a34a",
+    "implementation": "#0d9488",
+    "implementation-block": "#2563eb",
+    "implemented": "#16a34a",
+    "implemented-core": "#16a34a",
+    "integration": "#db2777",
+    "intent": "#8b5cf6",
+    "issue": "#dc2626",
+    "needs-visual-check": "#eab308",
+    "not-implemented": "#f97316",
+    "partial-implemented": "#f59e0b",
+    "remaining": "#dc2626",
+    "storage": "#64748b",
+    "sync": "#9333ea",
+    "target": "#0891b2",
+    "tools": "#0284c7",
+    "ui": "#14b8a6",
+    "verified": "#0284c7",
+    "workstream-a": "#0f766e",
+    "workstream-b": "#7c3aed",
+    "workstream-c": "#b45309",
+    "workstream-d": "#be123c",
+    "workstream-e": "#15803d",
+    "workstream-f": "#4338ca"
+  },
+  "nodes": [
+    {
+      "id": "ai-access",
+      "text": "AI graph access\nResource-oriented graph tools + bounded context; @mentions identify resources without attaching raw JSON/media.",
+      "tags": [
+        "ai",
+        "backend"
+      ],
+      "layout": {
+        "position": {
+          "x": 720,
+          "y": 80
+        }
+      }
+    },
+    {
+      "id": "block-a-live-draft-core",
+      "text": "Block A: Live draft core\nCurrent: implemented and verified. Core has a location-scoped in-memory ArchitectureDraft service keyed by resource ID, base revision/digest tracking, live load/patch/query/context/list overlay methods, explicit draft get/patch/commit/discard/reload operations, and stale saved-base conflicts.\nVerified by focused core tests and package typecheck.",
+      "tags": [
+        "backend",
+        "core",
+        "implementation-block",
+        "implemented",
+        "sync",
+        "verified",
+        "workstream-a"
+      ],
+      "layout": {
+        "position": {
+          "x": 854,
+          "y": 1402
+        }
+      }
+    },
+    {
+      "id": "block-b-editor-binding",
+      "text": "Block B: Editor draft binding\nCurrent: implemented and verified. React Flow editor/panel now binds to live draft APIs/events. Local editor edits patch the live draft, remote/AI draft events update the editor state, and the editor remains journal/undo aware.\nSave commits the live draft; Reload discards/reloads saved state instead of acting as an editing path.\nVerified by app architecture tests, app typecheck, and app production build.",
+      "tags": [
+        "frontend",
+        "implementation-block",
+        "implemented",
+        "sync",
+        "verified",
+        "workstream-b"
+      ],
+      "layout": {
+        "position": {
+          "x": 1254,
+          "y": 1402
+        }
+      }
+    },
+    {
+      "id": "block-c-live-first-tools",
+      "text": "Block C: Live-first graph tools\nCurrent: implemented and verified. Core ArchitectureTools, legacy opencode GraphTools, and Code Mode native graph tools use live-draft edits by default with saved fallback and source metadata.\nReload now means saved reload/discard. Live inspection uses list/query/context/live-aware paths instead.\nVerified by core tools tests, opencode graph/code-mode tests, typechecks, and HTTP draft route coverage.",
+      "tags": [
+        "ai",
+        "backend",
+        "implementation-block",
+        "implemented",
+        "tools",
+        "verified",
+        "workstream-c"
+      ],
+      "layout": {
+        "position": {
+          "x": 1654,
+          "y": 1402
+        }
+      }
+    },
+    {
+      "id": "block-d-save-reload-boundary",
+      "text": "Block D: Save/reload boundary\nCurrent: implemented and verified for normal edit-live/save/reload semantics. Draft patch edits stay in memory; explicit commit/save writes to managed resource; discard/reload drops the live draft and returns saved state.\nPublic draft routes and generated clients exist for get, patch, commit, discard, and reload.\nVerified by schema/core/client/app/opencode tests, route exerciser coverage for draft routes, and app build.",
+      "tags": [
+        "backend",
+        "frontend",
+        "implementation-block",
+        "implemented",
+        "storage",
+        "verified",
+        "workstream-d"
+      ],
+      "layout": {
+        "position": {
+          "x": 2054,
+          "y": 1402
+        }
+      }
+    },
+    {
+      "id": "block-e-conflict-lifecycle",
+      "text": "Block E: Conflict + lifecycle rules\nCurrent: partial implemented. Stale saved-base conflicts, draft discard/reload, remove/reset cleanup, and draft update/discard events are implemented.\nRemaining follow-up: deeper multi-window ownership/transfer policy, closed-window ownership cleanup UX, and exhaustive external disk-change user flows.\nCurrent normal edit-live/save/reload shift does not require loading/reloading as an editing path anymore.",
+      "tags": [
+        "backend",
+        "follow-up",
+        "frontend",
+        "implementation-block",
+        "partial-implemented",
+        "remaining",
+        "storage",
+        "workstream-e"
+      ],
+      "layout": {
+        "position": {
+          "x": 1054,
+          "y": 1672
+        }
+      }
+    },
+    {
+      "id": "block-f-focused-tests",
+      "text": "Block F: Focused tests + hardening\nCurrent: implemented for this shift, with follow-up coverage still possible for advanced ownership. Added/updated tests for draft patch persistence boundary, commit/discard/reload, stale saved-base conflict, live-first tools, editor draft events/helpers, generated client surface, legacy/Code Mode parity, and HTTP draft route scenarios.\nVerified package typechecks pass across schema/core/protocol/server/client/app/opencode; focused tests and app build pass.",
+      "tags": [
+        "implementation",
+        "implementation-block",
+        "implemented",
+        "test",
+        "verified",
+        "workstream-f"
+      ],
+      "layout": {
+        "position": {
+          "x": 1854,
+          "y": 1672
+        }
+      }
+    },
+    {
+      "id": "current-graph-tools",
+      "text": "Current Graph tools\nResource: list/create/rename/delete/reload/context/query.\nNodes/tags: create/update/delete nodes, set tag colors.\nWires/layout: connect/update/disconnect wires, batch layout.\nBulk: batch edit for many nodes/wires/tags at once.",
+      "tags": [
+        "ai",
+        "backend",
+        "tools"
+      ],
+      "layout": {
+        "position": {
+          "x": 427.93749403980075,
+          "y": 713.9947929056739
+        }
+      }
+    },
+    {
+      "id": "editor-subscribe-patches",
+      "text": "Editor subscribes to patches\nCurrent: implemented. App event handling recognizes draft updated/discarded events and updates the draft query/cache so live draft changes can flow into React Flow editor state.\nLocal editor edits patch the live draft and remain part of the same journal/save/reload workflow.",
+      "tags": [
+        "frontend",
+        "implementation",
+        "implemented",
+        "sync",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 2006.658728403409,
+          "y": 865.5802197681782
+        }
+      }
+    },
+    {
+      "id": "guardrails",
+      "text": "Product guardrails\nKeep graphs authored and conversational. No deterministic analyzers, fixed taxonomy, or generated source-of-truth model.",
+      "tags": [
+        "core"
+      ],
+      "layout": {
+        "position": {
+          "x": 720,
+          "y": 300
+        }
+      }
+    },
+    {
+      "id": "lifecycle-conflict-rules",
+      "text": "Define lifecycle + conflict rules\nCurrent: partial implemented. Stale saved-base conflict, draft discard/reload, commit boundary, and remove/reset cleanup are implemented.\nRemaining follow-up: formal multi-window ownership/transfer and closed-window cleanup policy beyond the basic live draft lifecycle.",
+      "tags": [
+        "backend",
+        "follow-up",
+        "frontend",
+        "implementation",
+        "partial-implemented",
+        "remaining"
+      ],
+      "layout": {
+        "position": {
+          "x": 1582.9670990675259,
+          "y": 1085.5331124107302
+        }
+      }
+    },
+    {
+      "id": "live-document-service",
+      "text": "Implement live document service\nCurrent: implemented. ArchitectureDraft plus ArchitectureGraph live/draft methods provide the shared in-memory resource draft keyed by resource ID, with base revision/digest and explicit commit/discard/reload operations.\nEditor, AI tools, legacy tools, and Code Mode now route through the live draft path where appropriate.",
+      "tags": [
+        "core",
+        "implementation",
+        "implemented",
+        "sync",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 1274.721599304349,
+          "y": 825.8130299050473
+        }
+      }
+    },
+    {
+      "id": "live-draft-gap",
+      "text": "Live draft gap\nCurrent: closed for the normal software shift. AI tools and the React editor now operate through live draft APIs, edits stay live until Save/commit, and Reload/discard means saved-state reload rather than editing.\nRemaining follow-up is narrower: advanced multi-window ownership/lifecycle hardening.",
+      "tags": [
+        "ai",
+        "frontend",
+        "implemented",
+        "target",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 1488.0069647972407,
+          "y": 521.0588667119911
+        }
+      }
+    },
+    {
+      "id": "live-draft-tests",
+      "text": "Add focused tests\nCurrent: implemented for the normal live edit/save/reload shift. Coverage includes core draft behavior, tool routing/source metadata, app draft event/helpers, client generated surface, legacy/Code Mode parity, HTTP draft routes, package typechecks, and app build.\nFollow-up: deeper multi-window ownership/transfer tests if that policy is expanded.",
+      "tags": [
+        "follow-up",
+        "implementation",
+        "implemented",
+        "test",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 1961.2364394119245,
+          "y": 1084.172849854106
+        }
+      }
+    },
+    {
+      "id": "overview-ai",
+      "text": "AI providers / tools",
+      "tags": [
+        "ai",
+        "tools"
+      ],
+      "layout": {
+        "position": {
+          "x": 362.0840332833161,
+          "y": -357.2534906509761
+        }
+      }
+    },
+    {
+      "id": "overview-client-sdk",
+      "text": "Client SDK",
+      "tags": [
+        "backend"
+      ],
+      "layout": {
+        "position": {
+          "x": 862.0840332833161,
+          "y": -617.2534906509761
+        }
+      }
+    },
+    {
+      "id": "overview-graph-editor",
+      "text": "Graph editor",
+      "tags": [
+        "frontend",
+        "integration"
+      ],
+      "layout": {
+        "position": {
+          "x": 62.084033283316046,
+          "y": -467.2534906509761
+        }
+      }
+    },
+    {
+      "id": "overview-root",
+      "text": "OpenCode",
+      "tags": [
+        "core"
+      ],
+      "layout": {
+        "position": {
+          "x": 362.0840332833161,
+          "y": -617.2534906509761
+        }
+      }
+    },
+    {
+      "id": "overview-server",
+      "text": "Server / API",
+      "tags": [
+        "backend"
+      ],
+      "layout": {
+        "position": {
+          "x": 662.0840332833161,
+          "y": -767.2534906509761
+        }
+      }
+    },
+    {
+      "id": "overview-session",
+      "text": "Session engine",
+      "tags": [
+        "core"
+      ],
+      "layout": {
+        "position": {
+          "x": 362.0840332833161,
+          "y": -877.2534906509761
+        }
+      }
+    },
+    {
+      "id": "overview-storage",
+      "text": "Schema / storage",
+      "tags": [
+        "storage"
+      ],
+      "layout": {
+        "position": {
+          "x": 662.0840332833161,
+          "y": -467.2534906509761
+        }
+      }
+    },
+    {
+      "id": "overview-ui",
+      "text": "Desktop app / UI",
+      "tags": [
+        "frontend"
+      ],
+      "layout": {
+        "position": {
+          "x": 62.084033283316046,
+          "y": -767.2534906509761
+        }
+      }
+    },
+    {
+      "id": "react-editor",
+      "text": "React Flow editor\nLazy UI for switching resources, editing text/tags, connecting nodes, routing wires, panels, filters, undo/redo.",
+      "tags": [
+        "frontend"
+      ],
+      "layout": {
+        "position": {
+          "x": 1212.0087964698707,
+          "y": -78.06160589128982
+        }
+      }
+    },
+    {
+      "id": "resource-shape",
+      "text": "Graph data shape\nNodes: text, free-form tags, position.\nWires: source/target IDs, endpoint sides, route style.",
+      "tags": [
+        "core",
+        "storage"
+      ],
+      "layout": {
+        "position": {
+          "x": 360,
+          "y": 40
+        }
+      }
+    },
+    {
+      "id": "resource-storage",
+      "text": "Managed resources\nStored as versioned graph resources with revisions/digests, locks, recovery backups, list/create/get/patch/remove/reset.",
+      "tags": [
+        "backend",
+        "storage"
+      ],
+      "layout": {
+        "position": {
+          "x": 360,
+          "y": -160
+        }
+      }
+    },
+    {
+      "id": "save-persistence-boundary",
+      "text": "Keep Save as persistence boundary\nCurrent: implemented. Draft edits do not auto-save. Explicit Save/commit writes the live draft to the managed resource; Reload/discard returns saved state and drops the live draft.\nExisting saved patch remains the durable disk-write path for saved-resource APIs.",
+      "tags": [
+        "implementation",
+        "implemented",
+        "storage",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 1275.270124996784,
+          "y": 1085.721665085257
+        }
+      }
+    },
+    {
+      "id": "selection-as-brief",
+      "text": "Selection as implementation brief — implemented\nWhen user selects graph nodes and asks AI to implement/fix, selected nodes become scoped task intent. AI is told to inspect the actual program before editing and not confuse graph nodes with source code.",
+      "tags": [
+        "ai",
+        "core",
+        "implemented",
+        "intent"
+      ],
+      "layout": {
+        "position": {
+          "x": 82.71325468800205,
+          "y": 363.05161380370816
+        }
+      }
+    },
+    {
+      "id": "server-api",
+      "text": "Server + protocol API\nArchitecture routes and handlers expose the managed resource operations to clients.",
+      "tags": [
+        "backend"
+      ],
+      "layout": {
+        "position": {
+          "x": 720,
+          "y": -160
+        }
+      }
+    },
+    {
+      "id": "session-integration",
+      "text": "OpenCode integration\nDesktop side panel, mobile tab, commands, capability probing, shared SDK accessors.",
+      "tags": [
+        "frontend",
+        "integration"
+      ],
+      "layout": {
+        "position": {
+          "x": 1694.9482863120404,
+          "y": -30.699671279962146
+        }
+      }
+    },
+    {
+      "id": "shift-lasso-stuck",
+      "text": "UI bug fixed: shift-select lasso cleanup\nAdded a React Flow store cleanup on window pointerup, pointercancel, and blur so the blue selection rectangle clears after shift-drag release while preserving selected nodes.",
+      "tags": [
+        "fixed",
+        "frontend",
+        "needs-visual-check",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 2324.59407656218,
+          "y": 251.54591516388035
+        }
+      }
+    },
+    {
+      "id": "tool-routing-live-first",
+      "text": "Change graph tools to live-first\nCurrent: implemented. Graph edit tools mutate the live draft by default; saved state is fallback when no live draft exists. Tool/list/query/context outputs expose source metadata where applicable.\nReload now explicitly reloads saved state and discards live draft for that resource.",
+      "tags": [
+        "ai",
+        "backend",
+        "implementation",
+        "implemented",
+        "tools",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 1630.0398749075455,
+          "y": 852.874129285293
+        }
+      }
+    },
+    {
+      "id": "workspace-model",
+      "text": "Graph workspace model\nShared human + AI design surface. Multiple named resources; not a generated dependency scanner.",
+      "tags": [
+        "core"
+      ],
+      "layout": {
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "ai-to-current-tools",
+      "source": "ai-access",
+      "target": "current-graph-tools",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "ai-to-editor",
+      "source": "ai-access",
+      "target": "react-editor",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "api-to-editor",
+      "source": "server-api",
+      "target": "react-editor",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "block-a-to-block-b",
+      "source": "block-a-live-draft-core",
+      "target": "block-b-editor-binding",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "block-a-to-block-c",
+      "source": "block-a-live-draft-core",
+      "target": "block-c-live-first-tools",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "block-b-to-block-d",
+      "source": "block-b-editor-binding",
+      "target": "block-d-save-reload-boundary",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "block-b-to-block-f",
+      "source": "block-b-editor-binding",
+      "target": "block-f-focused-tests",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "block-c-to-block-d",
+      "source": "block-c-live-first-tools",
+      "target": "block-d-save-reload-boundary",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "block-c-to-block-f",
+      "source": "block-c-live-first-tools",
+      "target": "block-f-focused-tests",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "block-d-to-block-e",
+      "source": "block-d-save-reload-boundary",
+      "target": "block-e-conflict-lifecycle",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "block-d-to-block-f",
+      "source": "block-d-save-reload-boundary",
+      "target": "block-f-focused-tests",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "block-e-to-block-f",
+      "source": "block-e-conflict-lifecycle",
+      "target": "block-f-focused-tests",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "block-f-to-live-tests",
+      "source": "block-f-focused-tests",
+      "target": "live-draft-tests",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "current-tools-to-live-first",
+      "source": "current-graph-tools",
+      "target": "tool-routing-live-first",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d62639001kyY462XD45xKH0",
+      "source": "overview-root",
+      "target": "overview-ui",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d62639002TMxZ84QWA1uPHM",
+      "source": "overview-root",
+      "target": "overview-session",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d62639003n1gfcmbKkKhVsS",
+      "source": "overview-root",
+      "target": "overview-server",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d62639004X2iUdzh4lHDiEA",
+      "source": "overview-root",
+      "target": "overview-ai",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d62639005F5osl69j2wYayJ",
+      "source": "overview-root",
+      "target": "overview-graph-editor",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d62639006AFVLhIDVUMK6S7",
+      "source": "overview-server",
+      "target": "overview-client-sdk",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_fe6d62639007FbIGVWhwvQXZLI",
+      "source": "overview-server",
+      "target": "overview-storage",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "editor-subscribe-to-tests",
+      "source": "editor-subscribe-patches",
+      "target": "live-draft-tests",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "editor-to-integration",
+      "source": "react-editor",
+      "target": "session-integration",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "editor-to-live-draft-gap",
+      "source": "react-editor",
+      "target": "live-draft-gap",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "editor-to-shift-lasso-stuck",
+      "source": "react-editor",
+      "target": "shift-lasso-stuck",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "gap-to-live-service",
+      "source": "live-draft-gap",
+      "target": "live-document-service",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "guardrails-to-ai",
+      "source": "guardrails",
+      "target": "ai-access",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "guardrails-to-model",
+      "source": "guardrails",
+      "target": "workspace-model",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "guardrails-to-selection-brief",
+      "source": "guardrails",
+      "target": "selection-as-brief",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "lifecycle-to-block-e",
+      "source": "lifecycle-conflict-rules",
+      "target": "block-e-conflict-lifecycle",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "lifecycle-to-tests",
+      "source": "lifecycle-conflict-rules",
+      "target": "live-draft-tests",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "live-draft-gap-to-ai",
+      "source": "live-draft-gap",
+      "target": "ai-access",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "live-draft-gap-to-storage",
+      "source": "live-draft-gap",
+      "target": "resource-storage",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "live-service-to-block-a",
+      "source": "live-document-service",
+      "target": "block-a-live-draft-core",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "live-service-to-save-boundary",
+      "source": "live-document-service",
+      "target": "save-persistence-boundary",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "live-service-to-tools",
+      "source": "live-document-service",
+      "target": "tool-routing-live-first",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "model-to-shape",
+      "source": "workspace-model",
+      "target": "resource-shape",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "model-to-storage",
+      "source": "workspace-model",
+      "target": "resource-storage",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "save-boundary-to-block-d",
+      "source": "save-persistence-boundary",
+      "target": "block-d-save-reload-boundary",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "save-boundary-to-tests",
+      "source": "save-persistence-boundary",
+      "target": "live-draft-tests",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "selection-brief-to-ai",
+      "source": "selection-as-brief",
+      "target": "ai-access",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "selection-brief-to-tools",
+      "source": "selection-as-brief",
+      "target": "current-graph-tools",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "shape-to-ai",
+      "source": "resource-shape",
+      "target": "ai-access",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "shift-lasso-to-tests",
+      "source": "shift-lasso-stuck",
+      "target": "live-draft-tests",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "storage-to-api",
+      "source": "resource-storage",
+      "target": "server-api",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "tool-routing-to-block-c",
+      "source": "tool-routing-live-first",
+      "target": "block-c-live-first-tools",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "tools-to-editor-subscribe",
+      "source": "tool-routing-live-first",
+      "target": "editor-subscribe-patches",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "tools-to-lifecycle-rules",
+      "source": "tool-routing-live-first",
+      "target": "lifecycle-conflict-rules",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    }
+  ]
+}

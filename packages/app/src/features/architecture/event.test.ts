@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { ArchitectureLiveDraft } from "./contract"
 import {
+  architectureDraftEventIsStale,
   architectureResourceEventInfo,
   architectureResourceDraftEventCache,
   architectureResourceDraftEventInfo,
@@ -121,6 +122,66 @@ describe("architecture resource events", () => {
         properties: { resourceID: "design", draft },
       }),
     ).toEqual({ resourceID: "design", action: "discarded", draft })
+  })
+
+  test("reads metadata-only draft events without pretending they include a draft", () => {
+    expect(
+      architectureResourceDraftEventInfo({
+        type: "architecture.resource.draft.updated",
+        data: {
+          resourceID: "design",
+          revision: 4,
+          digest: "live",
+          baseRevision: 2,
+          baseDigest: "saved",
+        },
+      }),
+    ).toEqual({
+      resourceID: "design",
+      action: "updated",
+      revision: 4,
+      digest: "live",
+      baseRevision: 2,
+      baseDigest: "saved",
+      draft: undefined,
+    })
+  })
+
+  test("detects stale draft events after a newer saved snapshot", () => {
+    const saved = {
+      resource: { version: 2 as const, id: "design", name: "Design", revision: 3, nodes: [], edges: [] },
+      digest: "saved",
+      storage: { root: "/repo/.opencode/architecture", path: ".opencode/architecture/resources/design.json" },
+    }
+
+    expect(
+      architectureDraftEventIsStale(saved, {
+        resourceID: "design",
+        action: "updated",
+        revision: 2,
+        digest: "live",
+        baseRevision: 2,
+        baseDigest: "old",
+      }),
+    ).toBe(true)
+    expect(
+      architectureDraftEventIsStale(saved, {
+        resourceID: "design",
+        action: "discarded",
+        revision: 2,
+        digest: "old",
+      }),
+    ).toBe(true)
+    expect(
+      architectureDraftEventIsStale(saved, {
+        resourceID: "design",
+        action: "updated",
+        revision: 3,
+        digest: "live",
+        baseRevision: 3,
+        baseDigest: "saved",
+      }),
+    ).toBe(false)
   })
 
   test("maps discard events to an explicit empty draft cache value", () => {

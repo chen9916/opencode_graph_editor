@@ -26,7 +26,19 @@ export function architectureResourceSummary(
   }
 }
 
-export function latestArchitectureSnapshot(current: ArchitectureSnapshot | undefined, candidate: ArchitectureSnapshot) {
+export function latestArchitectureSnapshot(
+  current: ArchitectureSnapshot | undefined,
+  candidate: ArchitectureSnapshot,
+): ArchitectureSnapshot
+export function latestArchitectureSnapshot(
+  current: ArchitectureSnapshot | undefined,
+  candidate: ArchitectureSnapshot | undefined,
+): ArchitectureSnapshot | undefined
+export function latestArchitectureSnapshot(
+  current: ArchitectureSnapshot | undefined,
+  candidate: ArchitectureSnapshot | undefined,
+) {
+  if (!candidate) return candidate
   if (current?.resource.id === candidate.resource.id && current.resource.revision > candidate.resource.revision)
     return current
   return candidate

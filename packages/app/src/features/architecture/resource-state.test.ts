@@ -69,6 +69,21 @@ describe("architecture resource state", () => {
     expect(summaries).toEqual([architectureResourceSummary(s2)])
   })
 
+  test("keeps newly saved nodes visible when a late refetch returns the previous revision", () => {
+    const old = snapshot("design", "Design")
+    const saved = {
+      ...snapshot("design", "Design"),
+      digest: "design-digest-2",
+      resource: {
+        ...old.resource,
+        revision: 2,
+        nodes: [{ id: "new", text: "New node", tags: [], layout: { position: { x: 0, y: 0 } } }],
+      },
+    }
+
+    expect(latestArchitectureSnapshot(saved, old)).toBe(saved)
+  })
+
   test("reconciles a newer saved event suppressed during a failed Save", async () => {
     const finish = beginArchitectureLocalSave({ server: "server", directory: "/repo", resourceID: "design" })
     const current = snapshot("design", "S1")

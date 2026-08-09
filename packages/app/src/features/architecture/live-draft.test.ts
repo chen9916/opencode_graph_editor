@@ -12,6 +12,8 @@ import {
   ArchitectureDraftSynchronizationCancelled,
   architectureLiveDraftCache,
   createArchitectureDraftSynchronizer,
+  discardSavedArchitectureLiveDraftCache,
+  latestArchitectureLiveDraftCache,
   rebaseArchitectureDraft,
   reconcileArchitectureDraft,
   sameArchitectureResource,
@@ -57,6 +59,22 @@ describe("architecture live draft", () => {
 
     expect(architectureLiveDraftCache(stale)).toEqual(stale)
     expect(architectureLiveDraftCache(saved)).toBeNull()
+  })
+
+  test("keeps newer live draft cache data over a late stale refetch", () => {
+    const newer = live({ ...resource("newer"), revision: 3 }, "newer")
+    const stale = live({ ...resource("stale"), revision: 2 }, "stale")
+
+    expect(latestArchitectureLiveDraftCache(newer, stale)).toBe(newer)
+  })
+
+  test("clears live draft cache once the saved snapshot covers it", () => {
+    const saved = snapshot({ ...resource("saved"), revision: 3 }, "saved")
+    const committedDraft = live({ ...resource("saved"), revision: 3 }, "saved")
+    const nextDraft = live({ ...resource("next"), revision: 4 }, "next")
+
+    expect(discardSavedArchitectureLiveDraftCache(committedDraft, saved)).toBeNull()
+    expect(discardSavedArchitectureLiveDraftCache(nextDraft, saved)).toBe(nextDraft)
   })
 
   test("reconciles two cumulative edits as incremental patches", async () => {

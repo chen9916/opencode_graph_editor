@@ -14,6 +14,7 @@ import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { graphLocation } from "./graph-location"
+import { InstanceRef } from "@/effect/instance-ref"
 
 export const CODE_MODE_TOOL = "execute"
 
@@ -219,6 +220,7 @@ export const CodeModeTool = Tool.define(
     const sessions = yield* Session.Service
     const plugin = yield* Plugin.Service
     const locations = yield* LocationServiceMap.Service
+    const capturedInstance = yield* InstanceRef
 
     const init: Tool.DefWithoutID<typeof Parameters, Metadata> = {
       description: DESCRIPTION,
@@ -233,6 +235,7 @@ export const CodeModeTool = Tool.define(
         }
         const agent = yield* agents.get(ctx.agent)
         const session = yield* sessions.get(ctx.sessionID).pipe(Effect.orDie)
+        const activeInstance = yield* InstanceRef
         const ruleset = Permission.merge(agent.permission, session.permission ?? [])
         const mcpTools = Permission.visibleTools(yield* mcp.tools(), ruleset)
         const nativeTools = visibleNativeTools(ruleset)
@@ -253,7 +256,7 @@ export const CodeModeTool = Tool.define(
               const patterns = entry.patterns(input)
               const locationLayer = locations.get(
                 entry.key.startsWith("graph_")
-                  ? graphLocation(session.directory)
+                  ? graphLocation((activeInstance ?? capturedInstance)?.directory ?? session.directory)
                   : Location.Ref.make({
                       directory: AbsolutePath.make(session.directory),
                       ...(session.workspaceID ? { workspaceID: session.workspaceID } : {}),

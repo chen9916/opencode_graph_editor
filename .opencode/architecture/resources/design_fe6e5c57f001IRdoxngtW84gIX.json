@@ -1,0 +1,555 @@
+{
+  "version": 2,
+  "revision": 8,
+  "id": "design_fe6e5c57f001IRdoxngtW84gIX",
+  "name": "Graph 3",
+  "tagColors": {
+    "planned": "#c58b45",
+    "resource-switching": "#5f86b3",
+    "rough": "#7a7f87",
+    "selection-improvement": "#b06a7a",
+    "ui-map": "#4c9a9a",
+    "unimplemented": "#b05d3b"
+  },
+  "nodes": [
+    {
+      "id": "node_graph_editor",
+      "text": "Graph editor",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 1923.9000888032126,
+          "y": 666.5032976137994
+        }
+      }
+    },
+    {
+      "id": "node_graph_switching_acceptance",
+      "text": "Acceptance check\nSwitch A to B to A, and click A directly on first load: active resource and content always update without a second switch",
+      "tags": [
+        "planned",
+        "resource-switching",
+        "unimplemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 3124.274327242376,
+          "y": 859.4480336333451
+        }
+      }
+    },
+    {
+      "id": "node_graph_switching_desired",
+      "text": "Desired behavior\nClicking any graph activates it immediately and renders the matching resource",
+      "tags": [
+        "planned",
+        "resource-switching",
+        "unimplemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 3118.3303501158985,
+          "y": 497.84019374800266
+        }
+      }
+    },
+    {
+      "id": "node_graph_switching_investigate",
+      "text": "Investigation note\nCheck selected-resource resolution, query or draft cache timing, and stale response races; cause is not confirmed yet",
+      "tags": [
+        "planned",
+        "resource-switching",
+        "unimplemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 3119.8163443975177,
+          "y": 663.7841708744802
+        }
+      }
+    },
+    {
+      "id": "node_graph_switching_observed",
+      "text": "Observed issue\nClicking the first graph may leave stale content or fail to switch until another graph is opened",
+      "tags": [
+        "planned",
+        "resource-switching",
+        "unimplemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 3116.8443558342788,
+          "y": 329.6063023972346
+        }
+      }
+    },
+    {
+      "id": "node_graph_switching_plan",
+      "text": "Improvement: responsive graph switching",
+      "tags": [
+        "planned",
+        "resource-switching",
+        "ui-map",
+        "unimplemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 2675.638475920272,
+          "y": 461.3724110464665
+        }
+      }
+    },
+    {
+      "id": "node_msm0rqev",
+      "text": "New node",
+      "tags": [],
+      "layout": {
+        "position": {
+          "x": 3621.200618165638,
+          "y": 349.4095285720825
+        }
+      }
+    },
+    {
+      "id": "node_shift_selection_acceptance",
+      "text": "Acceptance check\nSelect A, hold Shift, click B and C: A, B, and C remain selected together",
+      "tags": [
+        "planned",
+        "selection-improvement",
+        "unimplemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 2598.1197668548957,
+          "y": 1280.8863458779942
+        }
+      }
+    },
+    {
+      "id": "node_shift_selection_current",
+      "text": "Current behavior\nA later selection can clear earlier nodes even while Shift is held",
+      "tags": [
+        "planned",
+        "selection-improvement",
+        "unimplemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 2598.1197668548957,
+          "y": 820.8863458779942
+        }
+      }
+    },
+    {
+      "id": "node_shift_selection_desired",
+      "text": "Desired behavior\nShift-click adds nodes to the existing selection; already-selected nodes stay selected",
+      "tags": [
+        "planned",
+        "selection-improvement",
+        "unimplemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 2598.1197668548957,
+          "y": 960.8863458779942
+        }
+      }
+    },
+    {
+      "id": "node_shift_selection_plan",
+      "text": "Selection improvement: additive Shift selection",
+      "tags": [
+        "planned",
+        "selection-improvement",
+        "ui-map",
+        "unimplemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 2173.9783215378166,
+          "y": 989.8023115677106
+        }
+      }
+    },
+    {
+      "id": "node_shift_selection_rule",
+      "text": "Interaction rule\nPlain click replaces selection. Shift-click is additive and does not toggle selected nodes off",
+      "tags": [
+        "planned",
+        "selection-improvement",
+        "unimplemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 2598.1197668548957,
+          "y": 1120.8863458779942
+        }
+      }
+    },
+    {
+      "id": "node_ui_app_shell",
+      "text": "App shell + routing\nTitlebar, providers, route selection, responsive frame",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 408.00000014165073,
+          "y": -40
+        }
+      }
+    },
+    {
+      "id": "node_ui_composer",
+      "text": "Prompt composer + docks\nPrompt input, permissions, questions, todos, follow-ups, revert",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 1257.7918209949946,
+          "y": 404.4163580100109
+        }
+      }
+    },
+    {
+      "id": "node_ui_data_context",
+      "text": "Workspace data + state\nServer sync, SDK, files, prompts, comments, layout persistence",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 1820,
+          "y": 220
+        }
+      }
+    },
+    {
+      "id": "node_ui_home",
+      "text": "Home dashboard\nProjects, recent sessions, search, utility actions",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 700,
+          "y": -40
+        }
+      }
+    },
+    {
+      "id": "node_ui_navigation",
+      "text": "Project / workspace navigation\nProject rail, workspaces, session list, new session",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 980,
+          "y": -40
+        }
+      }
+    },
+    {
+      "id": "node_ui_session",
+      "text": "Session workspace\nHeader, active session surface, responsive desktop/mobile layout",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 1260,
+          "y": -40
+        }
+      }
+    },
+    {
+      "id": "node_ui_session_header",
+      "text": "Session header + tabs\nSession identity, navigation, file/review/architecture tab state",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 1260,
+          "y": 220
+        }
+      }
+    },
+    {
+      "id": "node_ui_shared",
+      "text": "Shared interaction layer\nSettings, command palette, dialogs, notifications, toasts",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 1540,
+          "y": -40
+        }
+      }
+    },
+    {
+      "id": "node_ui_side_panel",
+      "text": "Context side panel\nFile browser, changed files, review, architecture graph",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 1560,
+          "y": 400
+        }
+      }
+    },
+    {
+      "id": "node_ui_system_map",
+      "text": "Project UI system (rough map)",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 995.542017207765,
+          "y": -294.1778680738022
+        }
+      }
+    },
+    {
+      "id": "node_ui_terminal",
+      "text": "Terminal panel\nWorkspace shell, resizable or stacked beneath session content",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 1260,
+          "y": 580
+        }
+      }
+    },
+    {
+      "id": "node_ui_timeline",
+      "text": "Conversation timeline\nMessages, tool activity, status, scrolling history",
+      "tags": [
+        "rough",
+        "ui-map"
+      ],
+      "layout": {
+        "position": {
+          "x": 960,
+          "y": 400
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_graph_editor_selection_plan",
+      "source": "node_graph_editor",
+      "target": "node_shift_selection_plan",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_graph_editor_switching_plan",
+      "source": "node_graph_editor",
+      "target": "node_graph_switching_plan",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_msly7y6o_kxdggc",
+      "source": "node_ui_side_panel",
+      "target": "node_graph_editor",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_selection_plan_acceptance",
+      "source": "node_shift_selection_plan",
+      "target": "node_shift_selection_acceptance",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_selection_plan_current",
+      "source": "node_shift_selection_plan",
+      "target": "node_shift_selection_current",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_selection_plan_desired",
+      "source": "node_shift_selection_plan",
+      "target": "node_shift_selection_desired",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_selection_plan_rule",
+      "source": "node_shift_selection_plan",
+      "target": "node_shift_selection_rule",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_switching_plan_acceptance",
+      "source": "node_graph_switching_plan",
+      "target": "node_graph_switching_acceptance",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_switching_plan_desired",
+      "source": "node_graph_switching_plan",
+      "target": "node_graph_switching_desired",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_switching_plan_investigate",
+      "source": "node_graph_switching_plan",
+      "target": "node_graph_switching_investigate",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_switching_plan_observed",
+      "source": "node_graph_switching_plan",
+      "target": "node_graph_switching_observed",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_data_session",
+      "source": "node_ui_data_context",
+      "target": "node_ui_session",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "straight"
+    },
+    {
+      "id": "edge_ui_navigation_session",
+      "source": "node_ui_navigation",
+      "target": "node_ui_session",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "straight"
+    },
+    {
+      "id": "edge_ui_root_home",
+      "source": "node_ui_system_map",
+      "target": "node_ui_home",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_root_navigation",
+      "source": "node_ui_system_map",
+      "target": "node_ui_navigation",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_root_session",
+      "source": "node_ui_system_map",
+      "target": "node_ui_session",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_root_shared",
+      "source": "node_ui_system_map",
+      "target": "node_ui_shared",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_root_shell",
+      "source": "node_ui_system_map",
+      "target": "node_ui_app_shell",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_session_composer",
+      "source": "node_ui_session",
+      "target": "node_ui_composer",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_session_header",
+      "source": "node_ui_session",
+      "target": "node_ui_session_header",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_session_side",
+      "source": "node_ui_session",
+      "target": "node_ui_side_panel",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_session_terminal",
+      "source": "node_ui_session",
+      "target": "node_ui_terminal",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_session_timeline",
+      "source": "node_ui_session",
+      "target": "node_ui_timeline",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_ui_shared_session",
+      "source": "node_ui_shared",
+      "target": "node_ui_session",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "straight"
+    }
+  ]
+}
