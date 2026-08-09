@@ -1,6 +1,6 @@
-// Graph editor is new, developer-facing vocabulary. Keep these keys on the
-// existing English runtime fallback until each locale receives terminology
-// reviewed against its developer-tooling corpus.
+// New developer-facing settings and Graph editor vocabulary stay on the existing
+// English runtime fallback until each locale receives terminology reviewed
+// against its developer-tooling corpus.
 export const englishFallbackKeys = new Set([
   "session.tab.architecture",
   "session.panel.reviewFilesArchitecture",
@@ -16,5 +16,5 @@ export const englishFallbackKeys = new Set([
 ])
 
 export function usesEnglishFallback(key: string) {
-  return key.startsWith("architecture.") || englishFallbackKeys.has(key)
+  return key.startsWith("architecture.") || key.startsWith("settings.agents.") || englishFallbackKeys.has(key)
 }

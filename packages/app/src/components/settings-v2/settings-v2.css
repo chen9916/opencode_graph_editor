@@ -318,6 +318,51 @@
   color: var(--v2-text-text-accent-hover);
 }
 
+.settings-v2-agent-title {
+  display: inline-flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-v2-agent-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.settings-v2-agent-model-option {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-v2-agent-model-icon {
+  flex-shrink: 0;
+  color: var(--v2-icon-icon-base);
+}
+
+.settings-v2-agent-model-value {
+  max-width: min(360px, 54vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-v2-agent-empty {
+  border-radius: 8px;
+  background-color: var(--v2-background-bg-layer-01);
+  padding: 20px;
+  box-shadow: inset 0 0 0 0.5px var(--v2-border-border-muted);
+  font-size: 13px;
+  font-weight: 440;
+  line-height: 20px;
+  color: var(--v2-text-text-muted);
+}
+
 .settings-v2-tab-body.settings-v2-providers {
   gap: 32px;
 }
