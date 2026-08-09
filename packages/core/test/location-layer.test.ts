@@ -31,6 +31,7 @@ import { Project } from "../src/project"
 import { Reference } from "../src/reference"
 import { ToolRegistry } from "../src/tool/registry"
 import { ApplicationTools } from "../src/tool/application-tools"
+import { ArchitectureTools } from "../src/architecture/tools"
 
 const it = testEffect(
   AppNodeBuilder.build(LayerNode.group([ApplicationTools.node, Database.node, EventV2.node, LocationServiceMap.node])),
@@ -102,20 +103,13 @@ describe("LocationServiceMap", () => {
             )
 
           const blockedState = yield* update(blocked.path)
-          expect(blockedState.providers.some((provider) => provider.id === ProviderV2.ID.make("test"))).toBe(false)
-          expect(blockedState.tools.map((tool) => tool.name).sort()).toEqual([
+          const expectedTools = [
             "application_context",
             "apply_patch",
             "bash",
             "edit",
             "glob",
-            "graph_connect_nodes",
-            "graph_create_node",
-            "graph_delete_node",
-            "graph_disconnect_nodes",
-            "graph_get_context",
-            "graph_query",
-            "graph_update_node",
+            ...Object.values(ArchitectureTools.names),
             "grep",
             "question",
             "read",
@@ -124,31 +118,12 @@ describe("LocationServiceMap", () => {
             "webfetch",
             "websearch",
             "write",
-          ])
+          ].sort()
+          expect(blockedState.providers.some((provider) => provider.id === ProviderV2.ID.make("test"))).toBe(false)
+          expect(blockedState.tools.map((tool) => tool.name).sort()).toEqual(expectedTools)
           const allowedState = yield* update(allowed.path)
           expect(allowedState.providers.some((provider) => provider.id === ProviderV2.ID.make("test"))).toBe(true)
-          expect(allowedState.tools.map((tool) => tool.name).sort()).toEqual([
-            "application_context",
-            "apply_patch",
-            "bash",
-            "edit",
-            "glob",
-            "graph_connect_nodes",
-            "graph_create_node",
-            "graph_delete_node",
-            "graph_disconnect_nodes",
-            "graph_get_context",
-            "graph_query",
-            "graph_update_node",
-            "grep",
-            "question",
-            "read",
-            "skill",
-            "todowrite",
-            "webfetch",
-            "websearch",
-            "write",
-          ])
+          expect(allowedState.tools.map((tool) => tool.name).sort()).toEqual(expectedTools)
         }),
       ),
     ),

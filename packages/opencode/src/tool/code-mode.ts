@@ -8,10 +8,15 @@ import { Agent } from "@/agent/agent"
 import { Session } from "@/session/session"
 import { Permission } from "@/permission"
 import { Plugin } from "@/plugin"
+import { graphCodeModeTools, type CodeModeNativeTool } from "./graph-code-mode"
+import { LocationServiceMap } from "@opencode-ai/core/location-services"
+import { Location } from "@opencode-ai/core/location"
+import { AbsolutePath } from "@opencode-ai/core/schema"
+import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 
 export const CODE_MODE_TOOL = "execute"
 
-const DESCRIPTION = "Run a confined orchestration script with access to connected MCP tools."
+const DESCRIPTION = "Run a confined orchestration script with access to native Graph tools and connected MCP tools."
 
 export const Parameters = Schema.Struct({
   code: Schema.String.annotate({
@@ -28,7 +33,8 @@ type Metadata = {
 
 type Attachment = NonNullable<Tool.ExecuteResult["attachments"]>[number]
 
-type CatalogEntry = {
+type McpCatalogEntry = {
+  kind: "mcp"
   path: string
   key: string
   server: string
@@ -36,14 +42,17 @@ type CatalogEntry = {
   tool: MCP.McpTool
 }
 
-function groupByServer(mcpTools: Record<string, MCP.McpTool>, servers: readonly string[]): Map<string, CatalogEntry[]> {
+type CatalogEntry = McpCatalogEntry | CodeModeNativeTool
+
+function groupByServer(mcpTools: Record<string, MCP.McpTool>, servers: readonly string[]): Map<string, McpCatalogEntry[]> {
   const byLongest = [...servers].sort((a, b) => b.length - a.length)
-  const groups = new Map<string, CatalogEntry[]>()
+  const groups = new Map<string, McpCatalogEntry[]>()
   for (const key of Object.keys(mcpTools).sort((a, b) => a.localeCompare(b))) {
     const server =
       byLongest.find((name) => key.startsWith(name + "_")) ?? (key.includes("_") ? key.slice(0, key.indexOf("_")) : key)
     const local = server && key.startsWith(server + "_") ? key.slice(server.length + 1) : key
-    const entry: CatalogEntry = {
+    const entry: McpCatalogEntry = {
+      kind: "mcp",
       path: `${server}.${local}`,
       key,
       server,
@@ -55,13 +64,26 @@ function groupByServer(mcpTools: Record<string, MCP.McpTool>, servers: readonly 
   return groups
 }
 
-export function describeCatalog(mcpTools: Record<string, MCP.McpTool>, servers: readonly string[]): string {
+export function describeCatalog(
+  mcpTools: Record<string, MCP.McpTool>,
+  servers: readonly string[],
+  nativeTools: readonly CodeModeNativeTool[] = [],
+): string {
   return CodeMode.make({
     tools: toolTree(
-      [...groupByServer(mcpTools, servers).values()].flat(),
+      [...nativeTools, ...groupByServer(mcpTools, servers).values()].flat(),
       () => () => Effect.fail(toolError("Tool preview is not executable.")),
     ),
   }).instructions()
+}
+
+export function visibleNativeTools(ruleset: PermissionV1.Ruleset): CodeModeNativeTool[] {
+  return Object.values(
+    Permission.visibleTools(
+      Object.fromEntries(graphCodeModeTools().map((entry) => [entry.key, entry])),
+      ruleset,
+    ),
+  )
 }
 
 const lastSegment = (uri: string) => {
@@ -122,9 +144,12 @@ function toolTree(catalog: readonly CatalogEntry[], run: (entry: CatalogEntry) =
   for (const entry of catalog) {
     const namespace = (tree[entry.server] ??= {})
     namespace[entry.local] = SandboxTool.make({
-      description: entry.tool.def.description ?? "",
-      input: entry.tool.def.inputSchema as SandboxTool.JsonSchema,
-      output: entry.tool.def.outputSchema as SandboxTool.JsonSchema | undefined,
+      description: entry.kind === "mcp" ? (entry.tool.def.description ?? "") : entry.definition.description,
+      input: entry.kind === "mcp" ? (entry.tool.def.inputSchema as SandboxTool.JsonSchema) : entry.definition.input,
+      output:
+        entry.kind === "mcp"
+          ? (entry.tool.def.outputSchema as SandboxTool.JsonSchema | undefined)
+          : entry.definition.output,
       run: run(entry),
     })
   }
@@ -133,7 +158,7 @@ function toolTree(catalog: readonly CatalogEntry[], run: (entry: CatalogEntry) =
 
 const invokeChildTool = Effect.fn("CodeMode.invokeChildTool")(function* (input: {
   plugin: Plugin.Interface
-  entry: CatalogEntry
+  entry: McpCatalogEntry
   args: Record<string, unknown>
   callID: string
   ctx: Tool.Context
@@ -192,6 +217,7 @@ export const CodeModeTool = Tool.define(
     const agents = yield* Agent.Service
     const sessions = yield* Session.Service
     const plugin = yield* Plugin.Service
+    const locations = yield* LocationServiceMap.Service
 
     const init: Tool.DefWithoutID<typeof Parameters, Metadata> = {
       description: DESCRIPTION,
@@ -208,8 +234,9 @@ export const CodeModeTool = Tool.define(
         const session = yield* sessions.get(ctx.sessionID).pipe(Effect.orDie)
         const ruleset = Permission.merge(agent.permission, session.permission ?? [])
         const mcpTools = Permission.visibleTools(yield* mcp.tools(), ruleset)
+        const nativeTools = visibleNativeTools(ruleset)
         const servers = Object.keys(yield* mcp.clients()).map(McpCatalog.sanitize)
-        const catalog = [...groupByServer(mcpTools, servers).values()].flat()
+        const catalog = [...nativeTools, ...groupByServer(mcpTools, servers).values()].flat()
 
         const calls: CallEntry[] = []
         const attachments: Attachment[] = []
@@ -220,6 +247,44 @@ export const CodeModeTool = Tool.define(
         const callTool = (entry: CatalogEntry) => (input: unknown) =>
           Effect.gen(function* () {
             childCalls += 1
+            if (entry.kind === "native") {
+              const args = input && typeof input === "object" && !Array.isArray(input) ? input : {}
+              const patterns = entry.patterns(input)
+              const locationLayer = locations.get(
+                Location.Ref.make({
+                  directory: AbsolutePath.make(session.directory),
+                  ...(session.workspaceID ? { workspaceID: session.workspaceID } : {}),
+                }),
+              )
+              yield* plugin.trigger(
+                "tool.execute.before",
+                { tool: entry.key, sessionID: ctx.sessionID, callID: `${ctx.callID ?? entry.key}/${childCalls}` },
+                { args },
+              )
+              yield* ctx.ask({ permission: entry.permission, metadata: {}, patterns, always: patterns })
+              const result = yield* entry.definition.run(input).pipe(
+                Effect.provide(locationLayer),
+                Effect.withSpan("Tool.execute", {
+                  attributes: {
+                    "tool.name": entry.key,
+                    "tool.call_id": `${ctx.callID ?? entry.key}/${childCalls}`,
+                    "session.id": ctx.sessionID,
+                    "message.id": ctx.messageID,
+                  },
+                }),
+              )
+              yield* plugin.trigger(
+                "tool.execute.after",
+                {
+                  tool: entry.key,
+                  sessionID: ctx.sessionID,
+                  callID: `${ctx.callID ?? entry.key}/${childCalls}`,
+                  args,
+                },
+                result,
+              )
+              return result
+            }
             const result = yield* invokeChildTool({
               plugin,
               entry,

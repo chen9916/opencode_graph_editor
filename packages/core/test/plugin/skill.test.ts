@@ -20,6 +20,12 @@ describe("SkillPlugin.Plugin", () => {
           description: expect.stringContaining("opencode's own configuration"),
         }),
       )
+      expect(yield* skill.list()).toContainEqual(
+        expect.objectContaining({
+          name: "graph",
+          description: expect.stringContaining("@graph"),
+        }),
+      )
     }),
   )
 })

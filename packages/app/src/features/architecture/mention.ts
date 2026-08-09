@@ -2,6 +2,18 @@ export function architectureResourcePath(resourceID: string) {
   return `.opencode/architecture/resources/${resourceID}.json`
 }
 
+export const architectureGraphSkillName = "graph"
+
+export function architectureGraphSkillMention() {
+  return {
+    type: "agent" as const,
+    name: architectureGraphSkillName,
+    content: `@${architectureGraphSkillName}`,
+    start: 0,
+    end: 0,
+  }
+}
+
 export function architectureResourceAliases(resource: { name: string }) {
   const compact = resource.name.replace(/\s+/g, "")
   if (compact === resource.name) return [resource.name]

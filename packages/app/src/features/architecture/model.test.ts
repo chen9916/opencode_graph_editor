@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { ArchitectureResource } from "./contract"
-import { toReactFlow } from "./model"
+import { tagColorsKey, toReactFlow } from "./model"
 
 const resource: ArchitectureResource = {
   version: 2,
@@ -58,5 +58,16 @@ describe("architecture flow model", () => {
       { planned: "#4c82ff" },
       { planned: "#4c82ff" },
     ])
+    expect(nodes.map((node) => node.data.tagColorsKey)).toEqual([
+      "planned:#4c82ff",
+      "planned:#4c82ff",
+      "planned:#4c82ff",
+    ])
+  })
+
+  test("keys tag colors independently from object insertion order", () => {
+    expect(tagColorsKey({ planned: "#4c82ff", implemented: "#16a34a" })).toBe(
+      "implemented:#16a34a\u001fplanned:#4c82ff",
+    )
   })
 })

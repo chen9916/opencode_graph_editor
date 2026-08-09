@@ -27,6 +27,8 @@ import { useSync } from "@/context/sync"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { showToast } from "@/utils/toast"
 import {
+  architectureGraphSkillMention,
+  architectureGraphSkillName,
   architectureResourceAliases,
   architectureResourceMention,
   architectureResourcePath,
@@ -289,8 +291,16 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   )
   const context = createMemo<PromptInputV2Suggestion[]>(() => [
     ...references(),
+    {
+      id: `architecture-skill:${architectureGraphSkillName}`,
+      kind: "agent",
+      label: `@${architectureGraphSkillName}`,
+      search: "graph graph editor graph editor resources",
+      description: "Graph editor",
+      mention: architectureGraphSkillMention(),
+    },
     ...props.controls.agents.available
-      .filter((agent) => !agent.hidden && agent.mode !== "primary")
+      .filter((agent) => !agent.hidden && agent.mode !== "primary" && agent.name !== architectureGraphSkillName)
       .map((agent) => ({
         id: `agent:${agent.name}`,
         kind: "agent" as const,

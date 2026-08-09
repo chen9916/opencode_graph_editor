@@ -5,6 +5,7 @@ export type ArchitectureFlowNode = Node<
   {
     readonly node: ArchitectureNode
     readonly tagColors?: ArchitectureResource["tagColors"]
+    readonly tagColorsKey: string
     readonly dimmed?: boolean
     readonly onTextChange: (node: ArchitectureNode, text: string) => void
   },
@@ -32,13 +33,14 @@ export function toReactFlow(
   onTextChange: (node: ArchitectureNode, text: string) => void,
   controls?: ArchitectureFlowEdgeControls,
 ) {
+  const colorsKey = tagColorsKey(resource.tagColors)
   return {
     nodes: resource.nodes.map(
       (node): ArchitectureFlowNode => ({
         id: node.id,
         type: "architecture",
         position: node.layout.position,
-        data: { node, tagColors: resource.tagColors, onTextChange },
+        data: { node, tagColors: resource.tagColors, tagColorsKey: colorsKey, onTextChange },
       }),
     ),
     edges: resource.edges.map(
@@ -53,6 +55,13 @@ export function toReactFlow(
       }),
     ),
   }
+}
+
+export function tagColorsKey(tagColors: ArchitectureResource["tagColors"] | undefined) {
+  return Object.entries(tagColors ?? {})
+    .toSorted(([left], [right]) => left.localeCompare(right))
+    .map(([tag, color]) => `${tag}:${color}`)
+    .join("\u001f")
 }
 
 export function architectureNodeClass() {

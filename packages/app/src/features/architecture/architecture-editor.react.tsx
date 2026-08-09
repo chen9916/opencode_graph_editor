@@ -31,7 +31,7 @@ import type {
   ArchitectureViewport,
 } from "./contract"
 import { applyOperations, flattenJournal, operationID } from "./journal"
-import { toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } from "./model"
+import { tagColorsKey, toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } from "./model"
 import { ArchitectureEdgeView } from "./architecture-edge.react"
 import { ArchitectureNodeView } from "./architecture-node.react"
 
@@ -100,6 +100,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const nodeInternalsKey = editor.resource.nodes
     .map((node) => [node.id, node.layout.position.x, node.layout.position.y, node.text, ...node.tags].join("\u001f"))
     .join("\u001e")
+  const resourceTagColorsKey = tagColorsKey(editor.resource.tagColors)
 
   const commit = (batch: ReadonlyArray<ArchitectureOperation>) => {
     if (batch.length === 0) return
@@ -226,7 +227,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         }
       }),
     )
-  }, [editor.resource, filter.tag, filter.text, filterActive, setEdges, setNodes])
+  }, [editor.resource, filter.tag, filter.text, filterActive, resourceTagColorsKey, setEdges, setNodes])
 
   const undo = () => {
     const batch = editor.past.at(-1)
@@ -758,7 +759,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             fitView={!props.viewport}
             proOptions={{ hideAttribution: true }}
           >
-            <NodeInternalsRefresh nodeIDs={nodeIDsKey} refreshKey={nodeInternalsKey} />
+            <NodeInternalsRefresh nodeIDs={nodeIDsKey} refreshKey={`${nodeInternalsKey}\u001e${resourceTagColorsKey}`} />
             <Background />
             <Controls position={controlsPosition} />
             {!props.mobile && <MiniMap position={minimapPosition} pannable zoomable />}

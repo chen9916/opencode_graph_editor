@@ -76,7 +76,15 @@ export default function ArchitecturePanel() {
   }))
   const draft = createMemo(() => {
     const id = resourceID()
-    return id ? persistedState.drafts[id] : undefined
+    const current = id ? persistedState.drafts[id] : undefined
+    const snapshot = resource.data
+    if (!current || !snapshot || current.base.digest === snapshot.digest) return current
+    const rebased = rebaseOperations(current.base.resource, snapshot.resource, current.operations)
+    return {
+      base: snapshot,
+      operations: rebased.operations,
+      conflicts: [...current.conflicts, ...rebased.conflicts],
+    }
   })
   const viewport = createMemo(() => {
     const id = resourceID()

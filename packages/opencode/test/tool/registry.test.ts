@@ -21,6 +21,7 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { MCP } from "@/mcp"
 import type { Tool as MCPToolDef } from "@modelcontextprotocol/sdk/types.js"
+import { ArchitectureTools } from "@opencode-ai/core/architecture/tools"
 
 const configLayer = TestConfig.layer({
   directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
@@ -80,7 +81,7 @@ const withCodeMode = testEffect(
     ],
   ]),
 )
-const withEmptyCodeMode = testEffect(
+const withGraphOnlyCodeMode = testEffect(
   LayerNode.compile(root, [
     [Config.node, configLayer],
     [RuntimeFlags.node, RuntimeFlags.layer({ experimentalCodeMode: true })],
@@ -118,6 +119,23 @@ describe("tool.registry", () => {
     }),
   )
 
+  it.instance("exposes native graph tools through the legacy registry", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const ids = yield* registry.ids()
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: yield* agents.defaultInfo(),
+      })
+      const expected = Object.values(ArchitectureTools.names)
+
+      expect(ids).toEqual(expect.arrayContaining(expected))
+      expect(tools.map((tool) => tool.id)).toEqual(expect.arrayContaining(expected))
+    }),
+  )
+
   withCodeMode.instance("exposes execute when code mode is enabled", () =>
     Effect.gen(function* () {
       const registry = yield* ToolRegistry.Service
@@ -132,11 +150,12 @@ describe("tool.registry", () => {
 
       expect(ids).toContain("execute")
       expect(tools.map((tool) => tool.id)).toContain("execute")
+      expect(execute?.description).toContain("tools.graph.list_resources(input: {}):")
       expect(execute?.description).toContain("tools.weather.current(input: {\n  city: string,\n})")
     }),
   )
 
-  withEmptyCodeMode.instance("does not expose execute when code mode has no visible tools", () =>
+  withCodeMode.instance("keeps native graph tools visible alongside code mode execute", () =>
     Effect.gen(function* () {
       const registry = yield* ToolRegistry.Service
       const agents = yield* Agent.Service
@@ -144,6 +163,41 @@ describe("tool.registry", () => {
         providerID: ProviderV2.ID.opencode,
         modelID: ModelV2.ID.make("test"),
         agent: yield* agents.defaultInfo(),
+      })
+
+      expect(tools.map((tool) => tool.id)).toEqual(expect.arrayContaining(Object.values(ArchitectureTools.names)))
+      expect(tools.map((tool) => tool.id)).toContain("execute")
+    }),
+  )
+
+  withGraphOnlyCodeMode.instance("exposes execute for native graph tools when MCP has no visible tools", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: yield* agents.defaultInfo(),
+      })
+
+      const execute = tools.find((tool) => tool.id === "execute")
+      expect(execute?.description).toContain("tools.graph.list_resources(input: {}):")
+      expect(execute?.description).toContain("graph_list_resources")
+    }),
+  )
+
+  withGraphOnlyCodeMode.instance("does not expose execute when all Code Mode graph tools are denied and MCP is empty", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const agent = yield* agents.defaultInfo()
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: {
+          ...agent,
+          permission: [{ permission: "graph_*", pattern: "*", action: "deny" }],
+        },
       })
 
       expect(tools.map((tool) => tool.id)).not.toContain("execute")

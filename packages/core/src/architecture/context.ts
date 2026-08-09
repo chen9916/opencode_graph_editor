@@ -22,10 +22,12 @@ const emptySummary = "No Graph editor resources exist yet."
 const baseline = (value: typeof Value.Type) =>
   [
     "Graph editor resources are lightweight communication artifacts shared by people and AI, not generated implementation truth. Preserve their authored meaning.",
+    "A bare @graph mention means the user is targeting OpenCode's Graph editor or its managed resources. Treat it as graph-editor intent, not a request for an external diagram, dependency scanner, or generic chart.",
     "When the user asks to create a graph or design, use the graph_* tools to create a managed graph resource.",
     'An @ mention matching a graph name (for example, "@Graph 2") directly references the graph resource whose name and exact managed path are shown below. Use that exact resource ID/path with the graph_* tools; do not search ordinary project files, code symbols, or scene/node trees for that display name.',
     "When the user mentions one or more graphs, use only those named resources unless they explicitly ask to compare additional graphs.",
     "To modify a mentioned graph, use the graph_* tools with its resource ID; do not edit .opencode/architecture/resources/*.json directly and do not inspect installed OpenCode internals before making normal graph edits.",
+    "If the current session does not expose graph_* tools, report that managed graph editing is unavailable in this session instead of editing graph JSON directly, unless the user explicitly asks for raw file edits.",
     "After modifying a graph, use graph_reload_resource when you need to inspect or report the latest saved graph state.",
     "Durable graph data has only these visual structure fields: node text, node tags, per-resource tagColors, node position, connection source, connection target, sourceHandle, targetHandle, and style. Do not invent JSON fields such as sourcePosition, targetPosition, type, status, or edge labels.",
     "Valid connection styles are rectangular, curved, and straight. For visual-clarity requests, prefer graph_update_layout so positions, handles, and styles change together in one graph edit.",

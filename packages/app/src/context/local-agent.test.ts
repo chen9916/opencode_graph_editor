@@ -1,13 +1,17 @@
 import { describe, expect, test } from "bun:test"
-import { hasCustomAgent, resolveAgent } from "./local-agent"
+import { hasAgentPickerChoice, resolveAgent } from "./local-agent"
 
-describe("hasCustomAgent", () => {
+describe("hasAgentPickerChoice", () => {
   test("detects explicitly custom agents", () => {
-    expect(hasCustomAgent([{ native: true }, { native: false }])).toBe(true)
+    expect(hasAgentPickerChoice([{ native: true }, { native: false }])).toBe(true)
   })
 
   test("ignores built-in and unclassified agents", () => {
-    expect(hasCustomAgent([{ native: true }, {}])).toBe(false)
+    expect(hasAgentPickerChoice([{ native: true }, {}])).toBe(false)
+  })
+
+  test("shows selector for built-in graph mode", () => {
+    expect(hasAgentPickerChoice([{ name: "build", native: true }, { name: "graph", native: true }])).toBe(true)
   })
 })
 

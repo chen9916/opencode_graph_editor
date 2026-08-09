@@ -1,7 +1,17 @@
 import { describe, expect, test } from "bun:test"
-import { architectureResourceAliases, architectureResourceMention } from "./mention"
+import { architectureGraphSkillMention, architectureResourceAliases, architectureResourceMention } from "./mention"
 
 describe("architecture resource mentions", () => {
+  test("creates the graph editor skill mention", () => {
+    expect(architectureGraphSkillMention()).toEqual({
+      type: "agent",
+      name: "graph",
+      content: "@graph",
+      start: 0,
+      end: 0,
+    })
+  })
+
   test("creates a text-compatible graph reference pill", () => {
     expect(architectureResourceMention({ id: "design-1", name: "Design 1" })).toEqual({
       type: "file",

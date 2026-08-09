@@ -83,6 +83,8 @@ import { showToast } from "@/utils/toast"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
 import {
+  architectureGraphSkillMention,
+  architectureGraphSkillName,
   architectureResourceAliases,
   architectureResourceMention,
   architectureResourcePath,
@@ -587,9 +589,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   )
 
   const agentList = createMemo(() =>
-    props.controls.agents.available
-      .filter((agent) => !agent.hidden && agent.mode !== "primary")
-      .map((agent): AtOption => ({ type: "agent", name: agent.name, display: agent.name })),
+    [
+      { name: architectureGraphSkillName, display: architectureGraphSkillName },
+      ...props.controls.agents.available
+        .filter((agent) => !agent.hidden && agent.mode !== "primary" && agent.name !== architectureGraphSkillName)
+        .map((agent) => ({ name: agent.name, display: agent.name })),
+    ].map((agent): AtOption => ({ type: "agent", name: agent.name, display: agent.display })),
   )
 
   const mcpResourceList = createMemo(() =>
@@ -623,6 +628,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const handleAtSelect = (option: AtOption | undefined) => {
     if (!option) return
     if (option.type === "agent") {
+      if (option.name === architectureGraphSkillName) {
+        addPart(architectureGraphSkillMention())
+        return
+      }
       addPart({ type: "agent", name: option.name, content: "@" + option.name, start: 0, end: 0 })
       return
     }

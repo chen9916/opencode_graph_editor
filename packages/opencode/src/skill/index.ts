@@ -33,6 +33,10 @@ const CUSTOMIZE_OPENCODE_SKILL_NAME = "customize-opencode"
 const CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION =
   "Use ONLY when the user is editing or creating opencode's own configuration: opencode.json, opencode.jsonc, files under .opencode/, or files under ~/.config/opencode/. Also use when creating or fixing opencode agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring opencode itself."
 const CUSTOMIZE_OPENCODE_SKILL_BODY = SkillPlugin.CustomizeOpencodeContent
+const GRAPH_SKILL_NAME = "graph"
+const GRAPH_SKILL_DESCRIPTION =
+  "Use when the user mentions @graph or asks to create, edit, organize, explain, compare, search, filter, tag, color, or route OpenCode Graph editor resources. Do not use for unrelated diagrams, charts, dependency scanners, or generic graph theory unless the user explicitly says Graph editor or @graph."
+const GRAPH_SKILL_BODY = SkillPlugin.GraphContent
 
 export const Info = Schema.Struct({
   name: Schema.String,
@@ -280,6 +284,12 @@ const layer = Layer.effect(
           description: CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION,
           location: "<built-in>",
           content: CUSTOMIZE_OPENCODE_SKILL_BODY,
+        }
+        s.skills[GRAPH_SKILL_NAME] = {
+          name: GRAPH_SKILL_NAME,
+          description: GRAPH_SKILL_DESCRIPTION,
+          location: "<built-in>",
+          content: GRAPH_SKILL_BODY,
         }
         yield* loadSkills(s, yield* InstanceState.get(discovered), events)
         return s

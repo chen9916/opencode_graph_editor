@@ -135,7 +135,7 @@ describe("buildRequestParts", () => {
     }
   })
 
-  test("keeps architecture graph mentions as managed session references", () => {
+  test("keeps graph mentions as managed session references", () => {
     const result = buildRequestParts({
       prompt: [
         {

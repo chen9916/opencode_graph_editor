@@ -119,10 +119,16 @@ describe("AgentV2", () => {
         "compaction",
         "explore",
         "general",
+        "graph",
         "plan",
         "summary",
         "title",
       ])
+      expect(yield* agent.get(AgentV2.ID.make("graph"))).toMatchObject({
+        description: expect.stringContaining("Graph editor"),
+        mode: "primary",
+        system: expect.stringContaining("graph_*"),
+      })
       for (const item of agents) {
         expect(item.permissions.some((rule) => rule.action === "bash" && rule.effect !== "deny")).toBe(false)
       }

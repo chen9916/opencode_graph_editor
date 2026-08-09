@@ -21,13 +21,14 @@ const it = testEffect(
 )
 
 describe("ArchitectureContext", () => {
-  it.live("contributes dynamic context for all shared architecture graphs", () =>
+  it.live("contributes dynamic context for all shared graph resources", () =>
     Effect.gen(function* () {
       const graph = yield* ArchitectureGraph.Service
       const registry = yield* SystemContextRegistry.Service
 
       const empty = yield* SystemContext.initialize(yield* registry.load())
       expect(empty.baseline).toContain("Graph editor resources are lightweight communication artifacts")
+      expect(empty.baseline).toContain("A bare @graph mention")
       expect(empty.baseline).toContain("create a managed graph resource")
       expect(empty.baseline).toContain("plan a readable layout")
       expect(empty.baseline).toContain("No Graph editor resources exist yet.")

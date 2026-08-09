@@ -10,6 +10,8 @@ import * as Truncate from "@/tool/truncate"
 import { MessageID, SessionID } from "@/session/schema"
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js"
+import { ArchitectureGraph } from "@opencode-ai/core/architecture/graph"
+import { LocationServiceMap } from "@opencode-ai/core/location-services"
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import {
   CallToolRequestSchema,
@@ -147,11 +149,26 @@ async function buildTool() {
       output: (text: string) => Effect.succeed({ content: text, truncated: false as const }),
     }),
     Layer.mock(Agent.Service, { get: () => Effect.succeed({ name: "build", permission: [] } as any) }),
-    Layer.mock(Session.Service, { get: () => Effect.succeed({ permission: [] } as any) }),
+    Layer.mock(Session.Service, {
+      get: () => Effect.succeed({ directory: "/tmp/opencode-code-mode-integration-test", permission: [] } as any),
+    }),
     Layer.mock(MCP.Service, {
       tools: () => Effect.succeed(mcpTools),
       clients: () => Effect.succeed({ [SERVER]: {} as any }),
     }),
+    Layer.mock(LocationServiceMap.Service, {
+      get: () =>
+        Layer.mock(ArchitectureGraph.Service, {
+          list: () => Effect.succeed([]),
+          create: () => Effect.die("unexpected graph create in CodeMode integration test"),
+          load: () => Effect.die("unexpected graph load in CodeMode integration test"),
+          patch: () => Effect.die("unexpected graph patch in CodeMode integration test"),
+          remove: () => Effect.die("unexpected graph remove in CodeMode integration test"),
+          reset: () => Effect.die("unexpected graph reset in CodeMode integration test"),
+          query: () => Effect.die("unexpected graph query in CodeMode integration test"),
+          context: () => Effect.die("unexpected graph context in CodeMode integration test"),
+        }),
+    } as any),
   )
   return {
     tool: await Effect.runPromise(CodeModeTool.pipe(Effect.flatMap(Tool.init), Effect.provide(layer))),

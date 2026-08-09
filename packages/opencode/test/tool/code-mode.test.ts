@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { CODE_MODE_TOOL, CodeModeTool, Parameters, describeCatalog } from "@/tool/code-mode"
 import type { Tool as MCPToolDef } from "@modelcontextprotocol/sdk/types.js"
+import { ArchitectureGraph } from "@opencode-ai/core/architecture/graph"
+import { LocationServiceMap } from "@opencode-ai/core/location-services"
+import { Architecture } from "@opencode-ai/schema/architecture"
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
 import { MCP } from "@/mcp"
@@ -42,6 +45,7 @@ function harness(input: {
   servers: string[]
   permission?: PermissionV1.Rule[]
   trigger?: Plugin.Interface["trigger"]
+  graph?: Partial<ArchitectureGraph.Interface>
 }) {
   return Layer.mergeAll(
     Layer.mock(Plugin.Service, {
@@ -54,12 +58,15 @@ function harness(input: {
       get: () => Effect.succeed({ name: "build", permission: input.permission ?? [] } as any),
     }),
     Layer.mock(Session.Service, {
-      get: () => Effect.succeed({ permission: [] } as any),
+      get: () => Effect.succeed({ directory: "/tmp/opencode-code-mode-test", permission: [] } as any),
     }),
     Layer.mock(MCP.Service, {
       tools: () => Effect.succeed(input.mcpTools),
       clients: () => Effect.succeed(Object.fromEntries(input.servers.map((name) => [name, {} as any]))),
     }),
+    Layer.mock(LocationServiceMap.Service, {
+      get: () => Layer.mock(ArchitectureGraph.Service, graphMock(input.graph)),
+    } as any),
   )
 }
 
@@ -67,17 +74,32 @@ function serverNames(mcpTools: Record<string, MCP.McpTool>, servers?: string[]) 
   return servers ?? [...new Set(Object.keys(mcpTools).map((key) => key.split("_")[0]!))]
 }
 
+function graphMock(input: Partial<ArchitectureGraph.Interface> = {}): ArchitectureGraph.Interface {
+  return {
+    list: () => Effect.succeed([]),
+    create: () => Effect.die("unexpected graph create in CodeMode test"),
+    load: () => Effect.die("unexpected graph load in CodeMode test"),
+    patch: () => Effect.die("unexpected graph patch in CodeMode test"),
+    remove: () => Effect.die("unexpected graph remove in CodeMode test"),
+    reset: () => Effect.die("unexpected graph reset in CodeMode test"),
+    query: () => Effect.die("unexpected graph query in CodeMode test"),
+    context: () => Effect.die("unexpected graph context in CodeMode test"),
+    ...input,
+  }
+}
+
 function build(
   mcpTools: Record<string, MCP.McpTool>,
   servers?: string[],
   permission?: PermissionV1.Rule[],
   trigger?: Plugin.Interface["trigger"],
+  graph?: Partial<ArchitectureGraph.Interface>,
 ) {
   const names = serverNames(mcpTools, servers)
   return Effect.runPromise(
     CodeModeTool.pipe(
       Effect.flatMap(Tool.init),
-      Effect.provide(harness({ mcpTools, servers: names, permission, trigger })),
+      Effect.provide(harness({ mcpTools, servers: names, permission, trigger, graph })),
     ),
   )
 }
@@ -139,7 +161,9 @@ describe("code mode execute", () => {
   test("the static base description carries no catalog; the registry appends it", async () => {
     const tool = await build({ github_list_issues: mcpTool("list_issues", () => "") })
     expect(tool.id).toBe(CODE_MODE_TOOL)
-    expect(tool.description).toBe("Run a confined orchestration script with access to connected MCP tools.")
+    expect(tool.description).toBe(
+      "Run a confined orchestration script with access to native Graph tools and connected MCP tools.",
+    )
     expect(tool.description).not.toContain("Available tools")
     expect(tool.description).not.toContain("list_issues")
   })
@@ -256,7 +280,7 @@ describe("code mode execute", () => {
     expect(output.metadata.toolCalls).toEqual([])
   })
 
-  test("Object.keys(tools) enumerates the MCP server and CodeMode namespaces", async () => {
+  test("Object.keys(tools) enumerates Graph, MCP server, and CodeMode namespaces", async () => {
     const tool = await build({
       github_list_issues: mcpTool("list_issues", () => ""),
       linear_search: mcpTool("search", () => ""),
@@ -267,7 +291,64 @@ describe("code mode execute", () => {
         ctx,
       ),
     )
-    expect(JSON.parse(output.output)).toEqual({ namespaces: ["github", "linear", "$codemode"], count: 3 })
+    expect(JSON.parse(output.output)).toEqual({ namespaces: ["graph", "github", "linear", "$codemode"], count: 4 })
+  })
+
+  test("exposes native graph tools in the CodeMode catalog without MCP", async () => {
+    const tool = await build({})
+    const output = await Effect.runPromise(
+      tool.execute(
+        {
+          code: `
+            const matches = await tools.$codemode.search({ query: 'graph_set_tag_color', limit: 5 })
+            return {
+              namespaces: Object.keys(tools),
+              graph: Object.keys(tools.graph),
+              paths: matches.items.map((item) => item.path),
+            }
+          `,
+        },
+        ctx,
+      ),
+    )
+    const result = JSON.parse(output.output)
+    expect(result.namespaces).toContain("graph")
+    expect(result.graph).toContain("list_resources")
+    expect(result.graph).toContain("set_tag_color")
+    expect(result.paths).toContain("tools.graph.set_tag_color")
+  })
+
+  test("calls a native graph tool through CodeMode without MCP", async () => {
+    const asked: string[] = []
+    const summary = {
+      id: Architecture.ResourceID.make("design_test"),
+      name: "Test graph",
+      revision: 0,
+      digest: "digest",
+      nodes: 0,
+      edges: 0,
+    }
+    const tool = await build(
+      {},
+      undefined,
+      undefined,
+      undefined,
+      {
+        list: () => Effect.succeed([summary]),
+      },
+    )
+    const output = await Effect.runPromise(
+      tool.execute(
+        { code: "return await tools.graph.list_resources({})" },
+        { ...ctx, ask: (req) => Effect.sync(() => void asked.push(req.permission)) },
+      ),
+    )
+
+    expect(JSON.parse(output.output)).toEqual([summary])
+    expect(asked).toEqual(["read"])
+    expect(output.metadata.toolCalls).toEqual([
+      { tool: "graph.list_resources", status: "completed" },
+    ])
   })
 
   test("calls a namespaced MCP tool and flows its text result back into the program", async () => {

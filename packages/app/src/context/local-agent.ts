@@ -1,5 +1,5 @@
-export function hasCustomAgent(items: Array<{ native?: boolean }>) {
-  return items.some((item) => item.native === false)
+export function hasAgentPickerChoice(items: Array<{ name?: string; native?: boolean }>) {
+  return items.some((item) => item.native === false || item.name === "graph")
 }
 
 export function resolveAgent<T extends { name: string }>(items: T[], name?: string) {

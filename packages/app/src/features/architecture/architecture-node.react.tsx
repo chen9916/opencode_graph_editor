@@ -107,7 +107,7 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
           {node.tags.map((tag) => {
             const color = props.data.tagColors?.[tag]
             return (
-              <span key={tag} data-colored={color ? true : undefined} style={tagStyle(color)}>
+              <span key={`${tag}:${color ?? ""}`} data-colored={color ? true : undefined} style={tagStyle(color)}>
                 {tag}
               </span>
             )
