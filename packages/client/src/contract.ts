@@ -42,7 +42,6 @@ export const endpointNames = {
   "architecture.resource.list": "listResources",
   "architecture.resource.create": "createResource",
   "architecture.resource.get": "getResource",
-  "architecture.resource.patch": "patchResource",
   "architecture.resource.draft.get": "getDraft",
   "architecture.resource.draft.patch": "patchDraft",
   "architecture.resource.draft.commit": "commitDraft",

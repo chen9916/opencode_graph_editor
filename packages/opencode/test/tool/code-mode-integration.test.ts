@@ -171,7 +171,6 @@ async function buildTool() {
           load: () => Effect.die("unexpected graph load in CodeMode integration test"),
           loadLive: () => Effect.die("unexpected graph live load in CodeMode integration test"),
           loadDraft: () => Effect.die("unexpected graph draft load in CodeMode integration test"),
-          patch: () => Effect.die("unexpected graph patch in CodeMode integration test"),
           patchLive: () => Effect.die("unexpected graph live patch in CodeMode integration test"),
           patchDraft: () => Effect.die("unexpected graph draft patch in CodeMode integration test"),
           commitDraft: () => Effect.die("unexpected graph draft commit in CodeMode integration test"),

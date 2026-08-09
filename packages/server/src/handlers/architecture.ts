@@ -25,9 +25,6 @@ export const ArchitectureHandler = HttpApiBuilder.group(Api, "server.architectur
       .handle("architecture.resource.get", (ctx) =>
         response(ArchitectureGraph.Service.use((graph) => mapError(graph.load(ctx.params.resourceID)))),
       )
-      .handle("architecture.resource.patch", (ctx) =>
-        response(ArchitectureGraph.Service.use((graph) => mapError(graph.patch(ctx.params.resourceID, ctx.payload)))),
-      )
       .handle("architecture.resource.draft.get", (ctx) =>
         response(ArchitectureGraph.Service.use((graph) => mapError(graph.loadDraft(ctx.params.resourceID)))),
       )

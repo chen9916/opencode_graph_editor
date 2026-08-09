@@ -14,6 +14,8 @@ export interface CreateWebSocketFetchOptions {
   streamRetries?: number
 }
 
+type ProxiedRequestInit = RequestInit & { proxy?: string }
+
 interface PoolEntry {
   socket?: WebSocket
   connectedAt?: number
@@ -42,6 +44,7 @@ export function createWebSocketFetch(options?: CreateWebSocketFetchOptions) {
 
   async function websocketFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const url = input instanceof URL ? input.toString() : typeof input === "string" ? input : input.url
+    const proxiedInit = init as ProxiedRequestInit | undefined
     const internalHeaders = OpenAIWebSocket.normalizeHeaders(init?.headers)
     const httpInit = withoutInternalHeaders(init)
 
@@ -89,6 +92,7 @@ export function createWebSocketFetch(options?: CreateWebSocketFetchOptions) {
         connectTimeout,
         maxConnectionAge,
         init?.signal,
+        proxiedInit?.proxy,
       )
       let resolveFirstEvent: (event: boolean | OpenAIWebSocket.WrappedError) => void = () => {}
       let rejectFirstEvent: (error: Error) => void = () => {}
@@ -220,6 +224,7 @@ async function socket(
   connectTimeout: number,
   maxConnectionAge: number,
   signal?: AbortSignal | null,
+  proxy?: string,
 ) {
   if (
     entry.socket?.readyState === WebSocket.OPEN &&
@@ -235,6 +240,7 @@ async function socket(
     headers,
     timeout: connectTimeout,
     signal: signal ?? undefined,
+    proxy,
   })
   entry.connectedAt = Date.now()
   return next

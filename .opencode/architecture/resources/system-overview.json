@@ -1,16 +1,26 @@
 {
   "version": 2,
-  "revision": 3,
+  "revision": 5,
   "id": "system-overview",
   "name": "System Overview",
   "tagColors": {
     "ai": "#f59e0b",
+    "assessment": "#0ea5e9",
     "backend": "#2563eb",
+    "cleanup": "#14b8a6",
     "core": "#7c3aed",
     "frontend": "#16a34a",
+    "implemented": "#22c55e",
     "integration": "#db2777",
+    "legacy": "#dc2626",
+    "migration": "#9333ea",
+    "planned": "#eab308",
+    "remaining": "#ef4444",
+    "risk": "#f97316",
     "storage": "#64748b",
-    "tools": "#0284c7"
+    "test": "#6366f1",
+    "tools": "#0284c7",
+    "verified": "#84cc16"
   },
   "nodes": [
     {
@@ -72,12 +82,14 @@
       "text": "Conflict guard — if the saved base changed, commit stops instead of overwriting newer disk data.",
       "tags": [
         "backend",
-        "storage"
+        "implemented",
+        "storage",
+        "verified"
       ],
       "layout": {
         "position": {
-          "x": 0,
-          "y": 740
+          "x": 4,
+          "y": 820
         }
       }
     },
@@ -86,12 +98,14 @@
       "text": "Change events sync UI — draft updates, reloads, and discards refresh the visible canvas.",
       "tags": [
         "core",
-        "frontend"
+        "frontend",
+        "implemented",
+        "verified"
       ],
       "layout": {
         "position": {
-          "x": -360,
-          "y": 700
+          "x": -356,
+          "y": 780
         }
       }
     },
@@ -114,12 +128,14 @@
       "text": "Patches in memory — editor and AI tools change nodes, tags, positions, and wires without writing disk.",
       "tags": [
         "core",
-        "tools"
+        "implemented",
+        "tools",
+        "verified"
       ],
       "layout": {
         "position": {
-          "x": -360,
-          "y": 540
+          "x": -356,
+          "y": 620
         }
       }
     },
@@ -128,12 +144,14 @@
       "text": "Reload/discard — drops unsaved RAM changes and returns to the saved disk version.",
       "tags": [
         "core",
-        "storage"
+        "implemented",
+        "storage",
+        "verified"
       ],
       "layout": {
         "position": {
-          "x": 360,
-          "y": 700
+          "x": 364,
+          "y": 780
         }
       }
     },
@@ -142,12 +160,14 @@
       "text": "Save commits — the RAM draft is written as a new persisted graph revision on disk.",
       "tags": [
         "core",
-        "storage"
+        "implemented",
+        "storage",
+        "verified"
       ],
       "layout": {
         "position": {
-          "x": 360,
-          "y": 540
+          "x": 364,
+          "y": 620
         }
       }
     },
@@ -156,12 +176,197 @@
       "text": "Shared live reads — editor, API, and graph tools inspect the same current draft state.",
       "tags": [
         "backend",
-        "core"
+        "core",
+        "implemented",
+        "verified"
       ],
       "layout": {
         "position": {
-          "x": 0,
-          "y": 560
+          "x": 4,
+          "y": 640
+        }
+      }
+    },
+    {
+      "id": "migration-finished-state",
+      "text": "Finished state achieved — no normal graph edit path writes .opencode/architecture/resources/*.json directly. Saved JSON is durable output of Save/commit, not the live editing surface.",
+      "tags": [
+        "implemented",
+        "migration",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 4,
+          "y": 2060
+        }
+      }
+    },
+    {
+      "id": "migration-goal-commit-only",
+      "text": "Migration goal achieved — ordinary graph edits go to the live draft first. The saved JSON file is written by explicit commit/save or lifecycle operations such as create/remove/reset.",
+      "tags": [
+        "core",
+        "implemented",
+        "migration",
+        "storage",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 4,
+          "y": 1400
+        }
+      }
+    },
+    {
+      "id": "migration-implementation-complete",
+      "text": "Implementation complete — legacy saved patch tooling has been discarded; Graph editor and graph tools now fully rely on live draft mutation plus explicit Save/commit persistence.",
+      "tags": [
+        "cleanup",
+        "implemented",
+        "migration",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 420,
+          "y": 2420
+        }
+      }
+    },
+    {
+      "id": "migration-old-direct-patch",
+      "text": "Removed legacy direct saved patch — ArchitectureGraph.patch, the public saved patch route, patchResource client method, and dead app helper are gone. Normal graph mutations no longer write saved JSON immediately.",
+      "tags": [
+        "backend",
+        "cleanup",
+        "implemented",
+        "migration",
+        "storage",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 4,
+          "y": 1240
+        }
+      }
+    },
+    {
+      "id": "migration-save-tool-added",
+      "text": "Save tool added — graph_save_resource commits the current live draft through commitDraft and returns saved:true; if no live draft exists it no-ops with saved:false. This is the explicit AI/chat Save boundary and does not reintroduce direct saved JSON patching.",
+      "tags": [
+        "implemented",
+        "migration",
+        "storage",
+        "tools",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 760,
+          "y": 2420
+        }
+      }
+    },
+    {
+      "id": "migration-step-1-inventory",
+      "text": "Done: inventoried old callers — ArchitectureGraph.patch, the public saved PATCH resource route, generated patchResource clients, dead app helper, tests, and mocks were identified.",
+      "tags": [
+        "backend",
+        "implemented",
+        "migration",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": -560,
+          "y": 1540
+        }
+      }
+    },
+    {
+      "id": "migration-step-2-route-switch",
+      "text": "Done: product callers already used live draft paths; remaining latent surfaces were removed. Editor/API/tool mutations now stay on patchDraft/patchLive before Save.",
+      "tags": [
+        "backend",
+        "frontend",
+        "implemented",
+        "migration",
+        "tools",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": -280,
+          "y": 1700
+        }
+      }
+    },
+    {
+      "id": "migration-step-3-api-contract",
+      "text": "Done: API contract now removes the direct saved patch route instead of silently changing its semantics. Clients were regenerated after the Protocol/HttpApi change.",
+      "tags": [
+        "backend",
+        "implemented",
+        "migration",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 280,
+          "y": 1700
+        }
+      }
+    },
+    {
+      "id": "migration-step-4-remove-legacy",
+      "text": "Done: removed the legacy ArchitectureGraph.patch service method and server handler path so normal edit tooling cannot reach immediate saved-resource patching.",
+      "tags": [
+        "backend",
+        "cleanup",
+        "implemented",
+        "migration",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 560,
+          "y": 1540
+        }
+      }
+    },
+    {
+      "id": "migration-step-5-enforce-commit",
+      "text": "Done: tests were updated so graph edits prove live-draft behavior and saved persistence happens after commitDraft/save rather than direct saved patching.",
+      "tags": [
+        "implemented",
+        "migration",
+        "storage",
+        "test",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": 280,
+          "y": 1880
+        }
+      }
+    },
+    {
+      "id": "migration-step-6-verify",
+      "text": "Done: verified with focused core/client/opencode tests, protocol/server/app/opencode/core/client/sdk typechecks, generated client refresh, legacy JS SDK regeneration, grep for removed saved patch symbols, and git diff --check.",
+      "tags": [
+        "implemented",
+        "migration",
+        "test",
+        "verified"
+      ],
+      "layout": {
+        "position": {
+          "x": -280,
+          "y": 1880
         }
       }
     },
@@ -169,12 +374,14 @@
       "id": "node_mslw55fx",
       "text": "Live graph in RAM — temporary draft layer for one graph resource; edits are shared immediately but only become durable after Save.",
       "tags": [
-        "core"
+        "core",
+        "implemented",
+        "verified"
       ],
       "layout": {
         "position": {
-          "x": 0,
-          "y": 380
+          "x": 4,
+          "y": 460
         }
       }
     },
@@ -254,6 +461,67 @@
         "position": {
           "x": 0,
           "y": -220
+        }
+      }
+    },
+    {
+      "id": "status-in-place-backend-core",
+      "text": "In place: backend/core live draft service. ArchitectureDraft stores per-resource RAM entries; graph service exposes loadLive/loadDraft, patchLive/patchDraft, commitDraft, discardDraft, reloadSaved, and queryLive/contextLive.",
+      "tags": [
+        "assessment",
+        "backend",
+        "core",
+        "implemented"
+      ],
+      "layout": {
+        "position": {
+          "x": -520,
+          "y": 980
+        }
+      }
+    },
+    {
+      "id": "status-in-place-ui-events",
+      "text": "In place: UI event synchronization. The panel listens to server architecture events, updates resource and draft query caches, reloads stale draft snapshots, and rebases local journaled operations against live draft changes.",
+      "tags": [
+        "assessment",
+        "frontend",
+        "implemented"
+      ],
+      "layout": {
+        "position": {
+          "x": -519.1796647920105,
+          "y": 1210.040456847884
+        }
+      }
+    },
+    {
+      "id": "status-live-architecture-summary",
+      "text": "Status for selected live-draft architecture — the normal editor/tool path is in place: RAM draft, live patching, shared reads, save commit, reload/discard, conflict guard, and UI event sync. Final migration remains: remove/replace the legacy direct saved-resource patch path so disk writes happen only through explicit Save/commit.",
+      "tags": [
+        "assessment",
+        "implemented",
+        "migration"
+      ],
+      "layout": {
+        "position": {
+          "x": 4,
+          "y": 1020
+        }
+      }
+    },
+    {
+      "id": "status-remaining-hardening",
+      "text": "After final migration, remaining work is hardening only: multi-client timing edge cases, clearer conflict-resolution UX, and regression coverage around event ordering.",
+      "tags": [
+        "assessment",
+        "remaining",
+        "risk"
+      ],
+      "layout": {
+        "position": {
+          "x": 420.0408811980475,
+          "y": 995.8880585690888
         }
       }
     }
@@ -511,6 +779,174 @@
       "id": "edge_mslw65mt_ug8vpl",
       "source": "node_mslw64lx",
       "target": "node_mslw55fx",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-complete-save-tool",
+      "source": "migration-implementation-complete",
+      "target": "migration-save-tool-added",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-finished-complete",
+      "source": "migration-finished-state",
+      "target": "migration-implementation-complete",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-goal-step1",
+      "source": "migration-goal-commit-only",
+      "target": "migration-step-1-inventory",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-old-goal",
+      "source": "migration-old-direct-patch",
+      "target": "migration-goal-commit-only",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-step1-step2",
+      "source": "migration-step-1-inventory",
+      "target": "migration-step-2-route-switch",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-step2-step3",
+      "source": "migration-step-2-route-switch",
+      "target": "migration-step-3-api-contract",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-step3-step4",
+      "source": "migration-step-3-api-contract",
+      "target": "migration-step-4-remove-legacy",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-step4-step5",
+      "source": "migration-step-4-remove-legacy",
+      "target": "migration-step-5-enforce-commit",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-step5-finished",
+      "source": "migration-step-5-enforce-commit",
+      "target": "migration-finished-state",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-step5-step6",
+      "source": "migration-step-5-enforce-commit",
+      "target": "migration-step-6-verify",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-step6-finished",
+      "source": "migration-step-6-verify",
+      "target": "migration-finished-state",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-migration-summary-old-patch",
+      "source": "status-live-architecture-summary",
+      "target": "migration-old-direct-patch",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-save-tool-commit-goal",
+      "source": "migration-save-tool-added",
+      "target": "migration-goal-commit-only",
+      "sourceHandle": "top",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge-status-conflict-core",
+      "source": "live-conflict-guard",
+      "target": "status-in-place-backend-core",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge-status-events-ui",
+      "source": "live-events-sync",
+      "target": "status-in-place-ui-events",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-status-patch-core",
+      "source": "live-patch-draft",
+      "target": "status-in-place-backend-core",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-status-ram-summary",
+      "source": "node_mslw55fx",
+      "target": "status-live-architecture-summary",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-status-read-core",
+      "source": "live-shared-read",
+      "target": "status-in-place-backend-core",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge-status-reload-core",
+      "source": "live-reload-discard",
+      "target": "status-in-place-backend-core",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge-status-save-core",
+      "source": "live-save-commit",
+      "target": "status-in-place-backend-core",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge-status-summary-remaining",
+      "source": "status-live-architecture-summary",
+      "target": "status-remaining-hardening",
       "sourceHandle": "right",
       "targetHandle": "left",
       "style": "curved"

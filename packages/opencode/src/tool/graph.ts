@@ -26,6 +26,7 @@ const DeleteResourceInput = Schema.Struct({
   expectedDigest: Schema.String,
 })
 const ReloadResourceInput = Schema.Struct({ resourceID: Architecture.ResourceID })
+const SaveResourceInput = Schema.Struct({ resourceID: Architecture.ResourceID, expectedDigest: ExpectedDigest })
 const UpdateResourceInput = Schema.Struct({ resourceID: Architecture.ResourceID, name: Schema.NonEmptyString })
 const GetContextInput = Schema.Struct({ resourceIDs: Schema.Array(Architecture.ResourceID).pipe(Schema.optional) })
 const CreateNodeInput = Schema.Struct({
@@ -102,6 +103,7 @@ type Metadata = {
   digest?: string
   count?: number
   source?: ArchitectureGraph.Source
+  saved?: boolean
 }
 
 export const GraphTools = Effect.gen(function* () {
@@ -162,6 +164,50 @@ export const GraphTools = Effect.gen(function* () {
               `Graph resource ${output.snapshot.resource.id}`,
               { path: `${root}/${output.snapshot.resource.id}.json`, ...output.snapshot, source: output.source },
               snapshotMetadata(output.snapshot, output.source),
+            ),
+          ),
+        ),
+    }),
+    graphTool(ArchitectureTools.names.saveResource, {
+      description:
+        "Commit one managed Graph editor resource's current live draft to saved storage. This is the explicit Save boundary; if no live draft exists, it returns the saved snapshot without writing.",
+      parameters: SaveResourceInput,
+      execute: (input, ctx) =>
+        authorize(ctx, "edit", input.resourceID).pipe(
+          Effect.andThen(
+            withGraph((graph) =>
+              Effect.gen(function* () {
+                const current = yield* graph.loadDraft(input.resourceID)
+                if (current.source === "saved") return { snapshot: current.snapshot, source: current.source, saved: false }
+                if (input.expectedDigest !== undefined && current.snapshot.digest !== input.expectedDigest)
+                  return yield* Effect.fail(
+                    conflictError(
+                      ArchitectureConflict.make({
+                        resourceID: input.resourceID,
+                        resourceName: current.snapshot.resource.name,
+                        operation: ArchitectureTools.names.saveResource,
+                        expected: { digest: input.expectedDigest },
+                        actual: { revision: current.snapshot.resource.revision, digest: current.snapshot.digest },
+                        safeToRetry: "unknown",
+                      }),
+                    ),
+                  )
+                return {
+                  snapshot: yield* graph.commitDraft(input.resourceID, {
+                    revision: current.snapshot.resource.revision,
+                    digest: current.snapshot.digest,
+                  }, conflict(ArchitectureTools.names.saveResource, "unknown")),
+                  source: "saved" as const,
+                  saved: true,
+                }
+              }),
+            ),
+          ),
+          Effect.map((output) =>
+            json(
+              output.saved ? `Saved graph resource ${output.snapshot.resource.id}` : `Graph resource ${output.snapshot.resource.id} already saved`,
+              { ...output.snapshot, source: output.source, saved: output.saved },
+              { ...snapshotMetadata(output.snapshot, output.source), saved: output.saved },
             ),
           ),
         ),

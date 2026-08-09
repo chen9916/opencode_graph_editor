@@ -41,7 +41,7 @@ describe("ArchitectureContext", () => {
         id: Architecture.ResourceID.make("product"),
         name: "Graph 1",
       })
-      const saved = yield* graph.patch(base.resource.id, {
+      const draft = yield* graph.patchDraft(base.resource.id, {
         revision: base.resource.revision,
         digest: base.digest,
         operations: [
@@ -63,6 +63,10 @@ describe("ArchitectureContext", () => {
           },
         ],
       })
+      const saved = yield* graph.commitDraft(base.resource.id, {
+        revision: draft.snapshot.resource.revision,
+        digest: draft.snapshot.digest,
+      })
       const initialized = yield* SystemContext.initialize(yield* registry.load())
       expect(initialized.baseline).toContain("lightweight communication artifacts")
       expect(initialized.baseline).toContain(
@@ -79,7 +83,7 @@ describe("ArchitectureContext", () => {
       expect(initialized.baseline).toContain("(position: 0, 0)")
 
       const current = saved.resource.nodes[0]!
-      const changed = yield* graph.patch(saved.resource.id, {
+      const changedDraft = yield* graph.patchDraft(saved.resource.id, {
         revision: saved.resource.revision,
         digest: saved.digest,
         operations: [
@@ -89,6 +93,10 @@ describe("ArchitectureContext", () => {
             node: { ...current, text: "Collaborative conversation" },
           },
         ],
+      })
+      const changed = yield* graph.commitDraft(saved.resource.id, {
+        revision: changedDraft.snapshot.resource.revision,
+        digest: changedDraft.snapshot.digest,
       })
       const reconciled = yield* SystemContext.reconcile(yield* registry.load(), initialized.snapshot)
       expect(reconciled).toMatchObject({ _tag: "Updated" })

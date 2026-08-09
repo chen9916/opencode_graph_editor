@@ -30,23 +30,6 @@ export function loadArchitectureResource(api: ServerApi, directory: string, reso
     .then((result: ArchitectureGetResourceOutput) => result.data)
 }
 
-export function patchArchitectureResource(
-  api: ServerApi,
-  directory: string,
-  base: ArchitectureGetResourceOutput["data"],
-  operations: ReadonlyArray<ArchitectureOperation>,
-) {
-  return api.architecture
-    .patchResource({
-      location: { directory },
-      resourceID: base.resource.id,
-      revision: base.resource.revision,
-      digest: base.digest,
-      operations: [...operations],
-    })
-    .then((result) => result.data)
-}
-
 export function loadArchitectureResourceDraft(
   api: ServerApi,
   directory: string,

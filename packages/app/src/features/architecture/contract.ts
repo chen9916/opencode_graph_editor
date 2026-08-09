@@ -1,7 +1,7 @@
 import type {
   ArchitectureGetDraftOutput,
   ArchitectureGetResourceOutput,
-  ArchitecturePatchResourceInput,
+  ArchitecturePatchDraftInput,
 } from "@opencode-ai/client/promise"
 import type { Direction } from "@/context/language"
 import type { ArchitectureCommandAction } from "./commands"
@@ -12,7 +12,7 @@ export type ArchitectureResource = ArchitectureSnapshot["resource"]
 export type ArchitectureNode = ArchitectureResource["nodes"][number]
 export type ArchitectureEdge = ArchitectureResource["edges"][number]
 export type ArchitectureConnectionSide = NonNullable<ArchitectureEdge["sourceHandle"]>
-export type ArchitectureOperation = ArchitecturePatchResourceInput["operations"][number]
+export type ArchitectureOperation = ArchitecturePatchDraftInput["operations"][number]
 export type ArchitectureViewport = { readonly x: number; readonly y: number; readonly zoom: number }
 export type ArchitectureEdgeStyle = "rectangular" | "curved" | "straight"
 

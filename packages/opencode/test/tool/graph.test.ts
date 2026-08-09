@@ -4,7 +4,7 @@ import { LocationServiceMap } from "@opencode-ai/core/location-services"
 import { RelativePath } from "@opencode-ai/core/schema"
 import { ArchitectureTools } from "@opencode-ai/core/architecture/tools"
 import { Architecture } from "@opencode-ai/schema/architecture"
-import { Effect, Layer } from "effect"
+import { Cause, Effect, Exit, Layer } from "effect"
 import { Agent } from "@/agent/agent"
 import { MessageID, SessionID } from "@/session/schema"
 import { GraphTools } from "@/tool/graph"
@@ -31,7 +31,6 @@ function graphMock(input: Partial<ArchitectureGraph.Interface> = {}): Architectu
     load: () => Effect.die("unexpected graph load in legacy GraphTools test"),
     loadLive: () => Effect.die("unexpected graph live load in legacy GraphTools test"),
     loadDraft: () => Effect.die("unexpected graph draft load in legacy GraphTools test"),
-    patch: () => Effect.die("unexpected graph patch in legacy GraphTools test"),
     patchLive: () => Effect.die("unexpected graph live patch in legacy GraphTools test"),
     patchDraft: () => Effect.die("unexpected graph draft patch in legacy GraphTools test"),
     commitDraft: () => Effect.die("unexpected graph draft commit in legacy GraphTools test"),
@@ -89,6 +88,12 @@ function runTool(id: string, input: Record<string, unknown>, graph: Partial<Arch
   }).pipe(withTmpdirInstance(), Effect.scoped, Effect.provide(layer(graph)))
 }
 
+async function failure(effect: Effect.Effect<unknown, unknown, never>) {
+  const exit = await Effect.runPromise(effect.pipe(Effect.exit))
+  if (Exit.isSuccess(exit)) throw new Error("expected the tool to fail")
+  return Cause.squash(exit.cause) as Error
+}
+
 describe("legacy graph tools", () => {
   test("list reads live resources and reports source metadata", async () => {
     const saved = snapshot({
@@ -126,6 +131,98 @@ describe("legacy graph tools", () => {
 
     expect(JSON.parse(output.output)).toMatchObject({ resource: { name: "Saved graph" }, source: "saved" })
     expect(output.metadata).toMatchObject({ resourceID: "design_test", revision: 2, digest: "digest", source: "saved" })
+  })
+
+  test("save commits live drafts using the current draft revision and digest", async () => {
+    const resourceID = Architecture.ResourceID.make("design_test")
+    const current = snapshot({ version: 2, id: resourceID, name: "Live graph", revision: 4, nodes: [], edges: [] }, "live-digest")
+    const saved = snapshot({ ...current.resource, revision: 5 }, "saved-digest")
+    const calls: string[] = []
+    const output = await Effect.runPromise(
+      runTool(ArchitectureTools.names.saveResource, {
+        resourceID: "design_test",
+        expectedDigest: "live-digest",
+      }, {
+        loadDraft: () => Effect.sync(() => {
+          calls.push("loadDraft")
+          return { snapshot: current, source: "live" as const }
+        }),
+        commitDraft: (_id, input) => Effect.sync(() => {
+          calls.push(`commitDraft:${input.revision}:${input.digest}`)
+          return saved
+        }),
+      }),
+    )
+
+    expect(calls).toEqual(["loadDraft", "commitDraft:4:live-digest"])
+    expect(JSON.parse(output.output)).toMatchObject({
+      resource: { id: "design_test", revision: 5 },
+      digest: "saved-digest",
+      source: "saved",
+      saved: true,
+    })
+    expect(output.metadata).toMatchObject({
+      resourceID: "design_test",
+      revision: 5,
+      digest: "saved-digest",
+      source: "saved",
+      saved: true,
+    })
+  })
+
+  test("save no-ops when no live draft exists", async () => {
+    const resourceID = Architecture.ResourceID.make("design_test")
+    const current = snapshot({ version: 2, id: resourceID, name: "Saved graph", revision: 2, nodes: [], edges: [] }, "saved-digest")
+    const calls: string[] = []
+    const output = await Effect.runPromise(
+      runTool(ArchitectureTools.names.saveResource, { resourceID: "design_test" }, {
+        loadDraft: () => Effect.sync(() => {
+          calls.push("loadDraft")
+          return { snapshot: current, source: "saved" as const }
+        }),
+      }),
+    )
+
+    expect(calls).toEqual(["loadDraft"])
+    expect(JSON.parse(output.output)).toMatchObject({
+      resource: { id: "design_test", revision: 2 },
+      digest: "saved-digest",
+      source: "saved",
+      saved: false,
+    })
+    expect(output.metadata).toMatchObject({
+      resourceID: "design_test",
+      revision: 2,
+      digest: "saved-digest",
+      source: "saved",
+      saved: false,
+    })
+  })
+
+  test("save rejects stale expected digests before committing", async () => {
+    const resourceID = Architecture.ResourceID.make("design_test")
+    const current = snapshot({ version: 2, id: resourceID, name: "Live graph", revision: 4, nodes: [], edges: [] }, "live-digest")
+    const calls: string[] = []
+    const error = await failure(
+      runTool(ArchitectureTools.names.saveResource, {
+        resourceID: "design_test",
+        expectedDigest: "stale-digest",
+      }, {
+        loadDraft: () => Effect.sync(() => {
+          calls.push("loadDraft")
+          return { snapshot: current, source: "live" as const }
+        }),
+      }),
+    ) as Error & { conflict?: { error?: string; operation?: string; expectedDigest?: string; currentDigest?: string } }
+
+    expect(calls).toEqual(["loadDraft"])
+    expect(error.message).toContain("operation=graph_save_resource")
+    expect(error.conflict).toMatchObject({
+      error: "GraphConflictError",
+      operation: "graph_save_resource",
+      expectedDigest: "stale-digest",
+      currentDigest: "live-digest",
+    })
   })
 
   test("edits load and patch the live draft by default", async () => {

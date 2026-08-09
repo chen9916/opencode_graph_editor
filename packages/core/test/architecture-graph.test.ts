@@ -77,7 +77,7 @@ describe("ArchitectureGraph storage", () => {
         id: Architecture.ResourceID.make("runtime"),
         name: "Current runtime",
       })
-      const saved = yield* graph.patch(product.resource.id, {
+      const drafted = yield* graph.patchDraft(product.resource.id, {
         revision: product.resource.revision,
         digest: product.digest,
         operations: [
@@ -87,6 +87,10 @@ describe("ArchitectureGraph storage", () => {
             node: node("conversation"),
           },
         ],
+      })
+      const saved = yield* graph.commitDraft(product.resource.id, {
+        revision: drafted.snapshot.resource.revision,
+        digest: drafted.snapshot.digest,
       })
       const raw = yield* Effect.promise(() => fs.readFile(path.join(saved.storage.root, saved.storage.path), "utf8"))
 
@@ -101,17 +105,17 @@ describe("ArchitectureGraph storage", () => {
     }),
   )
 
-  it.live("rejects stale resource snapshots", () =>
+  it.live("rejects stale draft mutations", () =>
     Effect.gen(function* () {
       const graph = yield* ArchitectureGraph.Service
       const base = yield* graph.create({ id: Architecture.ResourceID.make("design"), name: "Design" })
-      const saved = yield* graph.patch(base.resource.id, {
+      const saved = yield* graph.patchDraft(base.resource.id, {
         revision: base.resource.revision,
         digest: base.digest,
         operations: [{ id: Architecture.OperationID.make("first"), type: "node.create", node: node("first") }],
       })
       const stale = yield* graph
-        .patch(base.resource.id, {
+        .patchDraft(base.resource.id, {
           revision: base.resource.revision,
           digest: base.digest,
           operations: [{ id: Architecture.OperationID.make("second"), type: "node.create", node: node("second") }],
@@ -121,15 +125,15 @@ describe("ArchitectureGraph storage", () => {
       expect(stale).toMatchObject({
         resourceID: base.resource.id,
         resourceName: "Design",
-        operation: "graph_patch",
+        operation: "graph_draft_patch",
         expectedRevision: base.resource.revision,
-        currentRevision: saved.resource.revision,
+        currentRevision: saved.snapshot.resource.revision,
         expectedDigest: base.digest,
-        currentDigest: saved.digest,
+        currentDigest: saved.snapshot.digest,
         safeToRetry: "unknown",
         retryHint: "Reload the graph resource and retry the edit against the latest digest.",
         expected: { revision: base.resource.revision, digest: base.digest },
-        actual: { revision: saved.resource.revision, digest: saved.digest },
+        actual: { revision: saved.snapshot.resource.revision, digest: saved.snapshot.digest },
         operationIDs: [],
       })
       expect(stale.message).toContain("expected revision 0")
@@ -139,7 +143,7 @@ describe("ArchitectureGraph storage", () => {
         message: "Graph resource changed before this edit could be applied.",
         resourceID: base.resource.id,
       })
-      expect((yield* graph.load(base.resource.id)).digest).toBe(saved.digest)
+      expect((yield* graph.load(base.resource.id)).digest).toBe(base.digest)
     }),
   )
 
@@ -290,13 +294,11 @@ describe("ArchitectureGraph storage", () => {
           { id: Architecture.OperationID.make("draft-node"), type: "node.create", node: node("draft-node") },
         ],
       })
-      const saved = yield* graph.patch(base.resource.id, {
-        revision: base.resource.revision,
-        digest: base.digest,
-        operations: [
-          { id: Architecture.OperationID.make("saved-node"), type: "node.create", node: node("saved-node") },
-        ],
-      })
+      const saved = { ...live.snapshot.resource, revision: live.snapshot.resource.revision + 1, name: "Saved draft" }
+      yield* Effect.promise(() =>
+        fs.writeFile(path.join(live.snapshot.storage.root, live.snapshot.storage.path), JSON.stringify(saved, null, 2) + "\n"),
+      )
+      const current = yield* graph.load(base.resource.id)
       const stale = yield* graph
         .patchLive(base.resource.id, {
           revision: live.snapshot.resource.revision,
@@ -310,9 +312,9 @@ describe("ArchitectureGraph storage", () => {
       expect(stale).toMatchObject({
         resourceID: base.resource.id,
         expectedRevision: base.resource.revision,
-        currentRevision: saved.resource.revision,
+        currentRevision: current.resource.revision,
         expectedDigest: base.digest,
-        currentDigest: saved.digest,
+        currentDigest: current.digest,
       })
       expect(yield* drafts.get(base.resource.id)).toMatchObject({
         baseRevision: base.resource.revision,
@@ -322,7 +324,7 @@ describe("ArchitectureGraph storage", () => {
       expect(yield* graph.loadLive(base.resource.id).pipe(Effect.flip)).toMatchObject({
         operation: "graph_draft_load",
         expected: { revision: base.resource.revision, digest: base.digest },
-        actual: { revision: saved.resource.revision, digest: saved.digest },
+        actual: { revision: current.resource.revision, digest: current.digest },
       })
       expect(
         yield* graph
@@ -334,7 +336,7 @@ describe("ArchitectureGraph storage", () => {
       ).toMatchObject({
         operation: "graph_draft_commit",
         expected: { revision: base.resource.revision, digest: base.digest },
-        actual: { revision: saved.resource.revision, digest: saved.digest },
+        actual: { revision: current.resource.revision, digest: current.digest },
       })
       yield* graph.discardDraft(base.resource.id)
       expect((yield* graph.loadLive(base.resource.id)).source).toBe("saved")
@@ -520,7 +522,7 @@ describe("ArchitectureGraph storage", () => {
 
       const listed = yield* graph.list()
       const current = yield* graph.load(Architecture.ResourceID.make("overview"))
-      const saved = yield* graph.patch(current.resource.id, {
+      const draft = yield* graph.patchDraft(current.resource.id, {
         revision: current.resource.revision,
         digest: current.digest,
         operations: [
@@ -530,6 +532,10 @@ describe("ArchitectureGraph storage", () => {
             name: "Migrated design",
           },
         ],
+      })
+      const saved = yield* graph.commitDraft(current.resource.id, {
+        revision: draft.snapshot.resource.revision,
+        digest: draft.snapshot.digest,
       })
 
       expect(String(listed[0]?.id)).toBe("overview")
@@ -632,10 +638,14 @@ describe("ArchitectureGraph storage", () => {
         style: "rectangular",
       })
 
-      const saved = yield* graph.patch(loaded.resource.id, {
+      const drafted = yield* graph.patchDraft(loaded.resource.id, {
         revision: loaded.resource.revision,
         digest: loaded.digest,
         operations: [{ id: Architecture.OperationID.make("rename"), type: "resource.update", name: "Clean graph" }],
+      })
+      const saved = yield* graph.commitDraft(loaded.resource.id, {
+        revision: drafted.snapshot.resource.revision,
+        digest: drafted.snapshot.digest,
       })
       const raw = yield* Effect.promise(() => fs.readFile(path.join(saved.storage.root, saved.storage.path), "utf8"))
       const json = JSON.parse(raw)

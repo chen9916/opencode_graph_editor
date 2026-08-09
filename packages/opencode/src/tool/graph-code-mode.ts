@@ -44,6 +44,11 @@ const MutationOutput = Schema.Struct({
 })
 
 const ResourceIDInput = Schema.Struct({ resourceID: Architecture.ResourceID })
+const SaveResourceInput = Schema.Struct({ resourceID: Architecture.ResourceID, expectedDigest: ExpectedDigest })
+const SaveOutput = Schema.Struct({
+  ...SourcedResourceSnapshot.fields,
+  saved: Schema.Boolean,
+})
 const DeleteResourceInput = Schema.Struct({
   resourceID: Architecture.ResourceID,
   expectedDigest: Schema.String,
@@ -163,6 +168,47 @@ export function graphCodeModeTools(): CodeModeNativeTool[] {
           const graph = yield* ArchitectureGraph.Service
           const saved = yield* graph.reloadSaved(input.resourceID)
           return { ...saved.snapshot, source: saved.source }
+        }),
+    }),
+    graphTool({
+      key: ArchitectureTools.names.saveResource,
+      permission: "edit",
+      input: SaveResourceInput,
+      output: SaveOutput,
+      description:
+        "Native graph_save_resource. Commit one managed Graph editor resource's current live draft to saved storage. This is the explicit Save boundary; if no live draft exists, it returns the saved snapshot without writing.",
+      run: (input) =>
+        Effect.gen(function* () {
+          const graph = yield* ArchitectureGraph.Service
+          const current = yield* graph.loadDraft(input.resourceID)
+          if (current.source === "saved")
+            return {
+              ...current.snapshot,
+              source: current.source,
+              saved: false,
+            }
+          if (input.expectedDigest !== undefined && current.snapshot.digest !== input.expectedDigest)
+            return yield* Effect.fail(
+              conflictError(
+                ArchitectureConflict.make({
+                  resourceID: input.resourceID,
+                  resourceName: current.snapshot.resource.name,
+                  operation: ArchitectureTools.names.saveResource,
+                  expected: { digest: input.expectedDigest },
+                  actual: { revision: current.snapshot.resource.revision, digest: current.snapshot.digest },
+                  safeToRetry: "unknown",
+                }),
+              ),
+            )
+          const saved = yield* graph.commitDraft(input.resourceID, {
+            revision: current.snapshot.resource.revision,
+            digest: current.snapshot.digest,
+          }, conflict(ArchitectureTools.names.saveResource, "unknown"))
+          return {
+            ...saved,
+            source: "saved" as const,
+            saved: true,
+          }
         }),
     }),
     graphTool({

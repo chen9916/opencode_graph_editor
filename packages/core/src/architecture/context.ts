@@ -31,7 +31,7 @@ const baseline = (value: typeof Value.Type) =>
     "When the user mentions one or more graphs, use only those named resources unless they explicitly ask to compare additional graphs.",
     "To modify a mentioned graph, use the graph_* tools with its resource ID; do not edit .opencode/architecture/resources/*.json directly and do not inspect installed OpenCode internals before making normal graph edits.",
     "If the current session does not expose graph_* tools, report that managed graph editing is unavailable in this session instead of editing graph JSON directly, unless the user explicitly asks for raw file edits.",
-    "Graph edits update a live draft first. Use query/context/list tools to inspect live draft state; use graph_reload_resource only for an explicit saved reload/discard, because reload drops the live draft for that resource.",
+    "Graph edits update a live draft first. Use query/context/list tools to inspect live draft state, graph_save_resource for an explicit Save boundary, and graph_reload_resource only for an explicit saved reload/discard because reload drops the live draft for that resource.",
     "Durable graph data has only these visual structure fields: node text, node tags, per-resource tagColors, node position, connection source, connection target, sourceHandle, targetHandle, and style. Do not invent JSON fields such as sourcePosition, targetPosition, type, status, or edge labels.",
     "Tag colors may be set before any node currently uses that tag; preserve them as planned visual language for later graph edits.",
     "For structural multi-node, multi-connection, or tag-color edits, prefer graph_batch_edit so related creations and updates land as one graph edit.",

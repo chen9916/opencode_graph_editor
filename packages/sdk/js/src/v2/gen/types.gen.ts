@@ -4057,6 +4057,13 @@ export type ArchitectureResourceSnapshot = {
   storage: ArchitectureStorage
 }
 
+export type ArchitectureDraftSource = "live" | "saved"
+
+export type ArchitectureDraftSnapshot = {
+  snapshot: ArchitectureResourceSnapshot
+  source: ArchitectureDraftSource
+}
+
 export type ArchitectureOperation =
   | {
       id: string
@@ -4116,13 +4123,6 @@ export type ArchitecturePatchInput = {
   revision: number
   digest: string
   operations: Array<ArchitectureOperation>
-}
-
-export type ArchitectureDraftSource = "live" | "saved"
-
-export type ArchitectureDraftSnapshot = {
-  snapshot: ArchitectureResourceSnapshot
-  source: ArchitectureDraftSource
 }
 
 export type ArchitectureDraftCommitInput = {
@@ -11899,63 +11899,6 @@ export type V2ArchitectureResourceGetResponses = {
 
 export type V2ArchitectureResourceGetResponse =
   V2ArchitectureResourceGetResponses[keyof V2ArchitectureResourceGetResponses]
-
-export type V2ArchitectureResourcePatchData = {
-  body: ArchitecturePatchInput
-  path: {
-    resourceID: string
-  }
-  query?: {
-    location?: {
-      directory?: string
-      workspace?: string
-    }
-  }
-  url: "/api/architecture/resource/{resourceID}"
-}
-
-export type V2ArchitectureResourcePatchErrors = {
-  /**
-   * InvalidRequestError
-   */
-  400: InvalidRequestError
-  /**
-   * UnauthorizedError
-   */
-  401: UnauthorizedError
-  /**
-   * ArchitectureNotFoundError
-   */
-  404: ArchitectureNotFoundError
-  /**
-   * ArchitectureConflictError
-   */
-  409: ArchitectureConflictError
-  /**
-   * ArchitectureInvalidGraphError
-   */
-  422: ArchitectureInvalidGraphError
-  /**
-   * ArchitectureUnavailableError
-   */
-  503: ArchitectureUnavailableError
-}
-
-export type V2ArchitectureResourcePatchError =
-  V2ArchitectureResourcePatchErrors[keyof V2ArchitectureResourcePatchErrors]
-
-export type V2ArchitectureResourcePatchResponses = {
-  /**
-   * Success
-   */
-  200: {
-    location: LocationInfo
-    data: ArchitectureResourceSnapshot
-  }
-}
-
-export type V2ArchitectureResourcePatchResponse =
-  V2ArchitectureResourcePatchResponses[keyof V2ArchitectureResourcePatchResponses]
 
 export type V2ArchitectureResourceDraftGetData = {
   body?: never

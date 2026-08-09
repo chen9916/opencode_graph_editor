@@ -15,6 +15,7 @@ export interface ConnectResponsesWebSocketOptions {
   headers: Record<string, string>
   timeout?: number
   signal?: AbortSignal
+  proxy?: string
 }
 
 export interface StreamResponsesWebSocketOptions {
@@ -83,9 +84,10 @@ export function connectResponsesWebSocket(options: ConnectResponsesWebSocketOpti
 
     // Bun does not apply HTTP(S)_PROXY to WebSockets unless the proxy is supplied explicitly.
     const proxy =
-      typeof Bun === "undefined"
+      options.proxy ??
+      (typeof Bun === "undefined"
         ? undefined
-        : ProxyEnv.getProxyForUrl(options.url.replace(/^wss:/, "https:").replace(/^ws:/, "http:"))
+        : ProxyEnv.getProxyForUrl(options.url.replace(/^wss:/, "https:").replace(/^ws:/, "http:")))
     const connect = { headers, ...(proxy ? { proxy } : {}) }
     const socket = new WebSocket(options.url, connect)
     const timeout = options.timeout

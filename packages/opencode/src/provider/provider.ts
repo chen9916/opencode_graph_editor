@@ -31,8 +31,10 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { ModelStatus } from "./model-status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderError } from "./error"
+import { ProxyEnv } from "@/util/proxy-env"
 
 const OPENAI_HEADER_TIMEOUT_DEFAULT = 300_000
+const nodeProxyAgents = new Map<string, unknown>()
 
 function wrapSSE(res: Response, ms: number, ctl: AbortController) {
   if (typeof ms !== "number" || ms <= 0) return res
@@ -88,6 +90,39 @@ function timeoutController(ms: number) {
   return {
     signal: ctl.signal,
     clear: () => clearTimeout(id),
+  }
+}
+
+function requestURL(input: RequestInfo | URL) {
+  if (input instanceof URL) return input
+  if (typeof input === "string") return input
+  return input.url
+}
+
+function parseProxy(value: unknown) {
+  if (typeof value === "string" || value === false) return value
+  return undefined
+}
+
+function parseNoProxy(value: unknown) {
+  if (typeof value === "string") return value
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) return value
+  return undefined
+}
+
+async function fetchProxyOptions(
+  proxy: string | undefined,
+  customFetch: unknown,
+): Promise<{ fetch?: typeof globalThis.fetch; init: Record<string, unknown> }> {
+  if (!proxy) return { init: {} }
+  if (typeof Bun !== "undefined") return { init: { proxy } }
+
+  const { ProxyAgent, fetch } = await import("undici")
+  const agent = nodeProxyAgents.get(proxy) ?? new ProxyAgent(proxy)
+  if (!nodeProxyAgents.has(proxy)) nodeProxyAgents.set(proxy, agent)
+  return {
+    fetch: customFetch ? undefined : (fetch as unknown as typeof globalThis.fetch),
+    init: { dispatcher: agent },
   }
 }
 
@@ -1170,6 +1205,7 @@ interface State {
   sdk: Map<string, BundledSDK>
   modelLoaders: Record<string, CustomModelLoader>
   varsLoaders: Record<string, CustomVarsLoader>
+  network?: ConfigV1.Info["network"]
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Provider") {}
@@ -1664,6 +1700,7 @@ const layer = Layer.effect(
           sdk,
           modelLoaders,
           varsLoaders,
+          network: cfg.network,
         }
       }),
     )
@@ -1737,12 +1774,21 @@ const layer = Layer.effect(
         const customFetch = options["fetch"]
         const chunkTimeout = options["chunkTimeout"]
         const headerTimeout = options["headerTimeout"]
+        const proxy = parseProxy(options["proxy"])
+        const noProxy = parseNoProxy(options["noProxy"])
         delete options["chunkTimeout"]
         delete options["headerTimeout"]
+        delete options["proxy"]
+        delete options["noProxy"]
 
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
           const fetchFn = customFetch ?? fetch
           const opts = init ?? {}
+          const requestProxy =
+            ProxyEnv.getProxyForUrl(requestURL(input), {
+              proxy: proxy ?? s.network?.proxy,
+              noProxy: noProxy ?? s.network?.noProxy,
+            })
           const chunkAbortCtl = typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
           const headerTimeoutMs = headerTimeout === false ? undefined : headerTimeout
           const headerTimeoutCtl = typeof headerTimeoutMs === "number" ? timeoutController(headerTimeoutMs) : undefined
@@ -1756,9 +1802,11 @@ const layer = Layer.effect(
 
           const combined = signals.length === 0 ? null : signals.length === 1 ? signals[0] : AbortSignal.any(signals)
           if (combined) opts.signal = combined
+          const proxyOptions = await fetchProxyOptions(requestProxy, customFetch)
 
-          const res = await fetchFn(input, {
+          const res = await (proxyOptions.fetch ?? fetchFn)(input, {
             ...opts,
+            ...proxyOptions.init,
             // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
             timeout: false,
           }).finally(() => headerTimeoutCtl?.clear())

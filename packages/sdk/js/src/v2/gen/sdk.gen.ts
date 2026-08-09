@@ -285,8 +285,6 @@ import type {
   V2ArchitectureResourceGetResponses,
   V2ArchitectureResourceListErrors,
   V2ArchitectureResourceListResponses,
-  V2ArchitectureResourcePatchErrors,
-  V2ArchitectureResourcePatchResponses,
   V2ArchitectureResourceRemoveErrors,
   V2ArchitectureResourceRemoveResponses,
   V2ArchitectureResourceResetErrors,
@@ -5457,50 +5455,6 @@ export class Resource2 extends HeyApiClient {
       url: "/api/architecture/resource/{resourceID}",
       ...options,
       ...params,
-    })
-  }
-
-  /**
-   * Update graph resource
-   *
-   * Atomically apply graph edits with optimistic concurrency checks.
-   */
-  public patch<ThrowOnError extends boolean = false>(
-    parameters: {
-      resourceID: string
-      location?: {
-        directory?: string
-        workspace?: string
-      }
-      architecturePatchInput: ArchitecturePatchInput
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "path", key: "resourceID" },
-            { in: "query", key: "location" },
-            { key: "architecturePatchInput", map: "body" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).patch<
-      V2ArchitectureResourcePatchResponses,
-      V2ArchitectureResourcePatchErrors,
-      ThrowOnError
-    >({
-      url: "/api/architecture/resource/{resourceID}",
-      ...options,
-      ...params,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-        ...params.headers,
-      },
     })
   }
 

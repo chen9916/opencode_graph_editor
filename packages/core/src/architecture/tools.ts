@@ -20,6 +20,7 @@ export const names = {
   listResources: "graph_list_resources",
   createResource: "graph_create_resource",
   reloadResource: "graph_reload_resource",
+  saveResource: "graph_save_resource",
   updateResource: "graph_update_resource",
   deleteResource: "graph_delete_resource",
   query: "graph_query",
@@ -61,6 +62,14 @@ const MutationOutput = Schema.Struct({
 })
 
 const ExpectedDigest = Schema.String.pipe(Schema.optional)
+const SaveResourceInput = Schema.Struct({
+  resourceID: Architecture.ResourceID,
+  expectedDigest: ExpectedDigest,
+})
+const SaveOutput = Schema.Struct({
+  ...SourcedResourceSnapshot.fields,
+  saved: Schema.Boolean,
+})
 
 const layer = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -136,6 +145,52 @@ const layer = Layer.effectDiscard(
             ),
         }),
         "read",
+      ),
+      [names.saveResource]: Tool.withPermission(
+        Tool.make({
+          description:
+            "Commit one managed Graph editor resource's current live draft to saved storage. This is the explicit Save boundary; if no live draft exists, it returns the saved snapshot without writing.",
+          input: SaveResourceInput,
+          output: SaveOutput,
+          toModelOutput: ({ output }) => [{ type: "text", text: JSON.stringify(output) }],
+          execute: (input, context) =>
+            Effect.gen(function* () {
+              yield* authorize("edit", context, input.resourceID)
+              const current = yield* graph.loadDraft(input.resourceID)
+              if (current.source === "saved")
+                return {
+                  ...current.snapshot,
+                  source: current.source,
+                  saved: false,
+                }
+              if (input.expectedDigest !== undefined && current.snapshot.digest !== input.expectedDigest) {
+                const details = ArchitectureConflict.make({
+                  resourceID: input.resourceID,
+                  resourceName: current.snapshot.resource.name,
+                  operation: names.saveResource,
+                  expected: { digest: input.expectedDigest },
+                  actual: { revision: current.snapshot.resource.revision, digest: current.snapshot.digest },
+                  safeToRetry: "unknown",
+                })
+                return yield* new ToolFailure({
+                  message: ArchitectureConflict.describe(details),
+                  metadata: { conflict: ArchitectureConflict.payload(details) },
+                })
+              }
+              const saved = yield* graph.commitDraft(input.resourceID, {
+                revision: current.snapshot.resource.revision,
+                digest: current.snapshot.digest,
+              }, conflict(names.saveResource, "unknown"))
+              return {
+                ...saved,
+                source: "saved" as const,
+                saved: true,
+              }
+            }).pipe(
+              Effect.mapError((error) => failure(`Unable to save graph resource ${input.resourceID}`, error)),
+            ),
+        }),
+        "edit",
       ),
       [names.updateResource]: Tool.withPermission(
         Tool.make({

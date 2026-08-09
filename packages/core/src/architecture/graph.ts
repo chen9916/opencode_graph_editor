@@ -63,11 +63,6 @@ export interface Interface {
   readonly load: (id: Architecture.ResourceID) => Effect.Effect<Architecture.ResourceSnapshot, Error>
   readonly loadLive: (id: Architecture.ResourceID) => Effect.Effect<SourcedSnapshot, Error>
   readonly loadDraft: (id: Architecture.ResourceID) => Effect.Effect<Architecture.DraftSnapshot, Error>
-  readonly patch: (
-    id: Architecture.ResourceID,
-    input: Architecture.PatchInput,
-    conflict?: ConflictContext,
-  ) => Effect.Effect<Architecture.ResourceSnapshot, Error>
   readonly patchLive: (
     id: Architecture.ResourceID,
     input: Architecture.PatchInput,
@@ -499,54 +494,6 @@ const layer = Layer.effect(
       return yield* loadLive(id)
     })
 
-    const patch = Effect.fn("ArchitectureGraph.patch")(function* (
-      id: Architecture.ResourceID,
-      input: Architecture.PatchInput,
-      conflict?: ConflictContext,
-    ) {
-      const storage = yield* roots.get
-      return yield* locked(
-        storage,
-        Effect.gen(function* () {
-          const current = (yield* read(storage, id)).resource
-          const currentDigest = ArchitecturePatch.digest(current)
-          if (current.revision !== input.revision || currentDigest !== input.digest)
-            return yield* graphConflict(
-              id,
-              current.name,
-              { revision: input.revision, digest: input.digest },
-              { revision: current.revision, digest: currentDigest },
-              conflict,
-              "graph_patch",
-            )
-          const patched = yield* ArchitecturePatch.apply(current, input.operations).pipe(
-            Effect.mapError((error) =>
-              error instanceof ArchitecturePatch.ConflictError
-                ? graphConflict(
-                    id,
-                    current.name,
-                    { revision: input.revision, digest: input.digest },
-                    { revision: current.revision, digest: currentDigest },
-                    conflict,
-                    "graph_patch",
-                    error.operationIDs,
-                  )
-                : error,
-            ),
-          )
-          return yield* write(
-            storage,
-            patched,
-            {
-              revision: current.revision,
-              digest: currentDigest,
-            },
-            conflict,
-          )
-        }),
-      )
-    })
-
     const patchLive = Effect.fn("ArchitectureGraph.patchLive")(function* (
       id: Architecture.ResourceID,
       input: Architecture.PatchInput,
@@ -835,7 +782,6 @@ const layer = Layer.effect(
       load,
       loadLive,
       loadDraft,
-      patch,
       patchLive,
       patchDraft,
       commitDraft,

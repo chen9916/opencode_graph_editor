@@ -470,6 +470,57 @@ describe("ArchitectureTools", () => {
     }),
   )
 
+  it.effect("saves live drafts and no-ops when already saved", () =>
+    Effect.gen(function* () {
+      assertions.length = 0
+      deny = false
+      const registry = yield* ToolRegistry.Service
+      const graph = yield* ArchitectureGraph.Service
+      const saveResourceID = Architecture.ResourceID.make("save-sample")
+
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createResource, {
+          id: saveResourceID,
+          name: "Save sample",
+        }),
+      )
+
+      const noOp = yield* settleTool(registry, call(ArchitectureTools.names.saveResource, { resourceID: saveResourceID }))
+      expect(noOp.output?.structured).toMatchObject({
+        resource: { id: "save-sample" },
+        source: "saved",
+        saved: false,
+      })
+
+      yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.createNode, {
+          resourceID: saveResourceID,
+          id: "draft-node",
+          text: "Draft node",
+        }),
+      )
+      const draft = yield* graph.loadLive(saveResourceID)
+      expect(draft.source).toBe("live")
+
+      const saved = yield* settleTool(
+        registry,
+        call(ArchitectureTools.names.saveResource, {
+          resourceID: saveResourceID,
+          expectedDigest: draft.snapshot.digest,
+        }),
+      )
+      expect(saved.output?.structured).toMatchObject({
+        resource: { id: "save-sample" },
+        source: "saved",
+        saved: true,
+      })
+      expect((yield* graph.loadLive(saveResourceID)).source).toBe("saved")
+      expect((yield* graph.load(saveResourceID)).resource.nodes).toMatchObject([{ id: "draft-node", text: "Draft node" }])
+    }),
+  )
+
   it.effect("does not read or mutate resources after permission denial", () =>
     Effect.gen(function* () {
       assertions.length = 0

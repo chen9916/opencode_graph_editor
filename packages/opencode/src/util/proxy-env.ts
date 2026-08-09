@@ -33,22 +33,27 @@ const DEFAULT_PORTS: Record<string, number> = {
   wss: 443,
 }
 
-export function getProxyForUrl(input: string | URL) {
+export interface Options {
+  proxy?: string | false
+  noProxy?: string | string[]
+}
+
+export function getProxyForUrl(input: string | URL, options?: Options) {
   const url = typeof input === "string" ? (URL.canParse(input) ? new URL(input) : undefined) : input
   if (!url) return
 
   const protocol = url.protocol.split(":", 1)[0]
   const hostname = url.host.replace(/:\d*$/, "")
   const port = Number.parseInt(url.port) || DEFAULT_PORTS[protocol] || 0
-  if (!shouldProxy(hostname, port)) return
+  if (!shouldProxy(hostname, port, options?.noProxy)) return
 
-  const proxy = env(`${protocol}_proxy`) || env("all_proxy")
+  const proxy = options?.proxy === undefined ? env(`${protocol}_proxy`) || env("all_proxy") : options.proxy
   if (!proxy) return
   return proxy.includes("://") ? proxy : `${protocol}://${proxy}`
 }
 
-function shouldProxy(hostname: string, port: number) {
-  const noProxy = env("no_proxy").toLowerCase()
+function shouldProxy(hostname: string, port: number, configured?: string | string[]) {
+  const noProxy = (Array.isArray(configured) ? configured.join(",") : configured ?? env("no_proxy")).toLowerCase()
   if (!noProxy) return true
   if (noProxy === "*") return false
 

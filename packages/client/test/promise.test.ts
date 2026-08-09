@@ -30,7 +30,6 @@ test("exposes every standard HTTP API group", () => {
     "listResources",
     "createResource",
     "getResource",
-    "patchResource",
     "getDraft",
     "patchDraft",
     "commitDraft",

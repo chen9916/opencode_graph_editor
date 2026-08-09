@@ -10,8 +10,6 @@ import type {
   ArchitectureCreateResourceOutput,
   ArchitectureGetResourceInput,
   ArchitectureGetResourceOutput,
-  ArchitecturePatchResourceInput,
-  ArchitecturePatchResourceOutput,
   ArchitectureGetDraftInput,
   ArchitectureGetDraftOutput,
   ArchitecturePatchDraftInput,
@@ -336,19 +334,6 @@ export function make(options: ClientOptions) {
             method: "GET",
             path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}`,
             query: { location: input["location"] },
-            successStatus: 200,
-            declaredStatuses: [409, 422, 404, 503, 401, 400],
-            empty: false,
-          },
-          requestOptions,
-        ),
-      patchResource: (input: ArchitecturePatchResourceInput, requestOptions?: RequestOptions) =>
-        request<ArchitecturePatchResourceOutput>(
-          {
-            method: "PATCH",
-            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}`,
-            query: { location: input["location"] },
-            body: { revision: input["revision"], digest: input["digest"], operations: input["operations"] },
             successStatus: 200,
             declaredStatuses: [409, 422, 404, 503, 401, 400],
             empty: false,

@@ -66,23 +66,6 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
       ),
   )
   .add(
-    HttpApiEndpoint.patch("architecture.resource.patch", "/api/architecture/resource/:resourceID", {
-      params: { resourceID: Architecture.ResourceID },
-      query: LocationQuery,
-      payload: Architecture.PatchInput,
-      success: Location.response(Architecture.ResourceSnapshot),
-      error: errors,
-    })
-      .annotateMerge(locationQueryOpenApi)
-      .annotateMerge(
-        OpenApi.annotations({
-          identifier: "v2.architecture.resource.patch",
-          summary: "Update graph resource",
-          description: "Atomically apply graph edits with optimistic concurrency checks.",
-        }),
-      ),
-  )
-  .add(
     HttpApiEndpoint.get("architecture.resource.draft.get", "/api/architecture/resource/:resourceID/draft", {
       params: { resourceID: Architecture.ResourceID },
       query: LocationQuery,

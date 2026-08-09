@@ -106,7 +106,6 @@ function graphMock(input: Partial<ArchitectureGraph.Interface> = {}): Architectu
     load: () => Effect.die("unexpected graph load in CodeMode test"),
     loadLive: () => Effect.die("unexpected graph live load in CodeMode test"),
     loadDraft: () => Effect.die("unexpected graph draft load in CodeMode test"),
-    patch: () => Effect.die("unexpected graph patch in CodeMode test"),
     patchLive: () => Effect.die("unexpected graph live patch in CodeMode test"),
     patchDraft: () => Effect.die("unexpected graph draft patch in CodeMode test"),
     commitDraft: () => Effect.die("unexpected graph draft commit in CodeMode test"),
@@ -364,7 +363,7 @@ describe("code mode execute", () => {
       tool.execute(
         {
           code: `
-            const matches = await tools.$codemode.search({ query: 'graph_set_tag_color', limit: 5 })
+            const matches = await tools.$codemode.search({ query: 'graph_save_resource', limit: 5 })
             return {
               namespaces: Object.keys(tools),
               graph: Object.keys(tools.graph),
@@ -378,11 +377,12 @@ describe("code mode execute", () => {
     const result = JSON.parse(output.output)
     expect(result.namespaces).toContain("graph")
     expect(result.graph).toContain("list_resources")
+    expect(result.graph).toContain("save_resource")
     expect(result.graph).toContain("batch_edit")
     expect(result.graph).toContain("set_tag_color")
     expect(result.graph).toContain("validate")
     expect(result.graph).toContain("auto_layout")
-    expect(result.paths).toContain("tools.graph.set_tag_color")
+    expect(result.paths).toContain("tools.graph.save_resource")
   })
 
   test("calls a native graph tool through CodeMode without MCP", async () => {
@@ -476,6 +476,66 @@ describe("code mode execute", () => {
     )
 
     expect(JSON.parse(output.output)).toEqual({ listedSource: "live", reloadSource: "saved", name: "Saved graph" })
+  })
+
+  test("native graph save commits live drafts through CodeMode", async () => {
+    const asked: string[] = []
+    const resourceID = Architecture.ResourceID.make("design_test")
+    const current = snapshot({
+      version: 2,
+      id: resourceID,
+      name: "Live graph",
+      revision: 4,
+      nodes: [],
+      edges: [],
+    }, "live-digest")
+    const saved = snapshot({ ...current.resource, revision: 5 }, "saved-digest")
+    const calls: string[] = []
+    const tool = await build(
+      {},
+      undefined,
+      undefined,
+      undefined,
+      {
+        loadDraft: () => Effect.sync(() => {
+          calls.push("loadDraft")
+          return { snapshot: current, source: "live" as const }
+        }),
+        commitDraft: (_id, input) => Effect.sync(() => {
+          calls.push(`commitDraft:${input.revision}:${input.digest}`)
+          return saved
+        }),
+      },
+    )
+    const output = await Effect.runPromise(
+      tool.execute(
+        {
+          code: `
+            return await tools.graph.save_resource({
+              resourceID: "design_test",
+              expectedDigest: "live-digest"
+            })
+          `,
+        },
+        { ...ctx, ask: (req) => Effect.sync(() => void asked.push(req.permission)) },
+      ),
+    )
+
+    expect(asked).toEqual(["edit"])
+    expect(calls).toEqual(["loadDraft", "commitDraft:4:live-digest"])
+    expect(JSON.parse(output.output)).toMatchObject({
+      resource: { id: "design_test", revision: 5 },
+      digest: "saved-digest",
+      source: "saved",
+      saved: true,
+    })
+    expect(output.metadata.toolCalls).toEqual([
+      {
+        tool: "graph.save_resource",
+        status: "completed",
+        input: { resourceID: "design_test", expectedDigest: "live-digest" },
+      },
+    ])
   })
 
   test("native graph edits patch live drafts by default", async () => {

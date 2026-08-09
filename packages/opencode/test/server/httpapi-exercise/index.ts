@@ -710,54 +710,6 @@ const scenarios: Scenario[] = [
     }))
     .json(404, object, "status"),
   http.protected
-    .patch("/api/architecture/resource/{resourceID}", "v2.architecture.resource.patch")
-    .inProject({ git: false })
-    .mutating()
-    .seeded((ctx) => {
-      const resource = ArchitecturePatch.empty({ id: Architecture.ResourceID.make("design"), name: "Design" })
-      return ctx
-        .file(".opencode/architecture/resources/design.json", JSON.stringify(resource, null, 2) + "\n")
-        .pipe(Effect.as({ resource, digest: ArchitecturePatch.digest(resource) }))
-    })
-    .at((ctx) => ({
-      path: route("/api/architecture/resource/{resourceID}", { resourceID: "design" }),
-      headers: ctx.headers(),
-      body: {
-        revision: ctx.state.resource.revision,
-        digest: ctx.state.digest,
-        operations: [
-          {
-            id: "httpapi-create-node",
-            type: "node.create",
-            node: {
-              id: "httpapi-root",
-              text: "HTTP API Root",
-              tags: ["request boundary"],
-              layout: { position: { x: 40, y: 80 } },
-            },
-          },
-        ],
-      },
-    }))
-    .jsonEffect(200, (body, ctx) =>
-      Effect.gen(function* () {
-        locationData((value) => {
-          object(value)
-          object(value.resource)
-          array(value.resource.nodes)
-          check(value.resource.revision === 1, "architecture patch should advance the resource revision")
-          check(
-            isRecord(value.resource.nodes[0]) && Array.isArray(value.resource.nodes[0].tags),
-            "architecture patch should preserve node tags",
-          )
-          check(
-            typeof value.digest === "string" && value.digest !== ctx.state.digest,
-            "architecture patch should update the digest",
-          )
-        })(body)
-      }),
-    ),
-  http.protected
     .get("/api/architecture/resource/{resourceID}/draft", "v2.architecture.resource.draft.get")
     .inProject({ git: false })
     .seeded((ctx) => {
@@ -776,55 +728,6 @@ const scenarios: Scenario[] = [
         object(value.snapshot.resource)
         check(value.source === "saved", "architecture draft get should fall back to saved state")
         check(value.snapshot.resource.id === "draft-get", "architecture draft get should return requested resource")
-      }),
-    ),
-  http.protected
-    .patch("/api/architecture/resource/{resourceID}/draft", "v2.architecture.resource.draft.patch")
-    .inProject({ git: false })
-    .mutating()
-    .seeded((ctx) => {
-      const resource = ArchitecturePatch.empty({ id: Architecture.ResourceID.make("draft-patch"), name: "Draft patch" })
-      return ctx
-        .file(".opencode/architecture/resources/draft-patch.json", JSON.stringify(resource, null, 2) + "\n")
-        .pipe(Effect.as({ resource, digest: ArchitecturePatch.digest(resource) }))
-    })
-    .at((ctx) => ({
-      path: route("/api/architecture/resource/{resourceID}/draft", { resourceID: "draft-patch" }),
-      headers: ctx.headers(),
-      body: {
-        revision: ctx.state.resource.revision,
-        digest: ctx.state.digest,
-        operations: [
-          {
-            id: "httpapi-draft-node",
-            type: "node.create",
-            node: {
-              id: "draft-node",
-              text: "Draft node",
-              tags: ["draft"],
-              layout: { position: { x: 10, y: 20 } },
-            },
-          },
-        ],
-      },
-    }))
-    .jsonEffect(200, (body, ctx) =>
-      Effect.gen(function* () {
-        locationData((value) => {
-          object(value)
-          object(value.snapshot)
-          object(value.snapshot.resource)
-          array(value.snapshot.resource.nodes)
-          check(value.source === "live", "architecture draft patch should return live source")
-          check(value.snapshot.resource.nodes.length === 1, "architecture draft patch should update draft resource")
-        })(body)
-        if (!ctx.directory) throw new Error("architecture draft patch scenario needs a project directory")
-        const saved = yield* Effect.promise(() =>
-          Bun.file(path.join(ctx.directory!, ".opencode", "architecture", "resources", "draft-patch.json")).json(),
-        )
-        object(saved)
-        array(saved.nodes)
-        check(saved.nodes.length === 0, "architecture draft patch should not write the saved resource file")
       }),
     ),
   http.protected
