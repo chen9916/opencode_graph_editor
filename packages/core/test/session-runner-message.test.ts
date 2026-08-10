@@ -51,6 +51,43 @@ describe("toLLMMessages", () => {
     ])
   })
 
+  test("includes prompt model context exactly once with the visible user text", () => {
+    const messages = toLLMMessages(
+      [
+        SessionMessage.User.make({
+          id: id("graph_context"),
+          type: "user",
+          text: "What should I implement?",
+          modelContext: [
+            {
+              text: "Graph selection in resource Design (overview).\nSelected nodes:\n- n1: Build it",
+              description: "Graph selection context attached",
+              metadata: { kind: "graph-selection" },
+            },
+          ],
+          time: { created },
+        }),
+      ],
+      model,
+    )
+
+    expect(messages).toEqual([
+      Message.make({
+        id: id("graph_context"),
+        role: "user",
+        content: [
+          { type: "text", text: "What should I implement?" },
+          {
+            type: "text",
+            text: "Graph selection in resource Design (overview).\nSelected nodes:\n- n1: Build it",
+            metadata: { kind: "graph-selection" },
+          },
+        ],
+        metadata: {},
+      }),
+    ])
+  })
+
   test("recognizes legacy architecture references stored only on the source path", () => {
     const base = FileAttachment.make({
       uri: "data:application/json;base64,e30=",

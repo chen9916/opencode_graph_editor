@@ -293,6 +293,48 @@ export type ArchitectureGetResourceOutput = {
   }
 }
 
+export type ArchitectureDuplicateResourceInput = {
+  readonly resourceID: { readonly resourceID: string }["resourceID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+  readonly id?: { readonly id?: string; readonly name?: string }["id"]
+  readonly name?: { readonly id?: string; readonly name?: string }["name"]
+}
+
+export type ArchitectureDuplicateResourceOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: {
+    readonly resource: {
+      readonly version: 2
+      readonly revision: number
+      readonly id: string
+      readonly name: string
+      readonly tagColors?: { readonly [x: string]: string }
+      readonly nodes: ReadonlyArray<{
+        readonly id: string
+        readonly text: string
+        readonly tags: ReadonlyArray<string>
+        readonly layout: { readonly position: { readonly x: number; readonly y: number } }
+      }>
+      readonly edges: ReadonlyArray<{
+        readonly id: string
+        readonly source: string
+        readonly target: string
+        readonly sourceHandle?: "top" | "right" | "bottom" | "left"
+        readonly targetHandle?: "top" | "right" | "bottom" | "left"
+        readonly style?: "rectangular" | "curved" | "straight"
+      }>
+    }
+    readonly digest: string
+    readonly storage: { readonly root: string; readonly path: string }
+  }
+}
+
 export type ArchitectureGetDraftInput = {
   readonly resourceID: { readonly resourceID: string }["resourceID"]
   readonly location?: {
@@ -1021,6 +1063,11 @@ export type SessionsPromptInput = {
         readonly name: string
         readonly source?: { readonly start: number; readonly end: number; readonly text: string }
       }>
+      readonly modelContext?: ReadonlyArray<{
+        readonly text: string
+        readonly description?: string
+        readonly metadata?: { readonly [x: string]: JsonValue }
+      }>
     }
     readonly delivery?: "steer" | "queue" | null
     readonly resume?: boolean | null
@@ -1038,6 +1085,11 @@ export type SessionsPromptInput = {
       readonly agents?: ReadonlyArray<{
         readonly name: string
         readonly source?: { readonly start: number; readonly end: number; readonly text: string }
+      }>
+      readonly modelContext?: ReadonlyArray<{
+        readonly text: string
+        readonly description?: string
+        readonly metadata?: { readonly [x: string]: JsonValue }
       }>
     }
     readonly delivery?: "steer" | "queue" | null
@@ -1057,6 +1109,11 @@ export type SessionsPromptInput = {
         readonly name: string
         readonly source?: { readonly start: number; readonly end: number; readonly text: string }
       }>
+      readonly modelContext?: ReadonlyArray<{
+        readonly text: string
+        readonly description?: string
+        readonly metadata?: { readonly [x: string]: JsonValue }
+      }>
     }
     readonly delivery?: "steer" | "queue" | null
     readonly resume?: boolean | null
@@ -1074,6 +1131,11 @@ export type SessionsPromptInput = {
       readonly agents?: ReadonlyArray<{
         readonly name: string
         readonly source?: { readonly start: number; readonly end: number; readonly text: string }
+      }>
+      readonly modelContext?: ReadonlyArray<{
+        readonly text: string
+        readonly description?: string
+        readonly metadata?: { readonly [x: string]: JsonValue }
       }>
     }
     readonly delivery?: "steer" | "queue" | null
@@ -1098,6 +1160,11 @@ export type SessionsPromptOutput = {
       readonly agents?: ReadonlyArray<{
         readonly name: string
         readonly source?: { readonly start: number; readonly end: number; readonly text: string }
+      }>
+      readonly modelContext?: ReadonlyArray<{
+        readonly text: string
+        readonly description?: string
+        readonly metadata?: { readonly [x: string]: JsonValue }
       }>
     }
     readonly delivery: "steer" | "queue"
@@ -1177,6 +1244,11 @@ export type SessionsContextOutput = {
         readonly agents?: ReadonlyArray<{
           readonly name: string
           readonly source?: { readonly start: number; readonly end: number; readonly text: string }
+        }>
+        readonly modelContext?: ReadonlyArray<{
+          readonly text: string
+          readonly description?: string
+          readonly metadata?: { readonly [x: string]: JsonValue }
         }>
         readonly type: "user"
       }
@@ -1370,6 +1442,11 @@ export type SessionsHistoryOutput = {
               readonly name: string
               readonly source?: { readonly start: number; readonly end: number; readonly text: string }
             }>
+            readonly modelContext?: ReadonlyArray<{
+              readonly text: string
+              readonly description?: string
+              readonly metadata?: { readonly [x: string]: JsonValue }
+            }>
           }
           readonly delivery: "steer" | "queue"
         }
@@ -1396,6 +1473,11 @@ export type SessionsHistoryOutput = {
             readonly agents?: ReadonlyArray<{
               readonly name: string
               readonly source?: { readonly start: number; readonly end: number; readonly text: string }
+            }>
+            readonly modelContext?: ReadonlyArray<{
+              readonly text: string
+              readonly description?: string
+              readonly metadata?: { readonly [x: string]: JsonValue }
             }>
           }
           readonly delivery: "steer" | "queue"
@@ -1828,6 +1910,11 @@ export type SessionsEventsOutput =
             readonly name: string
             readonly source?: { readonly start: number; readonly end: number; readonly text: string }
           }>
+          readonly modelContext?: ReadonlyArray<{
+            readonly text: string
+            readonly description?: string
+            readonly metadata?: { readonly [x: string]: JsonValue }
+          }>
         }
         readonly delivery: "steer" | "queue"
       }
@@ -1854,6 +1941,11 @@ export type SessionsEventsOutput =
           readonly agents?: ReadonlyArray<{
             readonly name: string
             readonly source?: { readonly start: number; readonly end: number; readonly text: string }
+          }>
+          readonly modelContext?: ReadonlyArray<{
+            readonly text: string
+            readonly description?: string
+            readonly metadata?: { readonly [x: string]: JsonValue }
           }>
         }
         readonly delivery: "steer" | "queue"
@@ -2256,6 +2348,11 @@ export type SessionsMessageOutput = {
           readonly name: string
           readonly source?: { readonly start: number; readonly end: number; readonly text: string }
         }>
+        readonly modelContext?: ReadonlyArray<{
+          readonly text: string
+          readonly description?: string
+          readonly metadata?: { readonly [x: string]: JsonValue }
+        }>
         readonly type: "user"
       }
     | {
@@ -2427,6 +2524,11 @@ export type MessagesListOutput = {
         readonly agents?: ReadonlyArray<{
           readonly name: string
           readonly source?: { readonly start: number; readonly end: number; readonly text: string }
+        }>
+        readonly modelContext?: ReadonlyArray<{
+          readonly text: string
+          readonly description?: string
+          readonly metadata?: { readonly [x: string]: JsonValue }
         }>
         readonly type: "user"
       }

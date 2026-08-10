@@ -66,6 +66,7 @@ import { animate } from "motion"
 import { attached, inline, kind, typeLabel } from "./message-file"
 import { readPartText } from "./message-part-text"
 import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
+import { userVisibleTextPart } from "./message-user-text"
 
 async function writeClipboard(text: string): Promise<boolean> {
   const body = typeof document === "undefined" ? undefined : document.body
@@ -1195,9 +1196,7 @@ export function UserMessageDisplay(props: {
   const copied = () => state.copied
   const busy = () => state.busy
 
-  const textPart = createMemo(
-    () => props.parts?.find((p) => p.type === "text" && !(p as TextPart).synthetic) as TextPart | undefined,
-  )
+  const textPart = createMemo(() => userVisibleTextPart(props.parts))
 
   const text = createMemo(() => textPart()?.text || "")
 

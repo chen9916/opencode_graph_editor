@@ -48,8 +48,10 @@ export interface PromptInputProps {
   ref?: (el: HTMLDivElement) => void
   newSessionWorktree?: string
   onNewSessionWorktreeReset?: () => void
-  edit?: { id: string; prompt: Prompt; context: FollowupDraft["context"] }
+  edit?: { id: string; prompt: Prompt; context: FollowupDraft["context"]; modelContext?: FollowupDraft["modelContext"] }
   onEditLoaded?: () => void
+  modelContext?: () => FollowupDraft["modelContext"]
+  onModelContextConsumed?: () => void
   shouldQueue?: () => boolean
   onQueue?: (draft: FollowupDraft) => void
   onAbort?: () => void

@@ -60,6 +60,10 @@ export interface Interface {
   readonly list: () => Effect.Effect<ReadonlyArray<Architecture.ResourceSummary>, Error>
   readonly listLive: () => Effect.Effect<SourcedSummaries, Error>
   readonly create: (input: Architecture.ResourceCreateInput) => Effect.Effect<Architecture.ResourceSnapshot, Error>
+  readonly duplicate: (
+    id: Architecture.ResourceID,
+    input: Architecture.ResourceDuplicateInput,
+  ) => Effect.Effect<Architecture.ResourceSnapshot, Error>
   readonly load: (id: Architecture.ResourceID) => Effect.Effect<Architecture.ResourceSnapshot, Error>
   readonly loadLive: (id: Architecture.ResourceID) => Effect.Effect<SourcedSnapshot, Error>
   readonly loadDraft: (id: Architecture.ResourceID) => Effect.Effect<Architecture.DraftSnapshot, Error>
@@ -479,6 +483,37 @@ const layer = Layer.effect(
       )
     })
 
+    const duplicate = Effect.fn("ArchitectureGraph.duplicate")(function* (
+      id: Architecture.ResourceID,
+      input: Architecture.ResourceDuplicateInput,
+    ) {
+      const storage = yield* roots.get
+      return yield* locked(
+        storage,
+        Effect.gen(function* () {
+          yield* migrateLegacy(storage)
+          const source = (yield* readLive(storage, id)).resource
+          const resource = yield* ArchitecturePatch.validate(
+            ArchitecturePatch.normalize({
+              version: 2,
+              revision: 0,
+              id: input.id ?? Architecture.ResourceID.create(),
+              name: input.name ?? `${source.name} copy`,
+              tagColors: source.tagColors,
+              nodes: source.nodes,
+              edges: source.edges,
+            }),
+          )
+          if (yield* fs.existsSafe(file(storage, resource.id)))
+            return yield* new ArchitecturePatch.ConflictError({
+              message: `Graph resource already exists: ${resource.id}`,
+              operationIDs: [],
+            })
+          return yield* write(storage, resource)
+        }),
+      )
+    })
+
     const load = Effect.fn("ArchitectureGraph.load")(function* (id: Architecture.ResourceID) {
       const storage = yield* roots.get
       return snapshot(storage, (yield* read(storage, id)).resource)
@@ -779,6 +814,7 @@ const layer = Layer.effect(
       list,
       listLive,
       create,
+      duplicate,
       load,
       loadLive,
       loadDraft,

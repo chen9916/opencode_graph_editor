@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Part } from "@opencode-ai/sdk/v2"
-import { extractPromptFromParts } from "./prompt"
+import { extractModelContextFromParts, extractPromptFromParts } from "./prompt"
 
 describe("extractPromptFromParts", () => {
   test("restores multiple uploaded attachments", () => {
@@ -48,6 +48,38 @@ describe("extractPromptFromParts", () => {
         filename: "b.pdf",
         mime: "application/pdf",
         blob: expect.objectContaining({ id: expect.any(String) }),
+      },
+    ])
+  })
+
+  test("restores only the short visible text when synthetic Graph context is attached", () => {
+    const parts = [
+      {
+        id: "text_1",
+        type: "text",
+        text: "What should I implement?",
+        sessionID: "ses_1",
+        messageID: "msg_1",
+      },
+      {
+        id: "text_2",
+        type: "text",
+        text: "Graph selection in resource Design (overview).",
+        synthetic: true,
+        metadata: { kind: "graph-selection", description: "Graph selection context attached" },
+        sessionID: "ses_1",
+        messageID: "msg_1",
+      },
+    ] satisfies Part[]
+
+    expect(extractPromptFromParts(parts)).toEqual([
+      { type: "text", content: "What should I implement?", start: 0, end: 24 },
+    ])
+    expect(extractModelContextFromParts(parts)).toEqual([
+      {
+        text: "Graph selection in resource Design (overview).",
+        description: "Graph selection context attached",
+        metadata: { kind: "graph-selection" },
       },
     ])
   })

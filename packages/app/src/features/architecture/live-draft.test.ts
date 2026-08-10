@@ -68,13 +68,31 @@ describe("architecture live draft", () => {
     expect(latestArchitectureLiveDraftCache(newer, stale)).toBe(newer)
   })
 
+  test("keeps the visible live draft over a late null or same-revision response", () => {
+    const current = live(resource("current"), "current")
+    const stale = live(resource("stale"), "stale")
+
+    expect(latestArchitectureLiveDraftCache(current, null)).toBe(current)
+    expect(latestArchitectureLiveDraftCache(current, stale)).toBe(current)
+  })
+
   test("clears live draft cache once the saved snapshot covers it", () => {
     const saved = snapshot({ ...resource("saved"), revision: 3 }, "saved")
     const committedDraft = live({ ...resource("saved"), revision: 3 }, "saved")
+    const aiDraft = live({ ...resource("ai"), revision: 3 }, "ai")
     const nextDraft = live({ ...resource("next"), revision: 4 }, "next")
 
     expect(discardSavedArchitectureLiveDraftCache(committedDraft, saved)).toBeNull()
+    expect(discardSavedArchitectureLiveDraftCache(aiDraft, saved)).toBe(aiDraft)
     expect(discardSavedArchitectureLiveDraftCache(nextDraft, saved)).toBe(nextDraft)
+  })
+
+  test("does not erase a newer AI draft after an out-of-order discard for the same saved revision", () => {
+    const saved = snapshot({ ...resource("saved"), revision: 2 }, "saved")
+    const aiDraft = live({ ...resource("AI"), revision: 2 }, "ai-draft")
+
+    expect(discardSavedArchitectureLiveDraftCache(aiDraft, saved)).toBe(aiDraft)
+    expect(latestArchitectureLiveDraftCache(aiDraft, null)).toBe(aiDraft)
   })
 
   test("reconciles two cumulative edits as incremental patches", async () => {
@@ -85,7 +103,9 @@ describe("architecture live draft", () => {
         patches.push([...operations])
         return live(applyOperations(base.resource, operations))
       },
-      update: (draft) => updates.push(draft),
+      update: (draft) => {
+        if (draft) updates.push(draft)
+      },
     })
     const first = resource("first")
     const second = { ...first, name: "Second" }
@@ -130,6 +150,57 @@ describe("architecture live draft", () => {
     expect(server).toEqual(resource("external"))
   })
 
+  test("waits for a delayed external draft fetch before saving the rebased canvas", async () => {
+    const externalNode = node("external", "AI")
+    const localNode = node("local", "Local")
+    const ai = { ...resource(), nodes: [...resource().nodes, externalNode] }
+    const operations: ArchitectureOperation[] = [{ id: "create-local", type: "node.create", node: localNode }]
+    const pending = deferred<ArchitectureDraftSnapshot>()
+    const synchronizer = createArchitectureDraftSynchronizer({
+      patch: async (base, operations) => live(applyOperations(base.resource, operations)),
+      update: () => undefined,
+    })
+
+    const fetch = synchronizer.adoptSnapshot(() => pending.promise)
+    await Promise.resolve()
+    const save = synchronizer.synchronizeAuthoritative(async () => live(ai), (observed) => {
+      const rebased = rebaseArchitectureDraft(resource(), operations, observed.snapshot.resource)
+      return applyOperations(rebased.base, rebased.operations)
+    })
+    pending.resolve(live(ai))
+
+    const synchronized = await save
+    await fetch
+
+    expect(synchronized.resource.nodes.map((item) => item.id).toSorted()).toEqual(["a", "external", "local"])
+  })
+
+  test("adopts an externally observed draft before calculating later local patches", async () => {
+    const externalNode = node("external", "AI")
+    const localNode = node("local", "Local")
+    const ai = { ...resource(), nodes: [...resource().nodes, externalNode] }
+    const target = { ...ai, nodes: [...ai.nodes, localNode] }
+    const patches: ArchitectureOperation[][] = []
+    const synchronizer = createArchitectureDraftSynchronizer({
+      patch: async (base, operations) => {
+        patches.push([...operations])
+        return live(applyOperations(base.resource, operations))
+      },
+      update: () => undefined,
+    })
+
+    await synchronizer.adopt(live(ai))
+    await synchronizer.synchronize(snapshot(resource()), target)
+
+    expect(patches).toHaveLength(1)
+    expect(patches[0]?.map((operation) => operation.type)).toEqual(["node.create"])
+    expect(applyOperations(ai, patches[0]!).nodes.map((item) => item.id).toSorted()).toEqual([
+      "a",
+      "external",
+      "local",
+    ])
+  })
+
   test("reconciles an empty local journal back to the pre-existing AI draft", async () => {
     const aiDraft = resource("AI")
     const patches: ArchitectureOperation[][] = []
@@ -156,7 +227,9 @@ describe("architecture live draft", () => {
     const updates: ArchitectureLiveDraft[] = []
     const synchronizer = createArchitectureDraftSynchronizer({
       patch: () => pending.promise,
-      update: (draft) => updates.push(draft),
+      update: (draft) => {
+        if (draft) updates.push(draft)
+      },
     })
     const write = synchronizer.synchronize(snapshot(), resource("draft"))
     await Promise.resolve()
@@ -168,13 +241,55 @@ describe("architecture live draft", () => {
     expect(updates).toEqual([])
   })
 
+  test("invalidate waits for an in-flight patch before reload can discard the draft", async () => {
+    const pending = deferred<ArchitectureLiveDraft>()
+    const started = deferred<void>()
+    const updates: ArchitectureLiveDraft[] = []
+    const events: string[] = []
+    let server = resource("saved")
+    const synchronizer = createArchitectureDraftSynchronizer({
+      patch: (_base, _operations) => {
+        events.push("patch-start")
+        started.resolve(undefined)
+        return pending.promise.then((draft) => {
+          server = draft.snapshot.resource
+          events.push("patch-finished")
+          return draft
+        })
+      },
+      update: (draft) => {
+        if (draft) updates.push(draft)
+      },
+    })
+    const write = synchronizer.synchronize(snapshot(server), resource("draft"))
+    await started.promise
+    let reloaded = false
+    const reload = synchronizer.invalidate().then(() => {
+      server = resource("reloaded")
+      reloaded = true
+      events.push("reload")
+    })
+
+    await Promise.resolve()
+    expect(reloaded).toBe(false)
+
+    pending.resolve(live(resource("draft")))
+    await Promise.all([write, reload])
+
+    expect(events).toEqual(["patch-start", "patch-finished", "reload"])
+    expect(server).toEqual(resource("reloaded"))
+    expect(updates).toEqual([])
+  })
+
   test("invalidating a pending authoritative observation rejects synchronization", async () => {
     const pending = deferred<ArchitectureDraftSnapshot>()
     const started = deferred<void>()
     const updates: ArchitectureLiveDraft[] = []
     const synchronizer = createArchitectureDraftSynchronizer({
       patch: async (base, operations) => live(applyOperations(base.resource, operations)),
-      update: (draft) => updates.push(draft),
+      update: (draft) => {
+        if (draft) updates.push(draft)
+      },
     })
     const write = synchronizer.synchronizeAuthoritative(() => {
       started.resolve(undefined)
@@ -186,6 +301,81 @@ describe("architecture live draft", () => {
     pending.resolve(live(resource("discarded")))
     await expect(write).rejects.toBeInstanceOf(ArchitectureDraftSynchronizationCancelled)
     await invalidated
+
+    expect(updates).toEqual([])
+  })
+
+  test("invalidating a pending external draft fetch prevents late cache restoration after save or reload", async () => {
+    const pending = deferred<ArchitectureDraftSnapshot>()
+    const updates: ArchitectureLiveDraft[] = []
+    const synchronizer = createArchitectureDraftSynchronizer({
+      patch: async (base, operations) => live(applyOperations(base.resource, operations)),
+      update: (draft) => {
+        if (draft) updates.push(draft)
+      },
+    })
+    const fetch = synchronizer.adoptSnapshot(() => pending.promise)
+    await Promise.resolve()
+    const invalidated = synchronizer.invalidate()
+
+    pending.resolve(live(resource("late")))
+    await expect(fetch).rejects.toBeInstanceOf(ArchitectureDraftSynchronizationCancelled)
+    await invalidated
+
+    expect(updates).toEqual([])
+  })
+
+  test("invalidating before authoritative save drains a started patch without waiting for a queued metadata fetch", async () => {
+    const patch = deferred<ArchitectureLiveDraft>()
+    const events: string[] = []
+    const synchronizer = createArchitectureDraftSynchronizer({
+      patch: () => {
+        events.push("patch-start")
+        return patch.promise
+      },
+      update: () => undefined,
+    })
+    const write = synchronizer.synchronize(snapshot(), resource("draft"))
+    await Promise.resolve()
+    const metadataFetch = synchronizer.adoptSnapshot(() => {
+      events.push("metadata-fetch-start")
+      return Promise.resolve(live(resource("metadata")))
+    })
+    const metadataFetchFailure = metadataFetch.catch((error) => error)
+    const invalidated = synchronizer.invalidate()
+    const save = synchronizer.synchronizeAuthoritative(
+      async () => {
+        events.push("save-observe")
+        return live(resource("server"))
+      },
+      resource("server"),
+    )
+
+    await Promise.resolve()
+    expect(events).toEqual(["patch-start"])
+
+    patch.resolve(live(resource("draft")))
+    await Promise.all([write, invalidated, save])
+
+    expect(await metadataFetchFailure).toBeInstanceOf(ArchitectureDraftSynchronizationCancelled)
+    expect(events).toEqual(["patch-start", "save-observe"])
+  })
+
+  test("resource switching invalidation cancels pending per-resource synchronization", async () => {
+    const pending = deferred<ArchitectureLiveDraft>()
+    const updates: ArchitectureLiveDraft[] = []
+    const synchronizer = createArchitectureDraftSynchronizer({
+      patch: () => pending.promise,
+      update: (draft) => {
+        if (draft) updates.push(draft)
+      },
+    })
+    const write = synchronizer.synchronize(snapshot(), resource("old selection"))
+    await Promise.resolve()
+    const switched = synchronizer.invalidate()
+
+    pending.resolve(live(resource("old selection")))
+    await Promise.all([write, switched])
 
     expect(updates).toEqual([])
   })

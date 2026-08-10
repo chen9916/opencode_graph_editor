@@ -24,6 +24,15 @@ export function createArchitectureResource(
   return api.architecture.createResource({ location: { directory }, ...input }).then((result) => result.data)
 }
 
+export function duplicateArchitectureResource(
+  api: ServerApi,
+  directory: string,
+  resourceID: string,
+  input: { readonly id?: string; readonly name?: string },
+) {
+  return api.architecture.duplicateResource({ location: { directory }, resourceID, ...input }).then((result) => result.data)
+}
+
 export function loadArchitectureResource(api: ServerApi, directory: string, resourceID: string, signal?: AbortSignal) {
   return api.architecture
     .getResource({ location: { directory }, resourceID }, { signal })

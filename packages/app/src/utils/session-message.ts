@@ -205,6 +205,12 @@ function userMessage(
 function userParts(sessionID: string, message: SessionMessageUser): Part[] {
   return [
     textPart(sessionID, message.id, 0, message.text),
+    ...(message.modelContext ?? []).map((context, index) =>
+      textPart(sessionID, message.id, index + 1, context.text, true, {
+        ...(context.metadata ?? {}),
+        ...(context.description === undefined ? {} : { description: context.description }),
+      }),
+    ),
     ...(message.files ?? []).map(
       (file, index): FilePart => ({
         id: `${message.id}:file:${index}`,
@@ -289,7 +295,14 @@ function assistantParts(sessionID: string, message: SessionMessageAssistant): Pa
   })
 }
 
-function textPart(sessionID: string, messageID: string, ordinal: number, text: string, synthetic?: boolean): Part {
+function textPart(
+  sessionID: string,
+  messageID: string,
+  ordinal: number,
+  text: string,
+  synthetic?: boolean,
+  metadata?: Record<string, unknown>,
+): Part {
   return {
     id: sessionMessagePartID(messageID, "text", ordinal),
     sessionID,
@@ -297,6 +310,7 @@ function textPart(sessionID: string, messageID: string, ordinal: number, text: s
     type: "text",
     text,
     synthetic,
+    metadata,
   }
 }
 

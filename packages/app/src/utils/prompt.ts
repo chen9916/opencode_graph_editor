@@ -1,4 +1,5 @@
 import type { AgentPart as MessageAgentPart, FilePart, Part, TextPart } from "@opencode-ai/sdk/v2"
+import type { Json } from "@opencode-ai/client/promise"
 import type { AgentPart, FileAttachmentPart, ImageAttachmentPart, Prompt } from "@/context/prompt"
 import { createLegacyBlobReference } from "@/utils/draft-store"
 
@@ -201,4 +202,24 @@ export function extractPromptFromParts(parts: Part[], opts?: { directory?: strin
 
   if (images.length === 0) return result
   return [...result, ...images]
+}
+
+export function extractModelContextFromParts(parts: Part[]) {
+  return parts
+    .filter((part): part is TextPart => part.type === "text" && part.synthetic === true)
+    .flatMap((part) => {
+      const metadata = part.metadata
+      if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return []
+      if ((metadata as Record<string, unknown>).kind !== "graph-selection") return []
+      const description = (metadata as Record<string, unknown>).description
+      return [
+        {
+          text: part.text,
+          ...(typeof description === "string" ? { description } : {}),
+          metadata: Object.fromEntries(
+            Object.entries(metadata as Record<string, unknown>).filter(([key]) => key !== "description"),
+          ) as Record<string, Json>,
+        },
+      ]
+    })
 }

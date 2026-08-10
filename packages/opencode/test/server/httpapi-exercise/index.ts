@@ -710,6 +710,54 @@ const scenarios: Scenario[] = [
     }))
     .json(404, object, "status"),
   http.protected
+    .post("/api/architecture/resource/{resourceID}/duplicate", "v2.architecture.resource.duplicate")
+    .inProject({ git: false })
+    .mutating()
+    .seeded((ctx) => {
+      const resource: Architecture.Resource = {
+        ...ArchitecturePatch.empty({ id: Architecture.ResourceID.make("duplicate-source"), name: "Duplicate source" }),
+        tagColors: { planned: Architecture.TagColor.make("#4c82ff") },
+        nodes: [
+          {
+            id: Architecture.NodeID.make("a"),
+            text: "A",
+            tags: [Architecture.Tag.make("planned")],
+            layout: { position: { x: 10, y: 20 } },
+          },
+        ],
+        edges: [],
+      }
+      return ctx.file(".opencode/architecture/resources/duplicate-source.json", JSON.stringify(resource, null, 2) + "\n")
+    })
+    .at((ctx) => ({
+      path: route("/api/architecture/resource/{resourceID}/duplicate", { resourceID: "duplicate-source" }),
+      headers: ctx.headers(),
+      body: { id: "duplicate-copy", name: "Duplicate copy" },
+    }))
+    .jsonEffect(200, (body, ctx) =>
+      Effect.gen(function* () {
+        locationData((value) => {
+          object(value)
+          object(value.resource)
+          check(value.resource.id === "duplicate-copy", "architecture duplicate should return the new resource ID")
+          check(value.resource.name === "Duplicate copy", "architecture duplicate should return the requested name")
+          array(value.resource.nodes)
+          object(value.resource.nodes[0])
+          object(value.resource.nodes[0].layout)
+          object(value.resource.nodes[0].layout.position)
+          object(value.resource.tagColors)
+          check(value.resource.nodes[0].layout.position.x === 10, "architecture duplicate should preserve positions")
+          check(value.resource.tagColors.planned === "#4c82ff", "architecture duplicate should preserve tag colors")
+        })(body)
+        if (!ctx.directory) throw new Error("architecture duplicate scenario needs a project directory")
+        const original = yield* Effect.promise(() =>
+          Bun.file(path.join(ctx.directory!, ".opencode", "architecture", "resources", "duplicate-source.json")).json(),
+        )
+        object(original)
+        check(original.id === "duplicate-source", "architecture duplicate should not mutate the source resource")
+      }),
+    ),
+  http.protected
     .get("/api/architecture/resource/{resourceID}/draft", "v2.architecture.resource.draft.get")
     .inProject({ git: false })
     .seeded((ctx) => {

@@ -72,7 +72,7 @@ import {
   type PromptInputState,
   type PromptInputSubmission,
 } from "./prompt-input/contracts"
-import { createPromptSubmit } from "./prompt-input/submit"
+import { createPromptSubmit, type FollowupDraft } from "./prompt-input/submit"
 import { PromptPopover, type AtOption, type SlashCommand } from "./prompt-input/slash-popover"
 import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
@@ -134,6 +134,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const command = useCommand()
   const permission = usePermission()
   const language = useLanguage()
+  const [editModelContext, setEditModelContext] = createSignal<FollowupDraft["modelContext"]>()
   const platform = usePlatform()
   const architectureResources = useArchitectureResourceMentions()
   const tabs = () => props.controls.session.tabs
@@ -1169,6 +1170,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         closePopover()
         setStore("historyIndex", -1)
         setStore("savedPrompt", null)
+        setEditModelContext(() => edit.modelContext)
         prompt.set(edit.prompt, promptLength(edit.prompt))
         requestAnimationFrame(() => {
           editorRef.focus()
@@ -1264,6 +1266,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       onAbort: props.onAbort,
       onSubmit: props.onSubmit,
       model: props.controls.model.selection,
+      consumeModelContext: () => {
+        const value = editModelContext() ?? props.modelContext?.()
+        setEditModelContext(undefined)
+        props.onModelContextConsumed?.()
+        return value
+      },
     })
 
   const handleKeyDown = (event: KeyboardEvent) => {

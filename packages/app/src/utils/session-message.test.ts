@@ -16,6 +16,13 @@ describe("normalizeSessionMessages", () => {
         id: "msg_3",
         type: "user",
         text: "inspect @src/client.ts",
+        modelContext: [
+          {
+            text: "Graph selection in resource Design (overview).",
+            description: "Graph selection context attached",
+            metadata: { kind: "graph-selection" },
+          },
+        ],
         files: [
           {
             data: "aGVsbG8=",
@@ -82,12 +89,19 @@ describe("normalizeSessionMessages", () => {
     expect(result.messages[1]).toMatchObject({ id: "msg_4", role: "assistant", parentID: "msg_3", cost: 0.1 })
     expect(result.parts.get("msg_3")?.map((part) => part.id)).toEqual([
       "msg_3:text:0",
+      "msg_3:text:1",
       "msg_3:file:0",
       "msg_3:file:1",
       "msg_3:agent:0",
       "msg_5:compaction",
     ])
-    expect(result.parts.get("msg_3")?.[2]).toMatchObject({
+    expect(result.parts.get("msg_3")?.[1]).toMatchObject({
+      type: "text",
+      text: "Graph selection in resource Design (overview).",
+      synthetic: true,
+      metadata: { description: "Graph selection context attached", kind: "graph-selection" },
+    })
+    expect(result.parts.get("msg_3")?.[3]).toMatchObject({
       type: "file",
       source: {
         type: "file",

@@ -6,14 +6,14 @@ import { Icon } from "@opencode-ai/ui/v2/icon"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
-import { createEffect, createMemo, on, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, on, Show } from "solid-js"
 import { ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
 import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
 import type { PromptInputProps } from "@/components/prompt-input/contracts"
 import { normalizePromptHistoryEntry, promptLength, type PromptHistoryComment } from "@/components/prompt-input/history"
 import { createPersistedPromptInputHistory } from "@/components/prompt-input/history-store"
 import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-input/placeholder"
-import { createPromptSubmit } from "@/components/prompt-input/submit"
+import { createPromptSubmit, type FollowupDraft } from "@/components/prompt-input/submit"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import { useComments } from "@/context/comments"
 import { useCommand } from "@/context/command"
@@ -99,6 +99,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   const platform = usePlatform()
   const architectureResources = useArchitectureResourceMentions()
   const prompt = props.state ?? usePrompt()
+  const [editModelContext, setEditModelContext] = createSignal<FollowupDraft["modelContext"]>()
   let editor: HTMLDivElement | undefined
 
   const interaction = createPromptInputV2State()
@@ -228,6 +229,12 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     onAbort: props.onAbort,
     onSubmit: props.onSubmit,
     model: props.controls.model.selection,
+    consumeModelContext: () => {
+      const value = editModelContext() ?? props.modelContext?.()
+      setEditModelContext(undefined)
+      props.onModelContextConsumed?.()
+      return value
+    },
   })
 
   const referenceDescription = (reference: ReferenceInfo) =>
@@ -486,6 +493,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
         )
         controller.dispatch({ type: "mode.normal" })
         controller.resetHistory()
+        setEditModelContext(() => edit.modelContext)
         prompt.set(edit.prompt, promptLength(edit.prompt))
         controller.restoreFocus()
         props.onEditLoaded?.()

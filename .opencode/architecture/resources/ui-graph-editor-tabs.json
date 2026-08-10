@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "revision": 17,
+  "revision": 46,
   "id": "ui-graph-editor-tabs",
   "name": "UI System: Graph Editor Tabs",
   "tagColors": {
@@ -14,7 +14,8 @@
     "mobile": "#16a34a",
     "planned": "#f59e0b",
     "session": "#4f46e5",
-    "tabs": "#2563eb"
+    "tabs": "#2563eb",
+    "test": "#0ea5e9"
   },
   "nodes": [
     {
@@ -94,46 +95,61 @@
       }
     },
     {
-      "id": "edited-node-hint-demo",
-      "text": "Remote-edit hint demo\nAgent test update: this node was changed remotely and should glow until your pointer moves over it.",
+      "id": "feature-colored-edit-hint",
+      "text": "Implemented improvement: colored remote-edit glow\nAgent/external node changes use a dedicated theme-aware amber hint color for the border, glow, and background tint; the effect remains transient and clears on pointer movement.",
       "tags": [
         "editor",
         "implemented"
       ],
       "layout": {
         "position": {
-          "x": 790.2541701953398,
-          "y": 1268.584273872047
+          "x": 484.648572027117,
+          "y": 1358.5277200899286
         }
       }
     },
     {
       "id": "feature-duplicate-graph",
-      "text": "Planned feature: duplicate graph\nAdd an explicit Duplicate action that creates a new managed Graph resource from the selected graph without mutating the original; preserve nodes, edges, tags, colors, and positions, then select the duplicate.",
+      "text": "Implemented feature: duplicate graph\nA duplicate action clones the current saved/live graph state into a new managed resource, preserving nodes, edges, tags, colors, connection sides/styles, and positions; the original remains unchanged and the duplicate becomes selected.",
       "tags": [
         "controller",
         "data",
-        "planned"
+        "implemented"
       ],
       "layout": {
         "position": {
-          "x": 200,
-          "y": 1450
+          "x": -478.56418499536977,
+          "y": 1366.005962282772
         }
       }
     },
     {
       "id": "feature-export-graph",
-      "text": "Planned feature: export graph\nAdd an explicit Export graph action for the current resource that produces a portable graph representation or file without changing the resource or draft state.",
+      "text": "Implemented feature: export graph\nExports the current visible graph state, including unsaved draft changes, as a portable `<name>.graph.json` file without mutating the resource, draft, selection, or viewport.",
       "tags": [
         "data",
         "editor",
-        "planned"
+        "implemented"
       ],
       "layout": {
         "position": {
-          "x": 600,
-          "y": 1450
+          "x": -163.03431211794455,
+          "y": 1390.9748929054424
+        }
+      }
+    },
+    {
+      "id": "feature-resource-file-menu",
+      "text": "Implemented improvement: resource File menu\nNew graph, Duplicate graph, and Delete graph now live in a File dropdown beside the selector; switching remains explicit and existing confirmations/action behavior are preserved. Export remains a separate editor action.",
+      "tags": [
+        "controller",
+        "data",
+        "implemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 183.12937439056697,
+          "y": 1341.8748848868631
         }
       }
     },
@@ -146,8 +162,8 @@
       ],
       "layout": {
         "position": {
-          "x": 843.3836007342154,
-          "y": 881.2704990822305
+          "x": 198.1022593212516,
+          "y": 1049.4738526146398
         }
       }
     },
@@ -161,8 +177,8 @@
       ],
       "layout": {
         "position": {
-          "x": 478,
-          "y": 887.9999999999999
+          "x": -138.6297534741166,
+          "y": 1074.7048161398297
         }
       }
     },
@@ -175,8 +191,8 @@
       ],
       "layout": {
         "position": {
-          "x": 1223.3940585575629,
-          "y": 927.7472220900984
+          "x": 548.5099465285828,
+          "y": 1013.5061295551448
         }
       }
     },
@@ -190,8 +206,39 @@
       ],
       "layout": {
         "position": {
-          "x": 140,
-          "y": 869.9999999999999
+          "x": -455.68005646025836,
+          "y": 1020.657438368529
+        }
+      }
+    },
+    {
+      "id": "plan-clean-ask-selection-message",
+      "text": "Implemented improvement: clean Ask about selection messages\nAsk submissions now keep the user’s short question in the visible message and store the complete selected-node Graph brief as durable model-only context. Current and legacy provider paths receive the context exactly once; rendering, copy, prompt restoration, retry, revert, queued followups, resend, and accessibility expose only the visible question. The Ask textarea has an accessible name and a compact context-attached indicator.",
+      "tags": [
+        "editor",
+        "implemented",
+        "session"
+      ],
+      "layout": {
+        "position": {
+          "x": 1600,
+          "y": 430
+        }
+      }
+    },
+    {
+      "id": "plan-save-draft-consistency",
+      "text": "Implemented fix: serialize and harden Graph draft/Save state\nEach resource serializes AI draft events, local journal patches, Save, Reload, and resource switching. Save invalidates obsolete queued work, drains only already-started PATCH mutations, observes and rebases against the authoritative live draft, and settles saved/live caches together. Cache generations reject late polling/refetch responses; out-of-order discard events re-observe authoritative state; same-revision newer AI drafts are preserved. Regression tests cover stale responses, concurrent AI/Save, Reload latency, resource switching, and synchronizer adoption.",
+      "tags": [
+        "controller",
+        "data",
+        "editor",
+        "implemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 988.4846945086165,
+          "y": 804.0779886714377
         }
       }
     },
@@ -224,6 +271,23 @@
           "y": 180
         }
       }
+    },
+    {
+      "id": "test-save-draft-consistency",
+      "text": "Test plan: Graph draft/Save consistency\n1. Apply an AI draft update and delay the draft fetch. 2. Make a local edit and invoke Save. 3. Resolve the delayed fetch after commit. Assert the canvas and cache remain on the committed snapshot and the live draft stays empty. Repeat with an AI edit during synchronization/commit, Reload, and resource switching; assert no stale graph returns and no operations are lost or duplicated. Verify event payloads under both properties and data.",
+      "tags": [
+        "controller",
+        "data",
+        "editor",
+        "planned",
+        "test"
+      ],
+      "layout": {
+        "position": {
+          "x": 885.7936907071291,
+          "y": 1406.8638990763386
+        }
+      }
     }
   ],
   "edges": [
@@ -236,20 +300,20 @@
       "style": "rectangular"
     },
     {
-      "id": "edited-node-hint-demo-to-fix",
-      "source": "edited-node-hint-demo",
-      "target": "fix-edited-node-hint",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "rectangular"
-    },
-    {
       "id": "editor-to-ask",
       "source": "react-flow-editor",
       "target": "ask-selection",
       "sourceHandle": "right",
       "targetHandle": "left",
       "style": "rectangular"
+    },
+    {
+      "id": "feature-colored-edit-hint-to-fix",
+      "source": "feature-colored-edit-hint",
+      "target": "fix-edited-node-hint",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
     },
     {
       "id": "feature-duplicate-graph-to-panel",
@@ -263,6 +327,14 @@
       "id": "feature-export-graph-to-editor",
       "source": "feature-export-graph",
       "target": "react-flow-editor",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "feature-resource-file-menu-to-panel",
+      "source": "feature-resource-file-menu",
+      "target": "architecture-panel",
       "sourceHandle": "top",
       "targetHandle": "bottom",
       "style": "curved"
@@ -324,12 +396,44 @@
       "style": "rectangular"
     },
     {
+      "id": "plan-clean-ask-selection-message-ask",
+      "source": "plan-clean-ask-selection-message",
+      "target": "ask-selection",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "plan-save-draft-consistency-api",
+      "source": "plan-save-draft-consistency",
+      "target": "api-wrappers",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "plan-save-draft-consistency-panel",
+      "source": "plan-save-draft-consistency",
+      "target": "architecture-panel",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
       "id": "session-to-panel",
       "source": "session-route-shell",
       "target": "architecture-panel",
       "sourceHandle": "right",
       "targetHandle": "left",
       "style": "rectangular"
+    },
+    {
+      "id": "test-save-draft-consistency-plan",
+      "source": "test-save-draft-consistency",
+      "target": "plan-save-draft-consistency",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
     }
   ]
 }

@@ -194,6 +194,7 @@ export type SessionPromptInput = {
   readonly resume?: boolean
   readonly files?: ReadonlyArray<SessionPromptFile>
   readonly agents?: ReadonlyArray<{ readonly name: string; readonly mention?: Mention }>
+  readonly modelContext?: ReadonlyArray<SessionModelContext>
   readonly legacyParts?: ReadonlyArray<unknown>
 }
 export type SessionPromptOutput = UserAdmittedInput
@@ -223,10 +224,11 @@ export type SessionApi = {
 export type Mention = { readonly text: string; readonly start: number; readonly end: number }
 export type SessionPromptFile = { readonly uri: string; readonly mime?: string; readonly name?: string; readonly mention?: Mention; readonly source?: { readonly type: "uri"; readonly uri: string } | { readonly type: "data" } | { readonly type: "inline" }; readonly data?: string }
 export type SessionMessageFile = { readonly uri?: string; readonly mime: string; readonly name?: string; readonly mention?: Mention; readonly source: { readonly type: "uri"; readonly uri: string } | { readonly type: "data" } | { readonly type: "inline" }; readonly data?: string }
+export type SessionModelContext = { readonly text: string; readonly description?: string; readonly metadata?: Record<string, JsonValue> }
 type MessageBase = { readonly id: string; readonly metadata?: Record<string, JsonValue>; readonly time: { readonly created: number; readonly completed?: number } }
 export type SessionMessageAgent = MessageBase & { readonly type: "agent-switched"; readonly agent: string }
 export type SessionMessageModel = MessageBase & { readonly type: "model-switched"; readonly model: { readonly id: string; readonly providerID: string; readonly variant?: string }; readonly previous?: { readonly id: string; readonly providerID: string; readonly variant?: string } }
-export type SessionMessageUser = MessageBase & { readonly type: "user"; readonly text: string; readonly files?: ReadonlyArray<SessionMessageFile>; readonly agents?: ReadonlyArray<{ readonly name: string; readonly mention?: Mention }> }
+export type SessionMessageUser = MessageBase & { readonly type: "user"; readonly text: string; readonly files?: ReadonlyArray<SessionMessageFile>; readonly agents?: ReadonlyArray<{ readonly name: string; readonly mention?: Mention }>; readonly modelContext?: ReadonlyArray<SessionModelContext> }
 export type SessionMessageSynthetic = MessageBase & { readonly type: "synthetic"; readonly text: string; readonly description?: string }
 export type SessionMessageShell = MessageBase & { readonly type: "shell"; readonly shellID: string; readonly command: string; readonly status: "running" | "completed" | "error" | "exited"; readonly exit?: number; readonly output?: { readonly output: string; readonly cursor?: number; readonly size?: number; readonly truncated?: boolean } }
 export type SessionMessageAssistantTool = {
@@ -249,7 +251,7 @@ export type SessionMessageCompaction = MessageBase & ({ readonly type: "compacti
 export type SessionMessageSkill = MessageBase & { readonly type: "skill"; readonly skill: string; readonly name: string; readonly text: string }
 export type SessionMessageInfo = SessionMessageAgent | SessionMessageModel | SessionMessageUser | SessionMessageSynthetic | SessionMessageShell | SessionMessageAssistant | SessionMessageCompaction | SessionMessageSkill
 export type SessionPendingMessage =
-  | { readonly type: "user"; readonly data: { readonly metadata?: Record<string, JsonValue>; readonly text: string; readonly files?: ReadonlyArray<SessionMessageFile>; readonly agents?: ReadonlyArray<{ readonly name: string; readonly mention?: Mention }> } }
+  | { readonly type: "user"; readonly data: { readonly metadata?: Record<string, JsonValue>; readonly text: string; readonly files?: ReadonlyArray<SessionMessageFile>; readonly agents?: ReadonlyArray<{ readonly name: string; readonly mention?: Mention }>; readonly modelContext?: ReadonlyArray<SessionModelContext> } }
   | { readonly type: "synthetic"; readonly data: { readonly metadata?: Record<string, JsonValue>; readonly text: string; readonly description?: string } }
 
 export type Json = JsonValue

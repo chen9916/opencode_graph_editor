@@ -4,7 +4,7 @@ import { Schema } from "effect"
 import { optional } from "./schema"
 import { ProviderMetadata, ToolContent } from "./llm"
 import { Model } from "./model"
-import { FileAttachment, Prompt } from "./prompt"
+import { FileAttachment, ModelContext, Prompt } from "./prompt"
 import { DateTimeUtcFromMillis, RelativePath, statics } from "./schema"
 import { SessionID } from "./session-id"
 import { ascending } from "./identifier"
@@ -47,6 +47,7 @@ export const User = Schema.Struct({
   text: Prompt.fields.text,
   files: Prompt.fields.files,
   agents: Prompt.fields.agents,
+  modelContext: ModelContext.pipe(Schema.Array, optional),
   type: Schema.Literal("user"),
 }).annotate({ identifier: "Session.Message.User" })
 

@@ -132,6 +132,12 @@ export const ResourceCreateInput = Schema.Struct({
   name: Schema.NonEmptyString,
 }).annotate({ identifier: "Architecture.ResourceCreateInput" })
 
+export interface ResourceDuplicateInput extends Schema.Schema.Type<typeof ResourceDuplicateInput> {}
+export const ResourceDuplicateInput = Schema.Struct({
+  id: ResourceID.pipe(optional),
+  name: Schema.NonEmptyString.pipe(optional),
+}).annotate({ identifier: "Architecture.ResourceDuplicateInput" })
+
 export interface ResourceRemoveInput extends Schema.Schema.Type<typeof ResourceRemoveInput> {}
 export const ResourceRemoveInput = Schema.Struct({
   revision: NonNegativeInt,

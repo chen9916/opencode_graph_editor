@@ -40,6 +40,7 @@ import {
   clearArchitectureEditedNodeHint,
   filterArchitectureEditedNodeHints,
 } from "./edit-hint"
+import { currentArchitectureDraftChange, draftChange } from "./editor-state"
 import { applyOperations, flattenJournal, operationID } from "./journal"
 import { tagColorsKey, toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } from "./model"
 import { ArchitectureEdgeView } from "./architecture-edge.react"
@@ -103,6 +104,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const locallyAuthoredResourceKeys = useRef(new Set<string>())
   const selectionRef = useRef<Selection>(emptySelection)
   const pendingSelection = useRef<Selection>()
+  const latestChange = useRef<ArchitectureDraftChange>()
   const selectionGesture = useRef<SelectionGesture>()
   const additiveSelectionModifier = useRef(false)
   const handledAction = useRef<number>()
@@ -124,6 +126,17 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [askPopover, setAskPopover] = useState<AskPopover>()
   const [editedHintNodeIDs, setEditedHintNodeIDs] = useState<ReadonlyArray<string>>([])
   const operations = flattenJournal(editor.past)
+  latestChange.current = currentArchitectureDraftChange({
+    base,
+    historyOrigin,
+    historyBase,
+    initialOperations: initial,
+    loadedKey: loaded.current,
+    initialKey,
+    editorResource: editor.resource,
+    editorOperations: operations,
+    conflicts: props.draft?.conflicts ?? [],
+  })
   const dirty = !!props.draft?.live || operations.length > 0 || (props.draft?.conflicts.length ?? 0) > 0
   const tags = unique(editor.resource.nodes.flatMap((node) => node.tags))
   const controlsPosition = props.direction === "rtl" ? "bottom-right" : "bottom-left"
@@ -171,9 +184,14 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     rememberLocalResource(next.resource)
     setEditor(next)
     keepExistingEditedNodeHints(next.resource)
-    props.onJournal(
-      draftChange(next.resource, flattenJournal(next.past), base, historyOrigin, props.draft?.conflicts ?? []),
+    latestChange.current = draftChange(
+      next.resource,
+      flattenJournal(next.past),
+      base,
+      historyOrigin,
+      props.draft?.conflicts ?? [],
     )
+    props.onJournal(latestChange.current)
   }
 
   const updateNodeText = (node: ArchitectureNode, text: string) => {
@@ -276,6 +294,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     loadedResourceID.current = base.resource.id
     const nextResource = applyOperations(historyBase, initial)
     const localEcho = consumeLocalResource(nextResource)
+    latestChange.current = draftChange(nextResource, initial, base, historyOrigin, props.draft?.conflicts ?? [])
     setEditor({
       resource: nextResource,
       past: initial.map((operation) => [operation]),
@@ -366,15 +385,14 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       future: [batch, ...editor.future],
     })
     keepExistingEditedNodeHints(nextResource)
-    props.onJournal(
-      draftChange(
-        nextResource,
-        flattenJournal(past),
-        base,
-        historyOrigin,
-        props.draft?.conflicts ?? [],
-      ),
+    latestChange.current = draftChange(
+      nextResource,
+      flattenJournal(past),
+      base,
+      historyOrigin,
+      props.draft?.conflicts ?? [],
     )
+    props.onJournal(latestChange.current)
   }
 
   const redo = () => {
@@ -389,15 +407,14 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       future: editor.future.slice(1),
     })
     keepExistingEditedNodeHints(nextResource)
-    props.onJournal(
-      draftChange(
-        nextResource,
-        flattenJournal(past),
-        base,
-        historyOrigin,
-        props.draft?.conflicts ?? [],
-      ),
+    latestChange.current = draftChange(
+      nextResource,
+      flattenJournal(past),
+      base,
+      historyOrigin,
+      props.draft?.conflicts ?? [],
     )
+    props.onJournal(latestChange.current)
   }
 
   const addNode = (position?: XYPosition) => {
@@ -499,8 +516,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     const action = props.action
     if (!action || !architectureCommandMatches(action, base.resource.id) || handledAction.current === action.id) return
     handledAction.current = action.id
-    if (action.type === "save")
-      props.onSave(draftChange(editor.resource, operations, base, historyOrigin, props.draft?.conflicts ?? []))
+    if (action.type === "save") props.onSave(latestChange.current!)
     if (action.type === "reload") props.onReload()
     if (action.type === "fitView") fitSelection()
     if (action.type === "addNode") addNode()
@@ -508,6 +524,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     if (action.type === "redo") redo()
     if (action.type === "delete") removeSelection()
     if (action.type === "exportPatch") props.onExport(operations)
+    if (action.type === "exportResource") props.onExportResource(editor.resource)
+    if (action.type === "duplicateResource") props.onDuplicate(latestChange.current!)
   }, [props.action?.id, props.action?.resourceID, base.resource.id])
 
   const onSelectionChange = (change: OnSelectionChangeParams<ArchitectureFlowNode, ArchitectureFlowEdge>) => {
@@ -1034,9 +1052,13 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               <div className="architecture-editor__ask-title">
                 {props.labels.selectedItems(askPopover.selection.nodeIDs.length, askPopover.selection.edgeIDs.length)}
               </div>
+              <div className="architecture-editor__ask-context-indicator">
+                {props.labels.askSelectionContextAttached}
+              </div>
               <textarea
                 data-prevent-session-autofocus
                 autoFocus
+                aria-label={props.labels.askSelectionLabel}
                 value={askPopover.text}
                 placeholder={props.labels.askSelectionPlaceholder}
                 onChange={(event) => setAskPopover({ ...askPopover, text: event.currentTarget.value })}
@@ -1098,16 +1120,6 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       </div>
     </div>
   )
-}
-
-function draftChange(
-  resource: ArchitectureResource,
-  operations: ReadonlyArray<ArchitectureOperation>,
-  base: ArchitecturePanelProps["snapshot"],
-  origin: ArchitecturePanelProps["snapshot"],
-  conflicts: NonNullable<ArchitecturePanelProps["draft"]>["conflicts"],
-): ArchitectureDraftChange {
-  return { base, origin, resource, operations, conflicts }
 }
 
 function SelectionLassoCleanup() {

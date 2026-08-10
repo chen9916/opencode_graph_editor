@@ -155,6 +155,11 @@ function toLLMMessage(message: SessionMessage.Message, model: Model): Message[] 
           role: "user",
           content: [
             { type: "text", text: message.text },
+            ...(message.modelContext ?? []).map((context) => ({
+              type: "text" as const,
+              text: context.text,
+              metadata: context.metadata,
+            })),
             ...(message.files ?? []).map((file) =>
               isArchitectureResource(file) ? architectureReference(file) : media(file),
             ),

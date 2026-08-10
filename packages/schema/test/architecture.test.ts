@@ -30,6 +30,13 @@ describe("Architecture schema", () => {
     ).toThrow()
   })
 
+  test("decodes optional duplicate targets", () => {
+    expect(Schema.decodeUnknownSync(Architecture.ResourceDuplicateInput)({})).toEqual({})
+    expect(
+      Schema.decodeUnknownSync(Architecture.ResourceDuplicateInput)({ id: "design_copy", name: "Design copy" }),
+    ).toMatchObject({ id: "design_copy", name: "Design copy" })
+  })
+
   test("decodes a lightweight graph with text nodes and tags", () => {
     expect(Schema.decodeUnknownSync(Architecture.Resource)(resource)).toMatchObject({
       version: 2,

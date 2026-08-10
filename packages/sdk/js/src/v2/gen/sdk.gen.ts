@@ -13,6 +13,7 @@ import type {
   ArchitectureDraftCommitInput,
   ArchitecturePatchInput,
   ArchitectureResourceCreateInput,
+  ArchitectureResourceDuplicateInput,
   ArchitectureResourceRemoveInput,
   Auth as Auth3,
   AuthRemoveErrors,
@@ -281,6 +282,8 @@ import type {
   V2ArchitectureResourceDraftPatchResponses,
   V2ArchitectureResourceDraftReloadErrors,
   V2ArchitectureResourceDraftReloadResponses,
+  V2ArchitectureResourceDuplicateErrors,
+  V2ArchitectureResourceDuplicateResponses,
   V2ArchitectureResourceGetErrors,
   V2ArchitectureResourceGetResponses,
   V2ArchitectureResourceListErrors,
@@ -5455,6 +5458,50 @@ export class Resource2 extends HeyApiClient {
       url: "/api/architecture/resource/{resourceID}",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Duplicate graph resource
+   *
+   * Clone the current live Graph editor resource into a new managed graph resource without changing the source resource.
+   */
+  public duplicate<ThrowOnError extends boolean = false>(
+    parameters: {
+      resourceID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      architectureResourceDuplicateInput: ArchitectureResourceDuplicateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "resourceID" },
+            { in: "query", key: "location" },
+            { key: "architectureResourceDuplicateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      V2ArchitectureResourceDuplicateResponses,
+      V2ArchitectureResourceDuplicateErrors,
+      ThrowOnError
+    >({
+      url: "/api/architecture/resource/{resourceID}/duplicate",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

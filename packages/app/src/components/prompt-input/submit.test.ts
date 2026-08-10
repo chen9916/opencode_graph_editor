@@ -4,6 +4,7 @@ import type { Prompt, PromptStore } from "@/context/prompt"
 import type { ModelSelection } from "@/context/local"
 
 let createPromptSubmit: typeof import("./submit").createPromptSubmit
+let sendFollowupDraft: typeof import("./submit").sendFollowupDraft
 
 const createdClients: string[] = []
 const createdSessions: string[] = []
@@ -135,6 +136,7 @@ beforeAll(async () => {
   mock.module("@opencode-ai/ui/toast", () => ({
     Toast: { Region: () => null },
     showToast: () => 0,
+    toaster: { dismiss: () => undefined },
   }))
 
   mock.module("@opencode-ai/core/util/encode", () => ({
@@ -276,6 +278,7 @@ beforeAll(async () => {
 
   const mod = await import("./submit")
   createPromptSubmit = mod.createPromptSubmit
+  sendFollowupDraft = mod.sendFollowupDraft
 })
 
 beforeEach(() => {
@@ -492,6 +495,56 @@ describe("prompt submit worktree selection", () => {
     expect((promptInputs[0] as { legacyParts?: { id: string; type: string; text?: string }[] }).legacyParts).toEqual([
       { id: expect.stringMatching(/^prt_/), type: "text", text: "ls" },
     ])
+  })
+
+  test("keeps Graph model context out of visible prompt text while preserving provider context", async () => {
+    params = { id: "session-1" }
+
+    await sendFollowupDraft({
+      api: clientFor("/repo/main").api.session as unknown as Parameters<typeof sendFollowupDraft>[0]["api"],
+      sync: {
+        data: { command: [] },
+        session: { optimistic: { add: () => undefined, remove: () => undefined } },
+        set: () => undefined,
+      } as unknown as Parameters<typeof sendFollowupDraft>[0]["sync"],
+      serverSync: { session: { set: () => undefined } } as unknown as Parameters<typeof sendFollowupDraft>[0]["serverSync"],
+      draft: {
+        sessionID: "session-1",
+        sessionDirectory: "/repo/main",
+        prompt: [{ type: "text", content: "What should I implement?", start: 0, end: 24 }],
+        context: [],
+        agent: "agent",
+        model: { providerID: "provider", modelID: "model" },
+        modelContext: [
+          {
+            text: "Graph selection in resource Design (overview).\nSelected nodes:\n- n1: Build it",
+            description: "Graph selection context attached",
+            metadata: { kind: "graph-selection" },
+          },
+        ],
+      },
+    })
+
+    expect(promptInputs[0]).toMatchObject({
+      text: "What should I implement?",
+      modelContext: [
+        {
+          text: "Graph selection in resource Design (overview).\nSelected nodes:\n- n1: Build it",
+          description: "Graph selection context attached",
+        },
+      ],
+    })
+    expect((promptInputs[0] as { legacyParts?: { id: string; type: string; text?: string; synthetic?: boolean; metadata?: unknown }[] }).legacyParts)
+      .toEqual([
+        { id: expect.stringMatching(/^prt_/), type: "text", text: "What should I implement?" },
+        {
+          id: expect.stringMatching(/^prt_/),
+          type: "text",
+          text: "Graph selection in resource Design (overview).\nSelected nodes:\n- n1: Build it",
+          synthetic: true,
+          metadata: { description: "Graph selection context attached", kind: "graph-selection" },
+        },
+      ])
   })
 
   test("submits slash commands through the current session API", async () => {

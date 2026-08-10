@@ -37,21 +37,30 @@ export const AgentAttachment = Schema.Struct({
   source: Source.pipe(optional),
 }).annotate({ identifier: "Prompt.AgentAttachment" })
 
+export interface ModelContext extends Schema.Schema.Type<typeof ModelContext> {}
+export const ModelContext = Schema.Struct({
+  text: Schema.String,
+  description: Schema.String.pipe(optional),
+  metadata: Schema.Record(Schema.String, Schema.Json).pipe(optional),
+}).annotate({ identifier: "Prompt.ModelContext" })
+
 export interface Prompt extends Schema.Schema.Type<typeof Prompt> {}
 export const Prompt = Schema.Struct({
   text: Schema.String,
   files: Schema.Array(FileAttachment).pipe(optional),
   agents: Schema.Array(AgentAttachment).pipe(optional),
+  modelContext: Schema.Array(ModelContext).pipe(optional),
 })
   .annotate({ identifier: "Prompt" })
   .pipe(
     statics((schema) => ({
       equivalence: Schema.toEquivalence(schema),
-      fromUserMessage: (input: Pick<Prompt, "text" | "files" | "agents">) =>
+      fromUserMessage: (input: Pick<Prompt, "text" | "files" | "agents" | "modelContext">) =>
         schema.make({
           text: input.text,
           ...(input.files === undefined ? {} : { files: input.files }),
           ...(input.agents === undefined ? {} : { agents: input.agents }),
+          ...(input.modelContext === undefined ? {} : { modelContext: input.modelContext }),
         }),
     })),
   )

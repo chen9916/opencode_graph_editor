@@ -105,7 +105,7 @@ import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
 import { Identifier } from "@/utils/id"
 import { diffs as list } from "@/utils/diffs"
 import { Persist, persisted } from "@/utils/persist"
-import { extractPromptFromParts } from "@/utils/prompt"
+import { extractModelContextFromParts, extractPromptFromParts } from "@/utils/prompt"
 import { formatServerError, isLocalSessionNotFoundError, isSessionNotFoundError } from "@/utils/server-errors"
 import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/session-route"
 import { useUsageExceededDialogs } from "./session/usage-exceeded-dialogs"
@@ -113,7 +113,7 @@ import { createSessionOwnership } from "./session/session-ownership"
 import { createSessionLineage } from "./session/session-lineage"
 
 type FollowupItem = FollowupDraft & { id: string }
-type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context">
+type FollowupEdit = Pick<FollowupItem, "id" | "prompt" | "context" | "modelContext">
 const emptyFollowups: FollowupItem[] = []
 
 type ChangeMode = "git" | "branch" | "turn"
@@ -888,6 +888,7 @@ export default function Page() {
   }
 
   let inputRef!: HTMLDivElement
+  const [restoredModelContext, setRestoredModelContext] = createSignal<FollowupDraft["modelContext"]>()
   let promptDock: HTMLDivElement | undefined
   let dockHeight = 0
   let scroller: HTMLDivElement | undefined
@@ -1697,6 +1698,8 @@ export default function Page() {
       attachmentName: language.t("common.attachment"),
     })
 
+  const draftModelContext = (id: string) => extractModelContextFromParts(sync().data.part[id] ?? [])
+
   const line = (id: string) => {
     const text = draft(id)
       .map((part) => (part.type === "image" ? `[image:${part.filename}]` : part.content))
@@ -1831,6 +1834,7 @@ export default function Page() {
       id: item.id,
       prompt: item.prompt,
       context: item.context,
+      modelContext: item.modelContext,
     })
   }
 
@@ -1857,6 +1861,7 @@ export default function Page() {
         capturePrompt: prompt.capture,
         optimistic: (prompt) => {
           roll(input.sessionID, { messageID: input.messageID }, target)
+          setRestoredModelContext(draftModelContext(input.messageID))
           prompt.set(value)
         },
         request: () => halt(input.sessionID).then(() => session.revert.stage(input)),
@@ -1884,9 +1889,11 @@ export default function Page() {
         optimistic: (promptSession) => {
           roll(sessionID, next ? { messageID: next.id } : undefined, target)
           if (next) {
+            setRestoredModelContext(draftModelContext(next.id))
             promptSession.set(draft(next.id))
             return
           }
+          setRestoredModelContext(undefined)
           promptSession.reset()
         },
         request: () =>
@@ -2239,6 +2246,8 @@ export default function Page() {
                       }}
                       edit={editingFollowup()}
                       onEditLoaded={clearFollowupEdit}
+                      modelContext={restoredModelContext}
+                      onModelContextConsumed={() => setRestoredModelContext(undefined)}
                       shouldQueue={queueEnabled}
                       onQueue={queueFollowup}
                       onAbort={() => {
@@ -2269,6 +2278,8 @@ export default function Page() {
                         return editingFollowup()
                       },
                       onEditLoaded: clearFollowupEdit,
+                      modelContext: restoredModelContext,
+                      onModelContextConsumed: () => setRestoredModelContext(undefined),
                       shouldQueue: queueEnabled,
                       onQueue: queueFollowup,
                       onAbort: () => {

@@ -4,6 +4,8 @@ import {
   architectureCommandKeybinds,
   architectureCommandMatches,
   architectureEditorCommandTarget,
+  ARCHITECTURE_COMMAND_EVENT,
+  dispatchArchitectureCommand,
   type ArchitectureCommandAction,
 } from "./commands"
 
@@ -13,6 +15,18 @@ describe("architecture commands", () => {
 
     expect(architectureCommandMatches(action, "new_graph")).toBe(true)
     expect(architectureCommandMatches(action, "auth_resourceID")).toBe(false)
+  })
+
+  test("dispatches reusable resource-level commands", () => {
+    const received: string[] = []
+    const listener = (event: Event) => received.push((event as CustomEvent<string>).detail)
+    document.addEventListener(ARCHITECTURE_COMMAND_EVENT, listener)
+
+    dispatchArchitectureCommand("exportResource")
+    dispatchArchitectureCommand("duplicateResource")
+
+    document.removeEventListener(ARCHITECTURE_COMMAND_EVENT, listener)
+    expect(received).toEqual(["exportResource", "duplicateResource"])
   })
 
   test("uses standard editor keybinds for graph save, reload, undo, and redo", () => {

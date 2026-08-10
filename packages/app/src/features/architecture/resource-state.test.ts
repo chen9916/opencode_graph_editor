@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import type { ArchitectureDraftChange, ArchitectureSnapshot } from "./contract"
 import { beginArchitectureLocalSave, isArchitectureLocalSaveEvent } from "./event"
 import {
+  architectureDraftHasVisibleChanges,
   architectureDraftResourceID,
   architectureResourceSelectionOptions,
   architectureResourceSummary,
@@ -100,6 +101,39 @@ describe("architecture resource state", () => {
 
     expect(architectureDraftResourceID(change)).toBe("new_graph")
     expect(architectureDraftResourceID(change)).not.toBe("auth_resourceID")
+  })
+
+  test("detects whether duplicate should use visible draft changes", () => {
+    const saved = snapshot("design", "Design")
+    const live = { ...snapshot("design", "Design"), digest: "live-digest" }
+
+    expect(
+      architectureDraftHasVisibleChanges({
+        base: saved,
+        origin: saved,
+        resource: saved.resource,
+        operations: [],
+        conflicts: [],
+      }),
+    ).toBe(false)
+    expect(
+      architectureDraftHasVisibleChanges({
+        base: saved,
+        origin: live,
+        resource: live.resource,
+        operations: [],
+        conflicts: [],
+      }),
+    ).toBe(true)
+    expect(
+      architectureDraftHasVisibleChanges({
+        base: saved,
+        origin: saved,
+        conflicts: [],
+        resource: { ...saved.resource, name: "Visible rename" },
+        operations: [{ id: "rename", type: "resource.update", name: "Visible rename" }],
+      }),
+    ).toBe(true)
   })
 
   test("save settling does not replace an already cached newer saved revision", () => {

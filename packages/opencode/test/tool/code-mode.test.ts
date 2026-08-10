@@ -103,6 +103,7 @@ function graphMock(input: Partial<ArchitectureGraph.Interface> = {}): Architectu
     list: () => Effect.succeed([]),
     listLive: () => Effect.succeed({ resources: [], source: "saved" }),
     create: () => Effect.die("unexpected graph create in CodeMode test"),
+    duplicate: () => Effect.die("unexpected graph duplicate in CodeMode test"),
     load: () => Effect.die("unexpected graph load in CodeMode test"),
     loadLive: () => Effect.die("unexpected graph live load in CodeMode test"),
     loadDraft: () => Effect.die("unexpected graph draft load in CodeMode test"),

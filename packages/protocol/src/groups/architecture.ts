@@ -66,6 +66,24 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
       ),
   )
   .add(
+    HttpApiEndpoint.post("architecture.resource.duplicate", "/api/architecture/resource/:resourceID/duplicate", {
+      params: { resourceID: Architecture.ResourceID },
+      query: LocationQuery,
+      payload: Architecture.ResourceDuplicateInput,
+      success: Location.response(Architecture.ResourceSnapshot),
+      error: errors,
+    })
+      .annotateMerge(locationQueryOpenApi)
+      .annotateMerge(
+        OpenApi.annotations({
+          identifier: "v2.architecture.resource.duplicate",
+          summary: "Duplicate graph resource",
+          description:
+            "Clone the current live Graph editor resource into a new managed graph resource without changing the source resource.",
+        }),
+      ),
+  )
+  .add(
     HttpApiEndpoint.get("architecture.resource.draft.get", "/api/architecture/resource/:resourceID/draft", {
       params: { resourceID: Architecture.ResourceID },
       query: LocationQuery,

@@ -97,6 +97,8 @@ export type ArchitectureLabels = {
   readonly exportPatch: string
   readonly askSelection: string
   readonly askSelectionPlaceholder: string
+  readonly askSelectionLabel: string
+  readonly askSelectionContextAttached: string
   readonly send: string
   readonly cancel: string
   readonly conflicts: string
@@ -127,8 +129,10 @@ export type ArchitecturePanelProps = {
   readonly onJournal: (change: ArchitectureDraftChange) => void
   readonly onViewport: (viewport: ArchitectureViewport) => void
   readonly onSave: (change: ArchitectureDraftChange) => void
+  readonly onDuplicate: (change: ArchitectureDraftChange) => void
   readonly onAskSelection?: (input: ArchitectureSelectionPrompt) => void
   readonly onReload: () => void
   readonly onExport: (operations: ReadonlyArray<ArchitectureOperation>) => void
+  readonly onExportResource: (resource: ArchitectureResource) => void
   readonly onConfirm: (message: string, confirmLabel: string, action: () => void) => void
 }

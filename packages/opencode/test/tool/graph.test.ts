@@ -28,6 +28,7 @@ function graphMock(input: Partial<ArchitectureGraph.Interface> = {}): Architectu
     list: () => Effect.die("unexpected graph list in legacy GraphTools test"),
     listLive: () => Effect.succeed({ resources: [], source: "saved" }),
     create: () => Effect.die("unexpected graph create in legacy GraphTools test"),
+    duplicate: () => Effect.die("unexpected graph duplicate in legacy GraphTools test"),
     load: () => Effect.die("unexpected graph load in legacy GraphTools test"),
     loadLive: () => Effect.die("unexpected graph live load in legacy GraphTools test"),
     loadDraft: () => Effect.die("unexpected graph draft load in legacy GraphTools test"),

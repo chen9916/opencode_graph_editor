@@ -910,6 +910,88 @@ describe("HttpApi SDK", () => {
   )
 
   httpapi(
+    "duplicates the current live Graph resource over HTTP",
+    withProject("raw", {}, ({ sdk, directory }) =>
+      Effect.gen(function* () {
+        const resourceID = Architecture.ResourceID.make("duplicate-source")
+        const created = yield* capture(() =>
+          sdk.v2.architecture.resource.create({
+            architectureResourceCreateInput: { id: resourceID, name: "Duplicate source" },
+          }),
+        )
+        const base = record(record(created.data).data)
+        const baseResource = record(base.resource)
+        const baseNode = {
+          id: "a",
+          text: "A",
+          tags: ["planned"],
+          layout: { position: { x: 12, y: 34 } },
+        }
+        const request = yield* serverFetch("raw")
+        const draftResponse = yield* Effect.promise(() =>
+          request(
+            new Request(`http://localhost/api/architecture/resource/${resourceID}/draft`, {
+              method: "PATCH",
+              headers: { "content-type": "application/json", "x-opencode-directory": directory },
+              body: JSON.stringify({
+                revision: Number(baseResource.revision),
+                digest: String(base.digest),
+                operations: [
+                  { id: "color", type: "tag.color", tag: "planned", color: "#4C82FF" },
+                  { id: "node-a", type: "node.create", node: baseNode },
+                  {
+                    id: "node-b",
+                    type: "node.create",
+                    node: { id: "b", text: "B", tags: [], layout: { position: { x: 210, y: 34 } } },
+                  },
+                  {
+                    id: "edge-a-b",
+                    type: "edge.create",
+                    edge: {
+                      id: "a-b",
+                      source: "a",
+                      target: "b",
+                      sourceHandle: "bottom",
+                      targetHandle: "top",
+                      style: "straight",
+                    },
+                  },
+                ],
+              }),
+            }),
+          ),
+        )
+        const draft = { status: draftResponse.status }
+        const duplicated = yield* capture(() =>
+          sdk.v2.architecture.resource.duplicate({
+            resourceID,
+            architectureResourceDuplicateInput: { id: "duplicate-copy", name: "Duplicate copy" },
+          }),
+        )
+        const copy = record(record(duplicated.data).data)
+        const copyResource = record(copy.resource)
+        const sourceSaved = yield* Effect.promise(() =>
+          Bun.file(path.join(directory, ".opencode", "architecture", "resources", `${resourceID}.json`)).json(),
+        )
+
+        expect(statuses({ created, draft, duplicated })).toEqual({ created: 200, draft: 200, duplicated: 200 })
+        expect(copyResource).toMatchObject({ id: "duplicate-copy", name: "Duplicate copy", revision: 0 })
+        expect(record(copyResource.tagColors).planned).toBe("#4c82ff")
+        expect(array(copyResource.nodes)).toContainEqual(baseNode)
+        expect(array(copyResource.edges)).toContainEqual(
+          expect.objectContaining({
+            id: "a-b",
+            sourceHandle: "bottom",
+            targetHandle: "top",
+            style: "straight",
+          }),
+        )
+        expect(sourceSaved.nodes).toEqual([])
+      }),
+    ),
+  )
+
+  httpapi(
     "rejects changed and missing expected Graph drafts over HTTP",
     withProject("raw", {}, ({ directory }) =>
       Effect.gen(function* () {

@@ -1,5 +1,6 @@
 import { getFilename } from "@opencode-ai/core/util/path"
 import { type AgentPartInput, type FilePartInput, type Part, type TextPartInput } from "@opencode-ai/sdk/v2/client"
+import type { Json } from "@opencode-ai/client/promise"
 import type { FileSelection } from "@/context/file"
 import { encodeFilePath } from "@/context/file/path"
 import type { AgentPart, FileAttachmentPart, ImageAttachmentPart, Prompt } from "@/context/prompt"
@@ -7,6 +8,12 @@ import { Identifier } from "@/utils/id"
 import { createCommentMetadata, formatCommentNote } from "@/utils/comment-note"
 
 type PromptRequestPart = (TextPartInput | FilePartInput | AgentPartInput) & { id: string }
+
+export type PromptModelContext = {
+  text: string
+  description?: string
+  metadata?: Record<string, Json>
+}
 
 type ContextFile = {
   key: string
@@ -24,6 +31,7 @@ type BuildRequestPartsInput = {
   context: ContextFile[]
   images: (Omit<ImageAttachmentPart, "blob"> & { dataUrl: string })[]
   text: string
+  modelContext?: PromptModelContext[]
   messageID: string
   sessionID: string
   sessionDirectory: string
@@ -206,6 +214,24 @@ export function buildRequestParts(input: BuildRequestPartsInput) {
   })
 
   requestParts.push(...files, ...context, ...agents, ...images)
+
+  requestParts.splice(
+    input.text.trim() ? 1 : 0,
+    0,
+    ...(input.modelContext ?? []).map(
+      (item) =>
+        ({
+          id: Identifier.ascending("part"),
+          type: "text",
+          text: item.text,
+          synthetic: true,
+          metadata: {
+            ...(item.metadata ?? {}),
+            ...(item.description === undefined ? {} : { description: item.description }),
+          },
+        }) satisfies PromptRequestPart,
+    ),
+  )
 
   return {
     requestParts,

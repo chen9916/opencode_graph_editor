@@ -1795,7 +1795,25 @@ export type ProviderConfig = {
      */
     headerTimeout?: number | false
     chunkTimeout?: number
-    [key: string]: unknown | string | boolean | number | false | number | false | number | undefined
+    /**
+     * HTTP, HTTPS, SOCKS, or local proxy URL used for outbound network requests. Set false to disable proxying.
+     */
+    proxy?: string | false
+    noProxy?: string | Array<string>
+    [key: string]:
+      | unknown
+      | string
+      | boolean
+      | number
+      | false
+      | number
+      | false
+      | number
+      | string
+      | false
+      | string
+      | Array<string>
+      | undefined
   }
   models?: {
     [key: string]: {
@@ -2000,6 +2018,7 @@ export type Config = {
           enabled: boolean
         }
   }
+  network?: ConfigV2Network
   /**
    * Enable or configure formatters. Omit or set to false to disable, true to enable built-ins, or an object to enable built-ins with overrides.
    */
@@ -3923,6 +3942,14 @@ export type ConfigV2ReferenceLocal = {
   hidden?: boolean
 }
 
+export type ConfigV2Network = {
+  /**
+   * HTTP, HTTPS, SOCKS, or local proxy URL used for outbound network requests. Set false to disable proxying.
+   */
+  proxy?: string | false
+  noProxy?: string | Array<string>
+}
+
 export type PolicyEffect = "allow" | "deny"
 
 export type ConfigV2ExperimentalPolicy = {
@@ -4055,6 +4082,11 @@ export type ArchitectureResourceSnapshot = {
   resource: ArchitectureResource
   digest: string
   storage: ArchitectureStorage
+}
+
+export type ArchitectureResourceDuplicateInput = {
+  id?: string
+  name?: string
 }
 
 export type ArchitectureDraftSource = "live" | "saved"
@@ -11899,6 +11931,63 @@ export type V2ArchitectureResourceGetResponses = {
 
 export type V2ArchitectureResourceGetResponse =
   V2ArchitectureResourceGetResponses[keyof V2ArchitectureResourceGetResponses]
+
+export type V2ArchitectureResourceDuplicateData = {
+  body: ArchitectureResourceDuplicateInput
+  path: {
+    resourceID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/architecture/resource/{resourceID}/duplicate"
+}
+
+export type V2ArchitectureResourceDuplicateErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ArchitectureNotFoundError
+   */
+  404: ArchitectureNotFoundError
+  /**
+   * ArchitectureConflictError
+   */
+  409: ArchitectureConflictError
+  /**
+   * ArchitectureInvalidGraphError
+   */
+  422: ArchitectureInvalidGraphError
+  /**
+   * ArchitectureUnavailableError
+   */
+  503: ArchitectureUnavailableError
+}
+
+export type V2ArchitectureResourceDuplicateError =
+  V2ArchitectureResourceDuplicateErrors[keyof V2ArchitectureResourceDuplicateErrors]
+
+export type V2ArchitectureResourceDuplicateResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: ArchitectureResourceSnapshot
+  }
+}
+
+export type V2ArchitectureResourceDuplicateResponse =
+  V2ArchitectureResourceDuplicateResponses[keyof V2ArchitectureResourceDuplicateResponses]
 
 export type V2ArchitectureResourceDraftGetData = {
   body?: never

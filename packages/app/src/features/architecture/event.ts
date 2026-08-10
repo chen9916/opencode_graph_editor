@@ -159,9 +159,10 @@ export function architectureDraftEventIsStale(
 }
 
 function architectureEventPayload(event: ArchitectureResourceEvent) {
-  const value = event.properties ?? event.data
-  if (!value || typeof value !== "object") return
-  return value as Record<string, unknown>
+  const properties = isRecord(event.properties) ? event.properties : undefined
+  const data = isRecord(event.data) ? event.data : undefined
+  if (!properties && !data) return
+  return { ...(data ?? {}), ...(properties ?? {}) }
 }
 
 function architectureEventDraft(payload: Record<string, unknown> | undefined): ArchitectureLiveDraft | undefined {

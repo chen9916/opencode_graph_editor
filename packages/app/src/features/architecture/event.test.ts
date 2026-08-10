@@ -124,6 +124,30 @@ describe("architecture resource events", () => {
     ).toEqual({ resourceID: "design", action: "discarded", draft })
   })
 
+  test("uses data payload fields when a legacy properties object is also present", () => {
+    expect(
+      architectureResourceDraftEventInfo({
+        type: "architecture.resource.draft.updated",
+        properties: {},
+        data: {
+          resourceID: "design",
+          revision: 5,
+          digest: "data-digest",
+          baseRevision: 4,
+          baseDigest: "base-digest",
+        },
+      }),
+    ).toEqual({
+      resourceID: "design",
+      action: "updated",
+      revision: 5,
+      digest: "data-digest",
+      baseRevision: 4,
+      baseDigest: "base-digest",
+      draft: undefined,
+    })
+  })
+
   test("reads metadata-only draft events without pretending they include a draft", () => {
     expect(
       architectureResourceDraftEventInfo({

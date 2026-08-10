@@ -10,6 +10,8 @@ import type {
   ArchitectureCreateResourceOutput,
   ArchitectureGetResourceInput,
   ArchitectureGetResourceOutput,
+  ArchitectureDuplicateResourceInput,
+  ArchitectureDuplicateResourceOutput,
   ArchitectureGetDraftInput,
   ArchitectureGetDraftOutput,
   ArchitecturePatchDraftInput,
@@ -334,6 +336,19 @@ export function make(options: ClientOptions) {
             method: "GET",
             path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}`,
             query: { location: input["location"] },
+            successStatus: 200,
+            declaredStatuses: [409, 422, 404, 503, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      duplicateResource: (input: ArchitectureDuplicateResourceInput, requestOptions?: RequestOptions) =>
+        request<ArchitectureDuplicateResourceOutput>(
+          {
+            method: "POST",
+            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/duplicate`,
+            query: { location: input["location"] },
+            body: { id: input["id"], name: input["name"] },
             successStatus: 200,
             declaredStatuses: [409, 422, 404, 503, 401, 400],
             empty: false,

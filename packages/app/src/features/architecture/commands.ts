@@ -1,5 +1,15 @@
 export const ARCHITECTURE_COMMAND_EVENT = "opencode:architecture-command"
-export type ArchitectureCommand = "save" | "reload" | "fitView" | "addNode" | "undo" | "redo" | "delete" | "exportPatch"
+export type ArchitectureCommand =
+  | "save"
+  | "reload"
+  | "fitView"
+  | "addNode"
+  | "undo"
+  | "redo"
+  | "delete"
+  | "exportPatch"
+  | "exportResource"
+  | "duplicateResource"
 export type ArchitectureCommandAction = {
   readonly id: number
   readonly type: ArchitectureCommand

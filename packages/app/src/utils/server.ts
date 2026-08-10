@@ -172,6 +172,7 @@ export function createApiForServer(input: {
             text: value.text,
             files: value.files?.map((file) => ({ uri: file.uri, name: file.name, source: file.mention })),
             agents: value.agents?.map((agent) => ({ name: agent.name, source: agent.mention })),
+            modelContext: value.modelContext,
           },
           delivery: value.delivery,
           resume: value.resume,

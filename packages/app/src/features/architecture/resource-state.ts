@@ -23,6 +23,10 @@ export function architectureDraftResourceID(change: ArchitectureDraftChange) {
   return change.resource.id
 }
 
+export function architectureDraftHasVisibleChanges(change: ArchitectureDraftChange) {
+  return change.operations.length > 0 || change.origin.digest !== change.base.digest
+}
+
 export function architectureResourceSummary(
   snapshot: ArchitectureSnapshot,
 ): ArchitectureResourceSummary {

@@ -632,6 +632,11 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
             onSelect: () => dispatchArchitectureCommand("addNode"),
           }),
           viewCommand({
+            id: "architecture.exportResource",
+            title: language.t("architecture.action.exportResource"),
+            onSelect: () => dispatchArchitectureCommand("exportResource"),
+          }),
+          viewCommand({
             id: "architecture.exportPatch",
             title: language.t("architecture.action.exportPatch"),
             onSelect: () => dispatchArchitectureCommand("exportPatch"),

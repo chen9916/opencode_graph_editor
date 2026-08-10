@@ -15,7 +15,7 @@ import { useSDK, type DirectorySDK } from "@/context/sdk"
 import { useSync, type DirectorySync } from "@/context/sync"
 import { Identifier } from "@/utils/id"
 import { Worktree as WorktreeState } from "@/utils/worktree"
-import { buildRequestParts } from "./build-request-parts"
+import { buildRequestParts, type PromptModelContext } from "./build-request-parts"
 import { setCursorPosition } from "./editor-dom"
 import { formatServerError } from "@/utils/server-errors"
 import { ScopedKey } from "@/utils/server-scope"
@@ -39,6 +39,7 @@ export type FollowupDraft = {
   agent: string
   model: { providerID: string; modelID: string }
   variant?: string
+  modelContext?: PromptModelContext[]
 }
 
 type FollowupSendInput = {
@@ -122,6 +123,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
     context: input.draft.context,
     images: encodedImages,
     text,
+    modelContext: input.draft.modelContext,
     sessionID: input.draft.sessionID,
     messageID,
     sessionDirectory: input.draft.sessionDirectory,
@@ -172,7 +174,10 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
       model: input.draft.model,
       variant: input.draft.variant,
       legacyParts: requestParts,
-      text: requestParts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n"),
+      text: input.draft.modelContext?.length
+        ? text
+        : requestParts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n"),
+      modelContext: input.draft.modelContext,
       files: requestParts.flatMap((part) => {
         if (part.type !== "file") return []
         const text = part.source?.text
@@ -229,6 +234,7 @@ type PromptSubmitInput = {
   onAbort?: () => void
   onSubmit?: () => void
   model?: ModelSelection
+  consumeModelContext?: () => PromptModelContext[] | undefined
 }
 
 export function createPromptSubmit(input: PromptSubmitInput) {
@@ -454,6 +460,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       agent,
       model,
       variant,
+      modelContext: input.consumeModelContext?.(),
     }
 
     const clearInput = () => {

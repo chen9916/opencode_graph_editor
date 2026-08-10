@@ -169,6 +169,75 @@ describe("ArchitectureGraph storage", () => {
     }),
   )
 
+  it.live("duplicates the current live graph without mutating the source", () =>
+    Effect.gen(function* () {
+      const graph = yield* ArchitectureGraph.Service
+      const drafts = yield* ArchitectureDraft.Service
+      const base = yield* graph.create({ id: Architecture.ResourceID.make("source"), name: "Source" })
+      const live = yield* graph.patchDraft(base.resource.id, {
+        revision: base.resource.revision,
+        digest: base.digest,
+        operations: [
+          {
+            id: Architecture.OperationID.make("tag-color"),
+            type: "tag.color",
+            tag: Architecture.Tag.make("planned"),
+            color: Architecture.TagColor.make("#4C82FF"),
+          },
+          {
+            id: Architecture.OperationID.make("node-a"),
+            type: "node.create",
+            node: {
+              id: Architecture.NodeID.make("a"),
+              text: "A",
+              tags: [Architecture.Tag.make("planned"), Architecture.Tag.make("interaction")],
+              layout: { position: { x: 10, y: 20 } },
+            },
+          },
+          {
+            id: Architecture.OperationID.make("node-b"),
+            type: "node.create",
+            node: {
+              id: Architecture.NodeID.make("b"),
+              text: "B",
+              tags: [Architecture.Tag.make("planned")],
+              layout: { position: { x: 220, y: 20 } },
+            },
+          },
+          {
+            id: Architecture.OperationID.make("edge-a-b"),
+            type: "edge.create",
+            edge: {
+              id: Architecture.EdgeID.make("a-b"),
+              source: Architecture.NodeID.make("a"),
+              target: Architecture.NodeID.make("b"),
+              sourceHandle: "bottom",
+              targetHandle: "top",
+              style: "curved",
+            },
+          },
+        ],
+      })
+
+      const copy = yield* graph.duplicate(base.resource.id, {
+        id: Architecture.ResourceID.make("source-copy"),
+        name: "Source copy",
+      })
+      const savedSource = yield* graph.load(base.resource.id)
+      const draftSource = yield* drafts.get(base.resource.id)
+
+      expect(copy.resource).toEqual({
+        ...live.snapshot.resource,
+        revision: 0,
+        id: Architecture.ResourceID.make("source-copy"),
+        name: "Source copy",
+      })
+      expect(savedSource.resource).toEqual(base.resource)
+      expect(draftSource?.resource).toEqual(live.snapshot.resource)
+      expect((yield* graph.loadDraft(copy.resource.id)).source).toBe("saved")
+    }),
+  )
+
   it.live("commits multiple live draft patches as one saved revision", () =>
     Effect.gen(function* () {
       const graph = yield* ArchitectureGraph.Service
