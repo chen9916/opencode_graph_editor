@@ -8,7 +8,9 @@ import {
   architectureSnapshotCoversEvent,
   architectureSnapshotMatchesEvent,
   architectureSummaryMatchesEvent,
+  beginArchitectureLocalDraftOperation,
   beginArchitectureLocalSave,
+  captureArchitectureLocalDraftOperationEvent,
   isArchitectureLocalSaveEvent,
 } from "./event"
 
@@ -95,6 +97,34 @@ describe("architecture resource events", () => {
         server: "http://127.0.0.1:4096",
         directory: "C:/repo",
         event: { resourceID: "design", revision: 2, digest: "abc" },
+      }),
+    ).toBe(false)
+  })
+
+  test("captures draft events during a local save or reload without exposing them to the live synchronizer", () => {
+    const finish = beginArchitectureLocalDraftOperation({
+      server: "http://127.0.0.1:4096",
+      directory: "C:/repo",
+      resourceID: "design",
+      operation: "save",
+    })
+    const event = { resourceID: "design", action: "discarded" as const, revision: 2, digest: "saved" }
+
+    expect(
+      captureArchitectureLocalDraftOperationEvent({
+        server: "http://127.0.0.1:4096",
+        directory: "C:/repo",
+        event,
+      }),
+    ).toBe(true)
+
+    expect(finish()).toEqual(event)
+    expect(finish()).toBeUndefined()
+    expect(
+      captureArchitectureLocalDraftOperationEvent({
+        server: "http://127.0.0.1:4096",
+        directory: "C:/repo",
+        event,
       }),
     ).toBe(false)
   })

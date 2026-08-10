@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "revision": 46,
+  "revision": 53,
   "id": "ui-graph-editor-tabs",
   "name": "UI System: Graph Editor Tabs",
   "tagColors": {
@@ -12,7 +12,10 @@
     "editor": "#ca8a04",
     "implemented": "#10b981",
     "mobile": "#16a34a",
+    "needs-redesign": "#fb7185",
     "planned": "#f59e0b",
+    "redesign": "#e11d48",
+    "risk": "#ef4444",
     "session": "#4f46e5",
     "tabs": "#2563eb",
     "test": "#0ea5e9"
@@ -76,6 +79,22 @@
         "position": {
           "x": 1600,
           "y": 180
+        }
+      }
+    },
+    {
+      "id": "audit-save-reload-pipeline",
+      "text": "Implemented audit: Save/Reload state ownership map\nMapped the current visible Graph state writers: query cache, persisted drafts/viewports, live draft synchronizer, event handlers, local Save/Reload operations, React editor history, React Flow nodes/edges, dirty state, resource list, reload generation, and tab lifecycle. The key remaining failure path was local Save/Reload success racing with draft updated/discarded events that could cancel synchronizer cleanup or keep saved-covered live drafts dirty.",
+      "tags": [
+        "implemented",
+        "redesign",
+        "risk",
+        "test"
+      ],
+      "layout": {
+        "position": {
+          "x": 980,
+          "y": 1080
         }
       }
     },
@@ -212,6 +231,22 @@
       }
     },
     {
+      "id": "fix-save-reload-local-transactions",
+      "text": "Implemented fix: local Save/Reload transaction guard\nDuring local Save or Reload, draft updated/discarded events are captured instead of being allowed to invalidate or overwrite the in-flight authoritative transition. Successful Save/Reload now always writes the returned saved snapshot, reconciles or clears live draft cache, clears persisted draft/journal state, updates resource summaries, advances renderer generation, and treats synchronizer cancellation after success as benign. Clean Save skips patch/commit work.",
+      "tags": [
+        "controller",
+        "data",
+        "editor",
+        "implemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 1260,
+          "y": 1280
+        }
+      }
+    },
+    {
       "id": "plan-clean-ask-selection-message",
       "text": "Implemented improvement: clean Ask about selection messages\nAsk submissions now keep the user’s short question in the visible message and store the complete selected-node Graph brief as durable model-only context. Current and legacy provider paths receive the context exactly once; rendering, copy, prompt restoration, retry, revert, queued followups, resend, and accessibility expose only the visible question. The Ask textarea has an accessible name and a compact context-attached indicator.",
       "tags": [
@@ -228,17 +263,19 @@
     },
     {
       "id": "plan-save-draft-consistency",
-      "text": "Implemented fix: serialize and harden Graph draft/Save state\nEach resource serializes AI draft events, local journal patches, Save, Reload, and resource switching. Save invalidates obsolete queued work, drains only already-started PATCH mutations, observes and rebases against the authoritative live draft, and settles saved/live caches together. Cache generations reject late polling/refetch responses; out-of-order discard events re-observe authoritative state; same-revision newer AI drafts are preserved. Regression tests cover stale responses, concurrent AI/Save, Reload latency, resource switching, and synchronizer adoption.",
+      "text": "Implemented tactical fix, but user testing still reports buggy Save/Reload\nThis pass added draft serialization, cache generation guards, discard re-observation, and mounted Reload reset. It reduced known races but did not establish one authoritative editor state owner: the unsaved hint can still remain after Save, Reload can appear visually stale until tab remount, and UI state still crosses query cache, persisted journal, synchronizer queue, and React/React Flow local state. Supersede with the state-authority redesign rather than adding more isolated guards.",
       "tags": [
         "controller",
         "data",
         "editor",
-        "implemented"
+        "implemented",
+        "needs-redesign",
+        "risk"
       ],
       "layout": {
         "position": {
-          "x": 988.4846945086165,
-          "y": 804.0779886714377
+          "x": 1560.4846945086165,
+          "y": 916.0779886714377
         }
       }
     },
@@ -253,6 +290,24 @@
         "position": {
           "x": 1280,
           "y": 180
+        }
+      }
+    },
+    {
+      "id": "redesign-graph-state-authority",
+      "text": "Planned/partially implemented redesign: authoritative Graph editor state controller\nCompleted a targeted transaction-guard step: local Save/Reload now capture their own draft events, apply authoritative server results unconditionally, centralize visible dirty-state derivation, skip clean Save work, and force renderer generation forward after clean transitions. Broader direction remains: collapse query cache, persisted journal, synchronizer queue, React editor history, and React Flow projection into one explicit per-resource controller if manual testing still finds stale UI.",
+      "tags": [
+        "controller",
+        "data",
+        "editor",
+        "implemented",
+        "planned",
+        "redesign"
+      ],
+      "layout": {
+        "position": {
+          "x": 1260,
+          "y": 1080
         }
       }
     },
@@ -291,6 +346,22 @@
     }
   ],
   "edges": [
+    {
+      "id": "audit-before-redesign-state-authority",
+      "source": "audit-save-reload-pipeline",
+      "target": "redesign-graph-state-authority",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "audit-tests-save-draft-consistency",
+      "source": "audit-save-reload-pipeline",
+      "target": "test-save-draft-consistency",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
     {
       "id": "capability-to-session",
       "source": "capability-gate",
@@ -356,6 +427,22 @@
       "style": "curved"
     },
     {
+      "id": "fix-local-transactions-from-audit",
+      "source": "audit-save-reload-pipeline",
+      "target": "fix-save-reload-local-transactions",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "fix-local-transactions-supports-redesign",
+      "source": "fix-save-reload-local-transactions",
+      "target": "redesign-graph-state-authority",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
       "id": "fix-remove-toolbar-to-editor",
       "source": "fix-remove-editor-toolbar",
       "target": "react-flow-editor",
@@ -416,6 +503,38 @@
       "source": "plan-save-draft-consistency",
       "target": "architecture-panel",
       "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "redesign-graph-state-authority-api",
+      "source": "redesign-graph-state-authority",
+      "target": "api-wrappers",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "redesign-graph-state-authority-editor",
+      "source": "redesign-graph-state-authority",
+      "target": "react-flow-editor",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "redesign-graph-state-authority-panel",
+      "source": "redesign-graph-state-authority",
+      "target": "architecture-panel",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "redesign-supersedes-save-draft-consistency",
+      "source": "redesign-graph-state-authority",
+      "target": "plan-save-draft-consistency",
+      "sourceHandle": "left",
       "targetHandle": "bottom",
       "style": "curved"
     },

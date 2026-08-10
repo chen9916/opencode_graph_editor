@@ -1,11 +1,15 @@
 import { describe, expect, test } from "bun:test"
-import type { ArchitectureDraftChange, ArchitectureSnapshot } from "./contract"
+import type { ArchitectureDraftChange, ArchitectureDraftSnapshot, ArchitectureLiveDraft, ArchitectureSnapshot } from "./contract"
 import { beginArchitectureLocalSave, isArchitectureLocalSaveEvent } from "./event"
 import {
+  architectureDraftIsDirty,
+  architectureDraftCanSkipSave,
   architectureDraftHasVisibleChanges,
   architectureDraftResourceID,
+  architectureReloadSuccessState,
   architectureResourceSelectionOptions,
   architectureResourceSummary,
+  architectureSaveSuccessState,
   latestArchitectureSnapshot,
   reconcileArchitectureSavedEvent,
   resolveArchitectureResourceSelection,
@@ -13,6 +17,7 @@ import {
   selectedArchitectureSnapshot,
   selectedArchitectureResourceSummary,
   updateArchitectureResourceSummaries,
+  visibleArchitectureDraft,
 } from "./resource-state"
 
 const snapshot = (id: string, name: string): ArchitectureSnapshot => ({
@@ -136,6 +141,73 @@ describe("architecture resource state", () => {
     ).toBe(true)
   })
 
+  test("clean Save can skip patch and commit work", () => {
+    const saved = snapshot("design", "Design")
+
+    expect(
+      architectureDraftCanSkipSave({
+        base: saved,
+        origin: saved,
+        resource: saved.resource,
+        operations: [],
+        conflicts: [],
+      }),
+    ).toBe(true)
+  })
+
+  test("successful Save plus a concurrent own draft discard clears dirty state and advances renderer generation", () => {
+    const saved = { ...snapshot("design", "Saved"), resource: { ...snapshot("design", "Saved").resource, revision: 2 } }
+    const state = architectureSaveSuccessState({
+      current: snapshot("design", "Draft"),
+      saved,
+      draft: live("design", "Draft"),
+      draftEvent: { resourceID: "design", action: "discarded", revision: 2, digest: saved.digest },
+      reloadGeneration: 4,
+    })
+
+    expect(state.snapshot).toEqual(saved)
+    expect(state.draft).toBeNull()
+    expect(state.reloadGeneration).toBe(5)
+    expect(
+      architectureDraftIsDirty({
+        draft: visibleArchitectureDraft({
+          base: state.snapshot,
+          origin: state.snapshot,
+          operations: [],
+          conflicts: [],
+          live: state.draft ?? undefined,
+        }),
+      }),
+    ).toBe(false)
+  })
+
+  test("successful Reload plus a concurrent draft event keeps the authoritative saved snapshot and advances renderer generation", () => {
+    const reloaded: ArchitectureDraftSnapshot = { source: "saved", snapshot: snapshot("design", "Saved") }
+    const state = architectureReloadSuccessState({
+      reloaded,
+      draftEvent: { resourceID: "design", action: "updated", revision: 1, digest: "stale" },
+      reloadGeneration: 2,
+    })
+
+    expect(state.snapshot).toEqual(reloaded.snapshot)
+    expect(state.draft).toBeNull()
+    expect(state.reloadGeneration).toBe(3)
+  })
+
+  test("saved-covered live draft is not dirty", () => {
+    const saved = { ...snapshot("design", "Saved"), resource: { ...snapshot("design", "Saved").resource, revision: 3 } }
+    const draft = visibleArchitectureDraft({
+      base: saved,
+      origin: saved,
+      operations: [],
+      conflicts: [],
+      live: { source: "live", snapshot: saved },
+    })
+
+    expect(draft).toBeUndefined()
+    expect(architectureDraftIsDirty({ draft })).toBe(false)
+  })
+
   test("save settling does not replace an already cached newer saved revision", () => {
     const s1 = snapshot("design", "S1")
     const s2 = { ...snapshot("design", "S2"), resource: { ...snapshot("design", "S2").resource, revision: 2 } }
@@ -188,3 +260,7 @@ describe("architecture resource state", () => {
     expect(reconciled).toEqual({ snapshot: newest, invalidate: false })
   })
 })
+
+function live(id: string, name: string): ArchitectureLiveDraft {
+  return { source: "live", snapshot: snapshot(id, name) }
+}

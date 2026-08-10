@@ -1,6 +1,23 @@
 import type { ArchitectureListResourcesOutput } from "@opencode-ai/client/promise"
-import type { ArchitectureDraftChange, ArchitectureSnapshot } from "./contract"
-import { architectureSnapshotCoversEvent, type ArchitectureResourceEventInfo } from "./event"
+import type {
+  ArchitectureDraft,
+  ArchitectureDraftChange,
+  ArchitectureDraftSnapshot,
+  ArchitectureLiveDraftCache,
+  ArchitectureOperation,
+  ArchitectureSnapshot,
+} from "./contract"
+import {
+  architectureResourceDraftEventCache,
+  architectureSnapshotCoversEvent,
+  type ArchitectureResourceDraftEventInfo,
+  type ArchitectureResourceEventInfo,
+} from "./event"
+import {
+  architectureLiveDraftCache,
+  discardSavedArchitectureLiveDraftCache,
+  latestArchitectureLiveDraftCache,
+} from "./live-draft"
 
 export type ArchitectureResourceSummary = ArchitectureListResourcesOutput["data"][number]
 
@@ -25,6 +42,60 @@ export function architectureDraftResourceID(change: ArchitectureDraftChange) {
 
 export function architectureDraftHasVisibleChanges(change: ArchitectureDraftChange) {
   return change.operations.length > 0 || change.origin.digest !== change.base.digest
+}
+
+export function architectureDraftCanSkipSave(change: ArchitectureDraftChange) {
+  return !architectureDraftHasVisibleChanges(change) && change.conflicts.length === 0
+}
+
+export function visibleArchitectureDraft(draft: ArchitectureDraft | undefined) {
+  if (!draft) return
+  const live = uncoveredArchitectureLiveDraft(draft.base, draft.live)
+  if (live === draft.live) return draft
+  if (draft.operations.length === 0 && draft.conflicts.length === 0) return
+  return { ...draft, live }
+}
+
+export function architectureDraftIsDirty(input: {
+  readonly draft: ArchitectureDraft | undefined
+  readonly operations?: ReadonlyArray<ArchitectureOperation>
+}) {
+  return (
+    !!uncoveredArchitectureLiveDraft(input.draft?.base, input.draft?.live) ||
+    (input.operations ?? input.draft?.operations ?? []).length > 0 ||
+    (input.draft?.conflicts.length ?? 0) > 0
+  )
+}
+
+export function architectureSaveSuccessState(input: {
+  readonly current: ArchitectureSnapshot | undefined
+  readonly saved: ArchitectureSnapshot
+  readonly draft: ArchitectureLiveDraftCache | undefined
+  readonly draftEvent?: ArchitectureResourceDraftEventInfo
+  readonly reloadGeneration: number | undefined
+}) {
+  const snapshot = latestArchitectureSnapshot(input.current, input.saved)
+  const eventDraft = input.draftEvent ? architectureResourceDraftEventCache(input.draftEvent) : undefined
+  return {
+    snapshot,
+    draft: discardSavedArchitectureLiveDraftCache(
+      eventDraft === undefined ? input.draft : latestArchitectureLiveDraftCache(input.draft, eventDraft),
+      snapshot,
+    ),
+    reloadGeneration: nextArchitectureRendererGeneration(input.reloadGeneration),
+  }
+}
+
+export function architectureReloadSuccessState(input: {
+  readonly reloaded: ArchitectureDraftSnapshot
+  readonly draftEvent?: ArchitectureResourceDraftEventInfo
+  readonly reloadGeneration: number | undefined
+}) {
+  return {
+    snapshot: input.reloaded.snapshot,
+    draft: architectureLiveDraftCache(input.reloaded),
+    reloadGeneration: nextArchitectureRendererGeneration(input.reloadGeneration),
+  }
 }
 
 export function architectureResourceSummary(
@@ -92,6 +163,18 @@ export function updateArchitectureResourceSummaries(
     ? list.map((item) => (item.id === summary.id && item.revision <= summary.revision ? summary : item))
     : [...list, summary]
   return next.toSorted((left, right) => left.name.localeCompare(right.name))
+}
+
+function uncoveredArchitectureLiveDraft(
+  snapshot: ArchitectureSnapshot | undefined,
+  draft: ArchitectureDraft["live"] | undefined,
+) {
+  if (!snapshot || !draft) return draft
+  return discardSavedArchitectureLiveDraftCache(draft, snapshot) ?? undefined
+}
+
+function nextArchitectureRendererGeneration(current: number | undefined) {
+  return (current ?? 0) + 1
 }
 
 export async function reconcileArchitectureSavedEvent(input: {

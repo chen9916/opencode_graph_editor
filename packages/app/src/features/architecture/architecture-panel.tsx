@@ -54,7 +54,10 @@ import {
   architectureResourceDraftEventInfo,
   architectureSnapshotMatchesEvent,
   architectureSummaryMatchesEvent,
+  beginArchitectureLocalDraftOperation,
   beginArchitectureLocalSave,
+  captureArchitectureLocalDraftOperationEvent,
+  getArchitectureLocalDraftOperationEvent,
   isArchitectureLocalSaveEvent,
 } from "./event"
 import { createArchitectureCacheOrder, guardedArchitectureCacheResponse } from "./cache-order"
@@ -64,15 +67,18 @@ import {
   ArchitectureDraftSynchronizationCancelled,
   architectureLiveDraftCache,
   createArchitectureDraftSynchronizer,
-  discardSavedArchitectureLiveDraftCache,
   latestArchitectureLiveDraftCache,
   rebaseArchitectureDraft,
 } from "./live-draft"
 import {
+  architectureDraftIsDirty,
+  architectureDraftCanSkipSave,
   architectureDraftHasVisibleChanges,
   architectureDraftResourceID,
+  architectureReloadSuccessState,
   architectureResourceSelectionOptions,
   architectureResourceSummary,
+  architectureSaveSuccessState,
   latestArchitectureSnapshot,
   reconcileArchitectureSavedEvent,
   resolveArchitectureResourceSelection,
@@ -80,6 +86,7 @@ import {
   selectedArchitectureSnapshot,
   selectedArchitectureResourceSummary,
   updateArchitectureResourceSummaries,
+  visibleArchitectureDraft,
 } from "./resource-state"
 import { architectureSelectionText } from "./selection-prompt"
 import "./architecture-panel.css"
@@ -107,6 +114,7 @@ export default function ArchitecturePanel() {
   const [state, setState] = createStore({
     busy: false,
     action: undefined as ArchitectureCommandAction | undefined,
+    reloadGenerations: {} as Record<string, number | undefined>,
   })
   const draftSynchronizers = new Map<string, ReturnType<typeof createArchitectureDraftSynchronizer>>()
   const cacheOrder = createArchitectureCacheOrder()
@@ -241,9 +249,14 @@ export default function ArchitecturePanel() {
       conflicts: [...current.conflicts, ...rebased.conflicts],
     }
   })
+  const visibleDraft = createMemo(() => visibleArchitectureDraft(draft()))
   const viewport = createMemo(() => {
     const id = resourceID()
     return id ? persistedState.viewports[id] : undefined
+  })
+  const reloadGeneration = createMemo(() => {
+    const id = resourceID()
+    return id ? (state.reloadGenerations[id] ?? 0) : 0
   })
   const labels = createMemo<ArchitectureLabels>(() => ({
     title: language.t("architecture.panel.title"),
@@ -329,6 +342,14 @@ export default function ArchitecturePanel() {
         data: "data" in event ? event.data : undefined,
       })
       if (draftEventInfo) {
+        if (
+          captureArchitectureLocalDraftOperationEvent({
+            server: current.url,
+            directory: current.directory,
+            event: draftEventInfo,
+          })
+        )
+          return
         const draftKey = architectureResourceDraftQueryKey(current.url, current.directory, draftEventInfo.resourceID)
         const resourceKey = architectureResourceQueryKey(current.url, current.directory, draftEventInfo.resourceID)
         if (
@@ -384,6 +405,7 @@ export default function ArchitecturePanel() {
         )
         setPersistedState("drafts", eventInfo.resourceID, undefined)
         setPersistedState("viewports", eventInfo.resourceID, undefined)
+        setState("reloadGenerations", eventInfo.resourceID, undefined)
         if (persistedState.selectedID === eventInfo.resourceID) setPersistedState("selectedID", undefined)
         return
       }
@@ -412,7 +434,7 @@ export default function ArchitecturePanel() {
     onCleanup(unsubscribe)
   })
 
-  const dirty = () => !!draft()?.live || (draft()?.operations.length ?? 0) > 0 || (draft()?.conflicts.length ?? 0) > 0
+  const dirty = () => architectureDraftIsDirty({ draft: visibleDraft() })
 
   const command = (event: Event) => {
     const id = resourceID()
@@ -442,6 +464,7 @@ export default function ArchitecturePanel() {
   const save = async (change: ArchitectureDraftChange) => {
     const id = architectureDraftResourceID(change)
     if (state.busy) return false
+    if (architectureDraftCanSkipSave(change)) return true
     setState("busy", true)
     const resourceKey = architectureResourceQueryKey(sdk().url, sdk().directory, id)
     const draftKey = architectureResourceDraftQueryKey(sdk().url, sdk().directory, id)
@@ -452,30 +475,44 @@ export default function ArchitecturePanel() {
       directory: sdk().directory,
       resourceID: id,
     })
+    const finishLocalDraftOperation = beginArchitectureLocalDraftOperation({
+      server: sdk().url,
+      directory: sdk().directory,
+      resourceID: id,
+      operation: "save",
+    })
     try {
       await synchronizer.invalidate()
-      const conflicts = { current: change.conflicts }
       const synchronized = await synchronizer.synchronizeAuthoritative(
         () => loadArchitectureResourceDraftSnapshot(serverSDK().currentApi, sdk().directory, id),
         (observed) => {
           const rebased = rebaseArchitectureDraft(change.origin.resource, change.operations, observed.snapshot.resource)
-          conflicts.current = mergeArchitectureConflicts(change.conflicts, rebased.conflicts)
           return applyOperations(rebased.base, rebased.operations)
         },
       )
       const saved = await commitArchitectureResourceDraft(serverSDK().currentApi, sdk().directory, synchronized)
-      const settled = latestArchitectureSnapshot(queryClient.getQueryData(resourceKey), saved)
-      await synchronizer.adopt(discardSavedArchitectureLiveDraftCache(queryClient.getQueryData(draftKey), settled))
+      const settled = architectureSaveSuccessState({
+        current: queryClient.getQueryData(resourceKey),
+        saved,
+        draft: queryClient.getQueryData(draftKey),
+        draftEvent: getArchitectureLocalDraftOperationEvent({
+          server: sdk().url,
+          directory: sdk().directory,
+          resourceID: id,
+        }),
+        reloadGeneration: state.reloadGenerations[id],
+      })
       batch(() => {
-        setArchitectureQueryData(resourceKey, settled)
+        setArchitectureQueryData(resourceKey, settled.snapshot)
+        setArchitectureQueryData(draftKey, settled.draft)
         setArchitectureQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
-          updateArchitectureResourceSummaries(current, architectureResourceSummary(settled)),
+          updateArchitectureResourceSummaries(current, architectureResourceSummary(settled.snapshot)),
         )
-        setPersistedState(
-          "drafts",
-          id,
-          conflicts.current.length > 0 ? { base: settled, operations: [], conflicts: conflicts.current } : undefined,
-        )
+        setPersistedState("drafts", id, undefined)
+        setState("reloadGenerations", id, settled.reloadGeneration)
+      })
+      void synchronizer.adopt(settled.draft).catch((error) => {
+        if (error instanceof ArchitectureDraftSynchronizationCancelled) return
       })
       return true
     } catch (error) {
@@ -532,6 +569,7 @@ export default function ArchitecturePanel() {
         void queryClient.invalidateQueries({ queryKey: resourceKey, exact: true })
         void queryClient.invalidateQueries({ queryKey: resourcesKey, exact: true })
       }
+      finishLocalDraftOperation()
       setState("busy", false)
     }
   }
@@ -568,22 +606,37 @@ export default function ArchitecturePanel() {
     const draftKey = architectureResourceDraftQueryKey(sdk().url, sdk().directory, id)
     const resourcesKey = architectureResourcesQueryKey(sdk().url, sdk().directory)
     const synchronizer = draftSynchronizer(id)
+    const finishLocalDraftOperation = beginArchitectureLocalDraftOperation({
+      server: sdk().url,
+      directory: sdk().directory,
+      resourceID: id,
+      operation: "reload",
+    })
     try {
       await synchronizer.invalidate()
       const reloaded = await reloadArchitectureResourceDraft(serverSDK().currentApi, sdk().directory, id)
-      await synchronizer.adopt(architectureLiveDraftCache(reloaded))
+      const settled = architectureReloadSuccessState({
+        reloaded,
+        reloadGeneration: state.reloadGenerations[id],
+      })
       batch(() => {
-        setArchitectureQueryData(resourceKey, reloaded.snapshot)
+        setArchitectureQueryData(resourceKey, settled.snapshot)
+        setArchitectureQueryData(draftKey, settled.draft)
         setArchitectureQueryData(
           resourcesKey,
           (current: ArchitectureListResourcesOutput["data"] | undefined) =>
-            updateArchitectureResourceSummaries(current, architectureResourceSummary(reloaded.snapshot)),
+            updateArchitectureResourceSummaries(current, architectureResourceSummary(settled.snapshot)),
         )
         setPersistedState("drafts", id, undefined)
+        setState("reloadGenerations", id, settled.reloadGeneration)
+      })
+      void synchronizer.adopt(settled.draft).catch((error) => {
+        if (error instanceof ArchitectureDraftSynchronizationCancelled) return
       })
     } catch {
       showToast({ variant: "error", title: language.t("architecture.panel.error") })
     } finally {
+      finishLocalDraftOperation()
       setState("busy", false)
     }
   }
@@ -841,7 +894,8 @@ export default function ArchitecturePanel() {
                       direction={language.direction()}
                       mobile={mobile()}
                       snapshot={activeSnapshot()!}
-                      draft={draft()}
+                      draft={visibleDraft()}
+                      reloadGeneration={reloadGeneration()}
                       viewport={viewport()}
                       busy={state.busy}
                       action={state.action}

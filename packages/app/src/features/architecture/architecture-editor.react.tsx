@@ -40,9 +40,16 @@ import {
   clearArchitectureEditedNodeHint,
   filterArchitectureEditedNodeHints,
 } from "./edit-hint"
-import { currentArchitectureDraftChange, draftChange } from "./editor-state"
+import {
+  architectureEditorInitialKey,
+  architectureEditorLoadPlan,
+  currentArchitectureDraftChange,
+  draftChange,
+  type ArchitectureEditorHistory,
+} from "./editor-state"
 import { applyOperations, flattenJournal, operationID } from "./journal"
 import { tagColorsKey, toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } from "./model"
+import { architectureDraftIsDirty } from "./resource-state"
 import { ArchitectureEdgeView } from "./architecture-edge.react"
 import { ArchitectureNodeView } from "./architecture-node.react"
 import {
@@ -74,11 +81,6 @@ type AskPopover = {
   readonly selection: Selection
   readonly text: string
 }
-type EditorState = {
-  readonly resource: ArchitectureResource
-  readonly past: ReadonlyArray<ReadonlyArray<ArchitectureOperation>>
-  readonly future: ReadonlyArray<ReadonlyArray<ArchitectureOperation>>
-}
 type ViewportMotion = {
   readonly active: boolean
   readonly last?: { readonly viewport: ArchitectureViewport; readonly time: number }
@@ -93,11 +95,15 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const initial = props.draft?.operations ?? []
   const historyOrigin = props.draft?.origin ?? props.draft?.live?.snapshot ?? base
   const historyBase = props.draft?.journalBase ?? historyOrigin.resource
-  const initialKey = props.draft?.live
-    ? `${base.resource.id}:live:${base.digest}:${props.draft.live.snapshot.digest}:${JSON.stringify(props.draft.live.snapshot.resource)}:${initial.map((operation) => operation.id).join(":")}`
-    : `${base.resource.id}:${base.digest}:${initial.map((operation) => operation.id).join(":")}`
+  const initialKey = architectureEditorInitialKey({
+    base,
+    liveSnapshot: props.draft?.live?.snapshot,
+    initialOperations: initial,
+    reloadGeneration: props.reloadGeneration,
+  })
   const loaded = useRef(initialKey)
   const loadedResourceID = useRef(base.resource.id)
+  const loadedReloadGeneration = useRef(props.reloadGeneration)
   const canvas = useRef<HTMLDivElement>(null)
   const viewportMotion = useRef<ViewportMotion>({ active: false, velocity: { x: 0, y: 0 } })
   const reconnectedEdgeIDs = useRef(new Set<string>())
@@ -112,7 +118,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const connecting = useRef(false)
   const outlineID = useId()
   const inspectorID = useId()
-  const [editor, setEditor] = useState<EditorState>(() => ({
+  const [editor, setEditor] = useState<ArchitectureEditorHistory>(() => ({
     resource: applyOperations(historyBase, initial),
     past: initial.map((operation) => [operation]),
     future: [],
@@ -137,7 +143,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     editorOperations: operations,
     conflicts: props.draft?.conflicts ?? [],
   })
-  const dirty = !!props.draft?.live || operations.length > 0 || (props.draft?.conflicts.length ?? 0) > 0
+  const dirty = architectureDraftIsDirty({ draft: props.draft, operations })
   const tags = unique(editor.resource.nodes.flatMap((node) => node.tags))
   const controlsPosition = props.direction === "rtl" ? "bottom-right" : "bottom-left"
   const minimapPosition = props.direction === "rtl" ? "top-left" : "top-right"
@@ -172,6 +178,23 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
 
   const clearEditedNodeHint = (nodeID: string) => {
     setEditedHintNodeIDs((current) => clearArchitectureEditedNodeHint(current, nodeID))
+  }
+
+  const resetTransientLoadState = (input: { readonly closePanels: boolean }) => {
+    cancelViewportInertia(viewportMotion.current)
+    viewportMotion.current = { active: false, velocity: { x: 0, y: 0 } }
+    reconnectedEdgeIDs.current.clear()
+    pendingSelection.current = undefined
+    selectionGesture.current = undefined
+    additiveSelectionModifier.current = false
+    suppressEmptySelectionUntil.current = 0
+    connecting.current = false
+    applySelection(emptySelection)
+    setContextMenu(undefined)
+    setAskPopover(undefined)
+    if (!input.closePanels) return
+    setOutlineOpen(false)
+    setInspectorOpen(false)
   }
 
   const commit = (batch: ReadonlyArray<ArchitectureOperation>) => {
@@ -288,26 +311,28 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   useEffect(() => () => cancelViewportInertia(viewportMotion.current), [])
 
   useLayoutEffect(() => {
-    if (loaded.current === initialKey) return
-    const resourceChanged = loadedResourceID.current !== base.resource.id
-    loaded.current = initialKey
-    loadedResourceID.current = base.resource.id
-    const nextResource = applyOperations(historyBase, initial)
-    const localEcho = consumeLocalResource(nextResource)
-    latestChange.current = draftChange(nextResource, initial, base, historyOrigin, props.draft?.conflicts ?? [])
-    setEditor({
-      resource: nextResource,
-      past: initial.map((operation) => [operation]),
-      future: [],
+    const plan = architectureEditorLoadPlan({
+      loadedKey: loaded.current,
+      loadedResourceID: loadedResourceID.current,
+      loadedReloadGeneration: loadedReloadGeneration.current,
+      initialKey,
+      resourceID: base.resource.id,
+      reloadGeneration: props.reloadGeneration,
+      historyBase,
+      initialOperations: initial,
     })
-    if (resourceChanged) {
+    if (plan.kind === "unchanged") return
+    loaded.current = plan.loadedKey
+    loadedResourceID.current = plan.loadedResourceID
+    loadedReloadGeneration.current = plan.loadedReloadGeneration
+    const nextResource = plan.editor.resource
+    const localEcho = plan.kind === "sync" && consumeLocalResource(nextResource)
+    latestChange.current = draftChange(nextResource, initial, base, historyOrigin, props.draft?.conflicts ?? [])
+    setEditor(plan.editor)
+    if (plan.kind === "resource" || plan.kind === "reload") {
       locallyAuthoredResourceKeys.current.clear()
-      setEditedHintNodeIDs([])
-      select(undefined)
-      setContextMenu(undefined)
-      setAskPopover(undefined)
-      setOutlineOpen(false)
-      setInspectorOpen(false)
+      if (plan.transient.clearEditedHints) setEditedHintNodeIDs([])
+      if (plan.transient.clearSelection) resetTransientLoadState({ closePanels: plan.transient.closePanels })
       return
     }
     if (localEcho) {
@@ -329,7 +354,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         external: true,
       }),
     )
-  }, [base.digest, base.resource.id, initialKey])
+  }, [base.digest, base.resource.id, initialKey, props.reloadGeneration])
 
   useLayoutEffect(() => {
     const next = toReactFlow(editor.resource, updateNodeText, {

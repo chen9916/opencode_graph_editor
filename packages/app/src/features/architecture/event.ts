@@ -29,12 +29,17 @@ type ArchitectureLocalSave = {
   readonly resourceID: string
 }
 
+type ArchitectureLocalDraftOperation = ArchitectureLocalSave & {
+  readonly operation: "save" | "reload"
+}
+
 type ArchitectureLocalSaveState = {
   count: number
   event?: ArchitectureResourceEventInfo
 }
 
 const localSaves = new Map<string, ArchitectureLocalSaveState>()
+const localDraftOperations = new Map<string, ArchitectureLocalDraftOperationState>()
 
 export function beginArchitectureLocalSave(input: ArchitectureLocalSave) {
   const key = localSaveKey(input)
@@ -64,6 +69,43 @@ export function isArchitectureLocalSaveEvent(input: {
   if (!state) return false
   localSaves.set(key, { ...state, event: latestResourceEvent(state.event, input.event) })
   return true
+}
+
+export function beginArchitectureLocalDraftOperation(input: ArchitectureLocalDraftOperation) {
+  const key = localSaveKey(input)
+  const current = localDraftOperations.get(key)
+  localDraftOperations.set(key, {
+    count: (current?.count ?? 0) + 1,
+    event: current?.event,
+  })
+  let finished = false
+  return () => {
+    if (finished) return
+    finished = true
+    const state = localDraftOperations.get(key)
+    if (!state || state.count === 1) {
+      localDraftOperations.delete(key)
+      return state?.event
+    }
+    localDraftOperations.set(key, { ...state, count: state.count - 1 })
+    return state.event
+  }
+}
+
+export function captureArchitectureLocalDraftOperationEvent(input: {
+  readonly server: string
+  readonly directory: string
+  readonly event: ArchitectureResourceDraftEventInfo
+}) {
+  const key = localSaveKey({ server: input.server, directory: input.directory, resourceID: input.event.resourceID })
+  const state = localDraftOperations.get(key)
+  if (!state) return false
+  localDraftOperations.set(key, { ...state, event: input.event })
+  return true
+}
+
+export function getArchitectureLocalDraftOperationEvent(input: ArchitectureLocalSave) {
+  return localDraftOperations.get(localSaveKey(input))?.event
 }
 
 export function architectureResourceEventInfo(
@@ -201,6 +243,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function localSaveKey(input: ArchitectureLocalSave) {
   return `${input.server}\0${input.directory}\0${input.resourceID}`
+}
+
+type ArchitectureLocalDraftOperationState = {
+  count: number
+  event?: ArchitectureResourceDraftEventInfo
 }
 
 function latestResourceEvent(
