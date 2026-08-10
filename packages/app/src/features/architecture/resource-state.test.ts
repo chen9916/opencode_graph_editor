@@ -3,11 +3,14 @@ import type { ArchitectureDraftChange, ArchitectureSnapshot } from "./contract"
 import { beginArchitectureLocalSave, isArchitectureLocalSaveEvent } from "./event"
 import {
   architectureDraftResourceID,
+  architectureResourceSelectionOptions,
   architectureResourceSummary,
   latestArchitectureSnapshot,
   reconcileArchitectureSavedEvent,
+  resolveArchitectureResourceSelection,
   resolveArchitectureResourceID,
   selectedArchitectureSnapshot,
+  selectedArchitectureResourceSummary,
   updateArchitectureResourceSummaries,
 } from "./resource-state"
 
@@ -33,6 +36,39 @@ describe("architecture resource state", () => {
     expect(optimistic.map((resource) => resource.id)).toEqual(["auth_resourceID", "new_graph"])
     expect(resolveArchitectureResourceID(created.resource.id, optimistic)).toBe("new_graph")
     expect(resolveArchitectureResourceID(created.resource.id, [auth])).toBe("new_graph")
+  })
+
+  test("ignores highlighted resources until the selector commits a selection", () => {
+    const auth = architectureResourceSummary(snapshot("auth_resourceID", "Auth"))
+    const billing = architectureResourceSummary(snapshot("billing_resourceID", "Billing"))
+
+    expect(
+      resolveArchitectureResourceSelection({
+        currentID: auth.id,
+        selectedID: billing.id,
+        committed: false,
+      }),
+    ).toBe(auth.id)
+    expect(
+      resolveArchitectureResourceSelection({
+        currentID: auth.id,
+        selectedID: billing.id,
+        committed: true,
+      }),
+    ).toBe(billing.id)
+  })
+
+  test("keeps an explicitly selected graph in selector options during stale list reconciliation", () => {
+    const auth = architectureResourceSummary(snapshot("auth_resourceID", "Auth"))
+    const billing = snapshot("billing_resourceID", "Billing")
+    const options = architectureResourceSelectionOptions([auth], billing)
+
+    expect(selectedArchitectureResourceSummary(billing.resource.id, [auth])).toBeUndefined()
+    expect(options.map((resource) => resource.id)).toEqual(["auth_resourceID", "billing_resourceID"])
+    expect(selectedArchitectureResourceSummary(billing.resource.id, [auth], billing)).toEqual(
+      architectureResourceSummary(billing),
+    )
+    expect(resolveArchitectureResourceID(billing.resource.id, [auth])).toBe(billing.resource.id)
   })
 
   test("ignores snapshots that do not belong to the active resource", () => {

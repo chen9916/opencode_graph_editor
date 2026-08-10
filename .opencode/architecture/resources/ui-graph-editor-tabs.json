@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "revision": 14,
+  "revision": 17,
   "id": "ui-graph-editor-tabs",
   "name": "UI System: Graph Editor Tabs",
   "tagColors": {
@@ -27,8 +27,8 @@
       ],
       "layout": {
         "position": {
-          "x": 117.69093862477479,
-          "y": 430.9879923585008
+          "x": -66.30906137522521,
+          "y": 590.9879923585008
         }
       }
     },
@@ -102,8 +102,38 @@
       ],
       "layout": {
         "position": {
-          "x": 952.2541701953398,
-          "y": 1060.5842738720473
+          "x": 790.2541701953398,
+          "y": 1268.584273872047
+        }
+      }
+    },
+    {
+      "id": "feature-duplicate-graph",
+      "text": "Planned feature: duplicate graph\nAdd an explicit Duplicate action that creates a new managed Graph resource from the selected graph without mutating the original; preserve nodes, edges, tags, colors, and positions, then select the duplicate.",
+      "tags": [
+        "controller",
+        "data",
+        "planned"
+      ],
+      "layout": {
+        "position": {
+          "x": 200,
+          "y": 1450
+        }
+      }
+    },
+    {
+      "id": "feature-export-graph",
+      "text": "Planned feature: export graph\nAdd an explicit Export graph action for the current resource that produces a portable graph representation or file without changing the resource or draft state.",
+      "tags": [
+        "data",
+        "editor",
+        "planned"
+      ],
+      "layout": {
+        "position": {
+          "x": 600,
+          "y": 1450
         }
       }
     },
@@ -116,8 +146,8 @@
       ],
       "layout": {
         "position": {
-          "x": 1005.3836007342154,
-          "y": 673.2704990822306
+          "x": 843.3836007342154,
+          "y": 881.2704990822305
         }
       }
     },
@@ -131,8 +161,8 @@
       ],
       "layout": {
         "position": {
-          "x": 640,
-          "y": 680
+          "x": 478,
+          "y": 887.9999999999999
         }
       }
     },
@@ -145,23 +175,23 @@
       ],
       "layout": {
         "position": {
-          "x": 1385.3940585575629,
-          "y": 719.7472220900985
+          "x": 1223.3940585575629,
+          "y": 927.7472220900984
         }
       }
     },
     {
       "id": "fix-resource-selector-stale",
-      "text": "Planned fix: stable resource selector\nHovering another resource must not change the active graph. Only an explicit selection should switch resources; keep the selector and loaded graph synchronized so it cannot snap to the first graph or claim it is already active.",
+      "text": "Implemented fix: stable resource selector\nHovering or highlighting another resource does not switch the graph. Explicit selection is committed through the controlled selector; persisted readiness and stale-list reconciliation keep the chosen graph displayed instead of snapping back to the first one.",
       "tags": [
         "controller",
         "data",
-        "planned"
+        "implemented"
       ],
       "layout": {
         "position": {
-          "x": 302,
-          "y": 662
+          "x": 140,
+          "y": 869.9999999999999
         }
       }
     },
@@ -220,6 +250,22 @@
       "sourceHandle": "right",
       "targetHandle": "left",
       "style": "rectangular"
+    },
+    {
+      "id": "feature-duplicate-graph-to-panel",
+      "source": "feature-duplicate-graph",
+      "target": "architecture-panel",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "feature-export-graph-to-editor",
+      "source": "feature-export-graph",
+      "target": "react-flow-editor",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
     },
     {
       "id": "fix-delete-selected-to-editor",

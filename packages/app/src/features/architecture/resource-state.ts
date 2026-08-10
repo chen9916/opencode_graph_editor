@@ -2,6 +2,8 @@ import type { ArchitectureListResourcesOutput } from "@opencode-ai/client/promis
 import type { ArchitectureDraftChange, ArchitectureSnapshot } from "./contract"
 import { architectureSnapshotCoversEvent, type ArchitectureResourceEventInfo } from "./event"
 
+export type ArchitectureResourceSummary = ArchitectureListResourcesOutput["data"][number]
+
 export function resolveArchitectureResourceID(
   selectedID: string | undefined,
   resources: ArchitectureListResourcesOutput["data"] | undefined,
@@ -23,7 +25,7 @@ export function architectureDraftResourceID(change: ArchitectureDraftChange) {
 
 export function architectureResourceSummary(
   snapshot: ArchitectureSnapshot,
-): ArchitectureListResourcesOutput["data"][number] {
+): ArchitectureResourceSummary {
   return {
     id: snapshot.resource.id,
     name: snapshot.resource.name,
@@ -32,6 +34,31 @@ export function architectureResourceSummary(
     nodes: snapshot.resource.nodes.length,
     edges: snapshot.resource.edges.length,
   }
+}
+
+export function architectureResourceSelectionOptions(
+  resources: ArchitectureListResourcesOutput["data"] | undefined,
+  snapshot: ArchitectureSnapshot | undefined,
+) {
+  if (!snapshot) return [...(resources ?? [])]
+  return updateArchitectureResourceSummaries(resources, architectureResourceSummary(snapshot))
+}
+
+export function selectedArchitectureResourceSummary(
+  resourceID: string | undefined,
+  resources: ArchitectureListResourcesOutput["data"] | undefined,
+  snapshot?: ArchitectureSnapshot,
+) {
+  return architectureResourceSelectionOptions(resources, snapshot).find((resource) => resource.id === resourceID)
+}
+
+export function resolveArchitectureResourceSelection(input: {
+  readonly currentID: string | undefined
+  readonly selectedID: string | undefined
+  readonly committed: boolean
+}) {
+  if (!input.committed || !input.selectedID) return input.currentID
+  return input.selectedID
 }
 
 export function latestArchitectureSnapshot(
@@ -54,7 +81,7 @@ export function latestArchitectureSnapshot(
 
 export function updateArchitectureResourceSummaries(
   current: ArchitectureListResourcesOutput["data"] | undefined,
-  summary: ArchitectureListResourcesOutput["data"][number],
+  summary: ArchitectureResourceSummary,
 ) {
   const list = current ?? []
   const next = list.some((item) => item.id === summary.id)

@@ -17,6 +17,7 @@ import { showToast } from "@/utils/toast"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { DialogFooter, DialogHeader, DialogTitleGroup, DialogV2 } from "@opencode-ai/ui/v2/dialog-v2"
+import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import {
   architectureResourceQueryKey,
   architectureResourceDraftQueryKey,
@@ -64,11 +65,14 @@ import {
 import { architectureResourceMention } from "./mention"
 import {
   architectureDraftResourceID,
+  architectureResourceSelectionOptions,
   architectureResourceSummary,
   latestArchitectureSnapshot,
   reconcileArchitectureSavedEvent,
+  resolveArchitectureResourceSelection,
   resolveArchitectureResourceID,
   selectedArchitectureSnapshot,
+  selectedArchitectureResourceSummary,
   updateArchitectureResourceSummaries,
 } from "./resource-state"
 import { architectureSelectionText } from "./selection-prompt"
@@ -86,7 +90,7 @@ export default function ArchitecturePanel() {
   const queryClient = useQueryClient()
   const dialog = useDialog()
   const mobile = createMediaQuery("(max-width: 767px)")
-  const [persistedState, setPersistedState] = persisted(
+  const [persistedState, setPersistedState, , persistedReady] = persisted(
     Persist.serverWorkspace(serverSDK().scope, sdk().directory, "architecture-editor.v2"),
     createStore({
       selectedID: undefined as string | undefined,
@@ -106,7 +110,9 @@ export default function ArchitecturePanel() {
     refetchInterval: state.busy ? false : 2_000,
     refetchIntervalInBackground: true,
   }))
-  const resourceID = createMemo(() => resolveArchitectureResourceID(persistedState.selectedID, resources.data))
+  const resourceID = createMemo(() =>
+    persistedReady() ? resolveArchitectureResourceID(persistedState.selectedID, resources.data) : undefined,
+  )
   const resource = createQuery(() => {
     const id = resourceID()
     return {
@@ -130,6 +136,8 @@ export default function ArchitecturePanel() {
     }
   })
   const activeSnapshot = createMemo(() => selectedArchitectureSnapshot(resourceID(), resource.data))
+  const resourceOptions = createMemo(() => architectureResourceSelectionOptions(resources.data, activeSnapshot()))
+  const selectedResource = createMemo(() => selectedArchitectureResourceSummary(resourceID(), resourceOptions()))
   const activeLiveDraft = createMemo(() => {
     const id = resourceID()
     const current = liveDraft.data
@@ -271,7 +279,7 @@ export default function ArchitecturePanel() {
 
   createEffect(() => {
     const id = resourceID()
-    if (id && persistedState.selectedID !== id) setPersistedState("selectedID", id)
+    if (persistedReady() && id && persistedState.selectedID !== id) setPersistedState("selectedID", id)
   })
 
   createEffect(() => {
@@ -534,7 +542,7 @@ export default function ArchitecturePanel() {
   }
 
   const createResource = async () => {
-    if (state.busy) return
+    if (state.busy || !persistedReady()) return
     setState("busy", true)
     try {
       const created = await createArchitectureResource(serverSDK().currentApi, sdk().directory, {
@@ -648,21 +656,26 @@ export default function ArchitecturePanel() {
         fallback={<ArchitectureMessage value={language.t("architecture.panel.unsupported")} />}
       >
         <header class="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-v2-border-subtle">
-          <select
-            class="architecture-panel__resource-select min-w-0 flex-1 rounded-md border border-v2-border-subtle bg-v2-background-bg-raised px-2 py-1"
+          <SelectV2
+            class="architecture-panel__resource-select min-w-0 flex-1"
             aria-label={language.t("architecture.resource.select")}
-            value={resourceID() ?? ""}
-            onChange={(event) => setPersistedState("selectedID", event.currentTarget.value)}
-            disabled={!resources.data?.length || state.busy}
-          >
-            <Show when={!resources.data?.length}>
-              <option value="">{language.t("architecture.resource.none")}</option>
-            </Show>
-            {resources.data?.map((item) => (
-              <option value={item.id}>{item.name}</option>
-            ))}
-          </select>
-          <ButtonV2 variant="ghost" onClick={() => void createResource()} disabled={state.busy}>
+            options={resourceOptions()}
+            current={selectedResource()}
+            value={(item) => item.id}
+            label={(item) => item.name}
+            placeholder={language.t("architecture.resource.none")}
+            fitViewport
+            onSelect={(item) => {
+              const next = resolveArchitectureResourceSelection({
+                currentID: resourceID(),
+                selectedID: item?.id,
+                committed: true,
+              })
+              if (next && persistedState.selectedID !== next) setPersistedState("selectedID", next)
+            }}
+            disabled={!persistedReady() || !resourceOptions().length || state.busy}
+          />
+          <ButtonV2 variant="ghost" onClick={() => void createResource()} disabled={state.busy || !persistedReady()}>
             {language.t("architecture.resource.new")}
           </ButtonV2>
           <ButtonV2 variant="ghost" onClick={removeResource} disabled={state.busy || !activeSnapshot()}>
@@ -671,7 +684,7 @@ export default function ArchitecturePanel() {
         </header>
         <div class="min-h-0 flex-1">
           <Show
-            when={!resources.isPending}
+            when={persistedReady() && !resources.isPending}
             fallback={<ArchitectureMessage value={language.t("architecture.panel.loading")} />}
           >
             <Show
