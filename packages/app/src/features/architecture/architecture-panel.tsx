@@ -35,7 +35,14 @@ import {
   updateArchitectureResourceDraft,
 } from "./api"
 import { ArchitectureIsland } from "./architecture-island"
-import { ARCHITECTURE_COMMAND_EVENT, type ArchitectureCommand, type ArchitectureCommandAction } from "./commands"
+import {
+  ARCHITECTURE_COMMAND_EVENT,
+  architectureCommandRequest,
+  architectureCommandRequestTarget,
+  architectureCommandRequestType,
+  dispatchArchitectureCommand,
+  type ArchitectureCommandAction,
+} from "./commands"
 import type {
   ArchitectureDraft,
   ArchitectureDraftChange,
@@ -59,6 +66,7 @@ import {
   captureArchitectureLocalDraftOperationEvent,
   getArchitectureLocalDraftOperationEvent,
   isArchitectureLocalSaveEvent,
+  rememberArchitectureLocalDraftOperationEvent,
 } from "./event"
 import { createArchitectureCacheOrder, guardedArchitectureCacheResponse } from "./cache-order"
 import { downloadArchitectureResourceExport } from "./export"
@@ -94,6 +102,13 @@ import "./architecture-panel.css"
 export default function ArchitecturePanel() {
   const sdk = useSDK()
   const serverSDK = useServerSDK()
+  const workspaceKey = createMemo(() => `${serverSDK().scope}\0${sdk().url}\0${sdk().directory}`)
+  return <Show when={workspaceKey()} keyed>{(_workspace) => <ArchitecturePanelWorkspace />}</Show>
+}
+
+function ArchitecturePanelWorkspace() {
+  const sdk = useSDK()
+  const serverSDK = useServerSDK()
   const language = useLanguage()
   const architectureAvailable = useServerArchitectureAvailable()
   const sync = useSync()
@@ -103,6 +118,7 @@ export default function ArchitecturePanel() {
   const queryClient = useQueryClient()
   const dialog = useDialog()
   const mobile = createMediaQuery("(max-width: 767px)")
+  let panel: HTMLDivElement | undefined
   const [persistedState, setPersistedState, , persistedReady] = persisted(
     Persist.serverWorkspace(serverSDK().scope, sdk().directory, "architecture-editor.v2"),
     createStore({
@@ -125,33 +141,50 @@ export default function ArchitecturePanel() {
     cacheOrder.mark(key)
     queryClient.setQueryData<T>(key, value)
   }
-  const resources = createQuery(() => ({
-    queryKey: architectureResourcesQueryKey(sdk().url, sdk().directory),
-    enabled: architectureAvailable() === true,
-    queryFn: ({ signal }) =>
-      guardedArchitectureCacheResponse<ArchitectureListResourcesOutput["data"]>({
-        cacheOrder,
-        key: architectureResourcesQueryKey(sdk().url, sdk().directory),
-        current: () => queryClient.getQueryData<ArchitectureListResourcesOutput["data"]>(architectureResourcesQueryKey(sdk().url, sdk().directory)),
-        observe: () => listArchitectureResources(serverSDK().currentApi, sdk().directory, signal),
-      }),
-    refetchInterval: state.busy ? false : 2_000,
-    refetchIntervalInBackground: true,
-  }))
+  const operationScope = (resourceID: string) => {
+    const workspace = sdk()
+    return {
+      api: serverSDK().currentApi,
+      server: workspace.url,
+      directory: workspace.directory,
+      resourceID,
+    }
+  }
+  const resources = createQuery(() => {
+    const workspace = sdk()
+    const api = serverSDK().currentApi
+    const key = architectureResourcesQueryKey(workspace.url, workspace.directory)
+    return {
+      queryKey: key,
+      enabled: architectureAvailable() === true,
+      queryFn: ({ signal }) =>
+        guardedArchitectureCacheResponse<ArchitectureListResourcesOutput["data"]>({
+          cacheOrder,
+          key,
+          current: () => queryClient.getQueryData<ArchitectureListResourcesOutput["data"]>(key),
+          observe: () => listArchitectureResources(api, workspace.directory, signal),
+        }),
+      refetchInterval: state.busy ? false : 2_000,
+      refetchIntervalInBackground: true,
+    }
+  })
   const resourceID = createMemo(() =>
     persistedReady() ? resolveArchitectureResourceID(persistedState.selectedID, resources.data) : undefined,
   )
   const resource = createQuery(() => {
     const id = resourceID()
+    const workspace = sdk()
+    const api = serverSDK().currentApi
+    const key = architectureResourceQueryKey(workspace.url, workspace.directory, id ?? "")
     return {
-      queryKey: architectureResourceQueryKey(sdk().url, sdk().directory, id ?? ""),
+      queryKey: key,
       enabled: architectureAvailable() === true && !!id,
       queryFn: ({ signal }) =>
         guardedArchitectureCacheResponse<ArchitectureSnapshot>({
           cacheOrder,
-          key: architectureResourceQueryKey(sdk().url, sdk().directory, id!),
-          current: () => queryClient.getQueryData<ArchitectureSnapshot>(architectureResourceQueryKey(sdk().url, sdk().directory, id!)),
-          observe: () => loadArchitectureResource(serverSDK().currentApi, sdk().directory, id!, signal),
+          key,
+          current: () => queryClient.getQueryData<ArchitectureSnapshot>(key),
+          observe: () => loadArchitectureResource(api, workspace.directory, id!, signal),
         }),
       refetchInterval: state.busy ? false : 2_000,
       refetchIntervalInBackground: true,
@@ -160,16 +193,18 @@ export default function ArchitecturePanel() {
   })
   const liveDraft = createQuery(() => {
     const id = resourceID()
+    const workspace = sdk()
+    const api = serverSDK().currentApi
+    const key = architectureResourceDraftQueryKey(workspace.url, workspace.directory, id ?? "")
     return {
-      queryKey: architectureResourceDraftQueryKey(sdk().url, sdk().directory, id ?? ""),
+      queryKey: key,
       enabled: architectureAvailable() === true && !!id,
       queryFn: ({ signal }) =>
         guardedArchitectureCacheResponse<ArchitectureLiveDraftCache>({
           cacheOrder,
-          key: architectureResourceDraftQueryKey(sdk().url, sdk().directory, id!),
-          current: () =>
-            queryClient.getQueryData<ArchitectureLiveDraftCache>(architectureResourceDraftQueryKey(sdk().url, sdk().directory, id!)),
-          observe: () => loadArchitectureResourceDraft(serverSDK().currentApi, sdk().directory, id!, signal),
+          key,
+          current: () => queryClient.getQueryData<ArchitectureLiveDraftCache>(key),
+          observe: () => loadArchitectureResourceDraft(api, workspace.directory, id!, signal),
         }),
       refetchInterval: state.busy ? false : 2_000,
       refetchIntervalInBackground: true,
@@ -186,19 +221,42 @@ export default function ArchitecturePanel() {
     if (current.snapshot.resource.id !== id) return undefined
     return current
   })
-  const draftSynchronizer = (id: string) => {
-    const key = draftSynchronizerKey(sdk().url, sdk().directory, id)
+  const draftSynchronizer = (scope: ReturnType<typeof operationScope>) => {
+    const key = draftSynchronizerKey(scope.server, scope.directory, scope.resourceID)
     const current = draftSynchronizers.get(key)
     if (current) return current
     const created = createArchitectureDraftSynchronizer({
-      patch: (base, operations) =>
-        updateArchitectureResourceDraft(serverSDK().currentApi, sdk().directory, base, operations),
+      patch: (base, operations) => {
+        const finishLocalDraftOperation = beginArchitectureLocalDraftOperation({
+          server: scope.server,
+          directory: scope.directory,
+          resourceID: scope.resourceID,
+          operation: "patch",
+        })
+        return updateArchitectureResourceDraft(scope.api, scope.directory, base, operations)
+          .then((updated) => {
+            if (updated)
+              rememberArchitectureLocalDraftOperationEvent({
+                server: scope.server,
+                directory: scope.directory,
+                event: {
+                  resourceID: scope.resourceID,
+                  action: "updated",
+                  revision: updated.snapshot.resource.revision,
+                  digest: updated.snapshot.digest,
+                },
+              })
+            return updated
+          })
+          .finally(finishLocalDraftOperation)
+      },
       update: (updated) =>
         setArchitectureQueryData<ArchitectureLiveDraftCache>(
-          architectureResourceDraftQueryKey(sdk().url, sdk().directory, id),
+          architectureResourceDraftQueryKey(scope.server, scope.directory, scope.resourceID),
           (current) => (updated ? latestArchitectureLiveDraftCache(current, updated) : updated),
         ),
-      adopt: (draft) => setArchitectureQueryData(architectureResourceDraftQueryKey(sdk().url, sdk().directory, id), draft),
+      adopt: (draft) =>
+        setArchitectureQueryData(architectureResourceDraftQueryKey(scope.server, scope.directory, scope.resourceID), draft),
     })
     draftSynchronizers.set(key, created)
     return created
@@ -342,6 +400,12 @@ export default function ArchitecturePanel() {
         data: "data" in event ? event.data : undefined,
       })
       if (draftEventInfo) {
+        const scope = {
+          api,
+          server: current.url,
+          directory: current.directory,
+          resourceID: draftEventInfo.resourceID,
+        }
         if (
           captureArchitectureLocalDraftOperationEvent({
             server: current.url,
@@ -360,10 +424,10 @@ export default function ArchitecturePanel() {
         )
           return
         if (draftEventInfo.action === "discarded") {
-          void draftSynchronizer(draftEventInfo.resourceID)
+          void draftSynchronizer(scope)
             .invalidate()
             .then(() =>
-              draftSynchronizer(draftEventInfo.resourceID)
+              draftSynchronizer(scope)
                 .adoptSnapshot(() => loadArchitectureResourceDraftSnapshot(api, current.directory, draftEventInfo.resourceID))
                 .catch((error) => {
                   if (error instanceof ArchitectureDraftSynchronizationCancelled) return
@@ -378,10 +442,10 @@ export default function ArchitecturePanel() {
         }
         const eventDraft = architectureResourceDraftEventCache(draftEventInfo)
         if (eventDraft) {
-          void draftSynchronizer(draftEventInfo.resourceID).adopt(eventDraft).catch(() => undefined)
+          void draftSynchronizer(scope).adopt(eventDraft).catch(() => undefined)
           return
         }
-        void draftSynchronizer(draftEventInfo.resourceID)
+        void draftSynchronizer(scope)
           .adoptSnapshot(() => loadArchitectureResourceDraftSnapshot(api, current.directory, draftEventInfo.resourceID))
           .catch((error) => {
             if (error instanceof ArchitectureDraftSynchronizationCancelled) return
@@ -439,16 +503,28 @@ export default function ArchitecturePanel() {
   const command = (event: Event) => {
     const id = resourceID()
     if (!id) return
-    const detail = (event as CustomEvent<ArchitectureCommand>).detail
-    setState("action", { id: (state.action?.id ?? 0) + 1, type: detail, resourceID: id })
+    const detail = architectureCommandRequest((event as CustomEvent<unknown>).detail)
+    if (!detail) return
+    const target = architectureCommandRequestTarget(detail)
+    if (!target || !panel?.contains(target)) return
+    setState("action", {
+      id: (state.action?.id ?? 0) + 1,
+      type: architectureCommandRequestType(detail),
+      server: sdk().url,
+      directory: sdk().directory,
+      resourceID: id,
+    })
   }
   document.addEventListener(ARCHITECTURE_COMMAND_EVENT, command)
   onCleanup(() => document.removeEventListener(ARCHITECTURE_COMMAND_EVENT, command))
 
   const journal = (change: ArchitectureDraftChange) => {
     const id = architectureDraftResourceID(change)
+    const workspace = sdk()
+    if (change.server !== workspace.url || change.directory !== workspace.directory) return
+    const scope = operationScope(id)
     const live = queryClient.getQueryData<ArchitectureLiveDraftCache>(
-      architectureResourceDraftQueryKey(sdk().url, sdk().directory, id),
+      architectureResourceDraftQueryKey(scope.server, scope.directory, id),
     )
     setPersistedState("drafts", id, {
       base: change.base,
@@ -456,7 +532,7 @@ export default function ArchitecturePanel() {
       operations: change.operations,
       conflicts: change.conflicts,
     })
-    void draftSynchronizer(id)
+    void draftSynchronizer(scope)
       .synchronize(live?.snapshot ?? change.origin, change.resource)
       .catch(() => undefined)
   }
@@ -465,39 +541,42 @@ export default function ArchitecturePanel() {
     const id = architectureDraftResourceID(change)
     if (state.busy) return false
     if (architectureDraftCanSkipSave(change)) return true
+    const workspace = sdk()
+    if (change.server !== workspace.url || change.directory !== workspace.directory) return false
+    const scope = operationScope(id)
     setState("busy", true)
-    const resourceKey = architectureResourceQueryKey(sdk().url, sdk().directory, id)
-    const draftKey = architectureResourceDraftQueryKey(sdk().url, sdk().directory, id)
-    const resourcesKey = architectureResourcesQueryKey(sdk().url, sdk().directory)
-    const synchronizer = draftSynchronizer(id)
+    const resourceKey = architectureResourceQueryKey(scope.server, scope.directory, id)
+    const draftKey = architectureResourceDraftQueryKey(scope.server, scope.directory, id)
+    const resourcesKey = architectureResourcesQueryKey(scope.server, scope.directory)
+    const synchronizer = draftSynchronizer(scope)
     const finishLocalSave = beginArchitectureLocalSave({
-      server: sdk().url,
-      directory: sdk().directory,
+      server: scope.server,
+      directory: scope.directory,
       resourceID: id,
     })
     const finishLocalDraftOperation = beginArchitectureLocalDraftOperation({
-      server: sdk().url,
-      directory: sdk().directory,
+      server: scope.server,
+      directory: scope.directory,
       resourceID: id,
       operation: "save",
     })
     try {
       await synchronizer.invalidate()
       const synchronized = await synchronizer.synchronizeAuthoritative(
-        () => loadArchitectureResourceDraftSnapshot(serverSDK().currentApi, sdk().directory, id),
+        () => loadArchitectureResourceDraftSnapshot(scope.api, scope.directory, id),
         (observed) => {
           const rebased = rebaseArchitectureDraft(change.origin.resource, change.operations, observed.snapshot.resource)
           return applyOperations(rebased.base, rebased.operations)
         },
       )
-      const saved = await commitArchitectureResourceDraft(serverSDK().currentApi, sdk().directory, synchronized)
+      const saved = await commitArchitectureResourceDraft(scope.api, scope.directory, synchronized)
       const settled = architectureSaveSuccessState({
         current: queryClient.getQueryData(resourceKey),
         saved,
         draft: queryClient.getQueryData(draftKey),
         draftEvent: getArchitectureLocalDraftOperationEvent({
-          server: sdk().url,
-          directory: sdk().directory,
+          server: scope.server,
+          directory: scope.directory,
           resourceID: id,
         }),
         reloadGeneration: state.reloadGenerations[id],
@@ -519,8 +598,8 @@ export default function ArchitecturePanel() {
       if (isConflict(error)) {
         await synchronizer.invalidate()
         const [latest, observedDraft] = await Promise.all([
-          loadArchitectureResource(serverSDK().currentApi, sdk().directory, id).catch(() => undefined),
-          loadArchitectureResourceDraftSnapshot(serverSDK().currentApi, sdk().directory, id).catch(() => undefined),
+          loadArchitectureResource(scope.api, scope.directory, id).catch(() => undefined),
+          loadArchitectureResourceDraftSnapshot(scope.api, scope.directory, id).catch(() => undefined),
         ])
         if (latest) {
           const settled = latestArchitectureSnapshot(queryClient.getQueryData(resourceKey), latest)
@@ -552,7 +631,7 @@ export default function ArchitecturePanel() {
       const reconciliation = await reconcileArchitectureSavedEvent({
         current: queryClient.getQueryData(resourceKey),
         event: finishLocalSave(),
-        observe: () => loadArchitectureResource(serverSDK().currentApi, sdk().directory, id),
+        observe: () => loadArchitectureResource(scope.api, scope.directory, id),
       })
       const observed = reconciliation.snapshot
       if (observed) {
@@ -598,23 +677,23 @@ export default function ArchitecturePanel() {
     ))
   }
 
-  const reloadResource = async () => {
-    const id = resourceID()
-    if (!id || state.busy) return
+  const reloadResource = async (scope: ReturnType<typeof operationScope>) => {
+    const id = scope.resourceID
+    if (state.busy) return
     setState("busy", true)
-    const resourceKey = architectureResourceQueryKey(sdk().url, sdk().directory, id)
-    const draftKey = architectureResourceDraftQueryKey(sdk().url, sdk().directory, id)
-    const resourcesKey = architectureResourcesQueryKey(sdk().url, sdk().directory)
-    const synchronizer = draftSynchronizer(id)
+    const resourceKey = architectureResourceQueryKey(scope.server, scope.directory, id)
+    const draftKey = architectureResourceDraftQueryKey(scope.server, scope.directory, id)
+    const resourcesKey = architectureResourcesQueryKey(scope.server, scope.directory)
+    const synchronizer = draftSynchronizer(scope)
     const finishLocalDraftOperation = beginArchitectureLocalDraftOperation({
-      server: sdk().url,
-      directory: sdk().directory,
+      server: scope.server,
+      directory: scope.directory,
       resourceID: id,
       operation: "reload",
     })
     try {
       await synchronizer.invalidate()
-      const reloaded = await reloadArchitectureResourceDraft(serverSDK().currentApi, sdk().directory, id)
+      const reloaded = await reloadArchitectureResourceDraft(scope.api, scope.directory, id)
       const settled = architectureReloadSuccessState({
         reloaded,
         reloadGeneration: state.reloadGenerations[id],
@@ -642,24 +721,29 @@ export default function ArchitecturePanel() {
   }
 
   const reload = () => {
+    const id = resourceID()
+    if (!id || state.busy) return
+    const scope = operationScope(id)
     if (!dirty()) {
-      void reloadResource()
+      void reloadResource(scope)
       return
     }
-    confirm(labels().discardConfirm, labels().reload, () => void reloadResource())
+    confirm(labels().discardConfirm, labels().reload, () => void reloadResource(scope))
   }
 
   const createResource = async () => {
     if (state.busy || !persistedReady()) return
+    const workspace = sdk()
+    const api = serverSDK().currentApi
     setState("busy", true)
     try {
-      const created = await createArchitectureResource(serverSDK().currentApi, sdk().directory, {
+      const created = await createArchitectureResource(api, workspace.directory, {
         name: language.t("architecture.resource.defaultName", { number: (resources.data?.length ?? 0) + 1 }),
       })
       batch(() => {
-        setArchitectureQueryData(architectureResourceQueryKey(sdk().url, sdk().directory, created.resource.id), created)
+        setArchitectureQueryData(architectureResourceQueryKey(workspace.url, workspace.directory, created.resource.id), created)
         setArchitectureQueryData(
-          architectureResourcesQueryKey(sdk().url, sdk().directory),
+          architectureResourcesQueryKey(workspace.url, workspace.directory),
           (current: ArchitectureListResourcesOutput["data"] | undefined) =>
             updateArchitectureResourceSummaries(current, architectureResourceSummary(created)),
         )
@@ -676,16 +760,25 @@ export default function ArchitecturePanel() {
   const requestDuplicateResource = () => {
     const id = resourceID()
     if (!id || state.busy) return
-    setState("action", { id: (state.action?.id ?? 0) + 1, type: "duplicateResource", resourceID: id })
+    setState("action", {
+      id: (state.action?.id ?? 0) + 1,
+      type: "duplicateResource",
+      server: sdk().url,
+      directory: sdk().directory,
+      resourceID: id,
+    })
   }
 
   const duplicateResource = async (change: ArchitectureDraftChange) => {
     const id = architectureDraftResourceID(change)
     if (state.busy || !persistedReady()) return
+    const workspace = sdk()
+    if (change.server !== workspace.url || change.directory !== workspace.directory) return
+    const scope = operationScope(id)
     setState("busy", true)
-    const sourceDraftKey = architectureResourceDraftQueryKey(sdk().url, sdk().directory, id)
-    const resourcesKey = architectureResourcesQueryKey(sdk().url, sdk().directory)
-    const synchronizer = draftSynchronizer(id)
+    const sourceDraftKey = architectureResourceDraftQueryKey(scope.server, scope.directory, id)
+    const resourcesKey = architectureResourcesQueryKey(scope.server, scope.directory)
+    const synchronizer = draftSynchronizer(scope)
     try {
       await Promise.all([
         queryClient.cancelQueries({ queryKey: sourceDraftKey, exact: true }),
@@ -695,15 +788,15 @@ export default function ArchitecturePanel() {
       // admitted to the live draft layer; the saved source resource remains unchanged.
       if (architectureDraftHasVisibleChanges(change))
         await synchronizer.synchronizeAuthoritative(
-          () => loadArchitectureResourceDraftSnapshot(serverSDK().currentApi, sdk().directory, id),
+          () => loadArchitectureResourceDraftSnapshot(scope.api, scope.directory, id),
           change.resource,
         )
-      const created = await duplicateArchitectureResource(serverSDK().currentApi, sdk().directory, id, {
+      const created = await duplicateArchitectureResource(scope.api, scope.directory, id, {
         name: language.t("architecture.resource.duplicateName", { name: change.resource.name }),
       })
       batch(() => {
-        setArchitectureQueryData(architectureResourceQueryKey(sdk().url, sdk().directory, created.resource.id), created)
-        setArchitectureQueryData(architectureResourceDraftQueryKey(sdk().url, sdk().directory, created.resource.id), null)
+        setArchitectureQueryData(architectureResourceQueryKey(scope.server, scope.directory, created.resource.id), created)
+        setArchitectureQueryData(architectureResourceDraftQueryKey(scope.server, scope.directory, created.resource.id), null)
         setArchitectureQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
           updateArchitectureResourceSummaries(current, architectureResourceSummary(created)),
         )
@@ -720,12 +813,14 @@ export default function ArchitecturePanel() {
   const removeResource = () => {
     const current = activeSnapshot()
     if (!current || state.busy) return
+    const workspace = sdk()
+    const api = serverSDK().currentApi
     confirm(language.t("architecture.confirm.deleteResource"), labels().delete, () => {
       setState("busy", true)
-      void removeArchitectureResource(serverSDK().currentApi, sdk().directory, current)
+      void removeArchitectureResource(api, workspace.directory, current)
         .then(async () => {
           setArchitectureQueryData(
-            architectureResourcesQueryKey(sdk().url, sdk().directory),
+            architectureResourcesQueryKey(workspace.url, workspace.directory),
             (list: ArchitectureListResourcesOutput["data"] | undefined) =>
               removeResourceSummary(list, current.resource.id),
           )
@@ -817,7 +912,11 @@ export default function ArchitecturePanel() {
   }
 
   return (
-    <div class="h-full min-h-0 overflow-hidden bg-v2-background-bg-base text-v2-text-primary flex flex-col">
+    <div
+      ref={panel}
+      data-architecture-panel
+      class="h-full min-h-0 overflow-hidden bg-v2-background-bg-base text-v2-text-primary flex flex-col"
+    >
       <Show
         when={architectureAvailable() !== false}
         fallback={<ArchitectureMessage value={language.t("architecture.panel.unsupported")} />}
@@ -839,11 +938,33 @@ export default function ArchitecturePanel() {
                 selectedID: item?.id,
                 committed: true,
               })
-              if (currentID && currentID !== next) void draftSynchronizer(currentID).invalidate()
+              if (currentID && currentID !== next) void draftSynchronizer(operationScope(currentID)).invalidate()
               if (next && persistedState.selectedID !== next) setPersistedState("selectedID", next)
             }}
             disabled={!persistedReady() || !resourceOptions().length || state.busy}
           />
+          <div class="architecture-panel__actions">
+            <ButtonV2
+              size="small"
+              variant={dirty() ? "contrast" : "neutral"}
+              icon="check"
+              disabled={state.busy || !activeSnapshot()}
+              onClick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) =>
+                dispatchArchitectureCommand("save", event.currentTarget)
+              }
+            >
+              {labels().save}
+            </ButtonV2>
+            <ButtonV2
+              size="small"
+              variant="ghost"
+              icon="reset"
+              disabled={state.busy || !activeSnapshot()}
+              onClick={() => reload()}
+            >
+              {labels().reload}
+            </ButtonV2>
+          </div>
           <MenuV2 gutter={4} modal={false} placement="bottom-end">
             <MenuV2.Trigger
               as={ButtonV2}
@@ -891,6 +1012,8 @@ export default function ArchitecturePanel() {
                     fallback={<ArchitectureMessage value={language.t("architecture.panel.loading")} />}
                   >
                     <ArchitectureIsland
+                      server={sdk().url}
+                      directory={sdk().directory}
                       direction={language.direction()}
                       mobile={mobile()}
                       snapshot={activeSnapshot()!}
@@ -901,9 +1024,10 @@ export default function ArchitecturePanel() {
                       action={state.action}
                       labels={labels()}
                       onJournal={journal}
-                      onViewport={(value) => {
-                        const id = resourceID()
-                        if (id) setPersistedState("viewports", id, value)
+                      onViewport={(change) => {
+                        const workspace = sdk()
+                        if (change.server !== workspace.url || change.directory !== workspace.directory) return
+                        setPersistedState("viewports", change.resourceID, change.viewport)
                       }}
                       onSave={(change) => void save(change)}
                       onDuplicate={(change) => void duplicateResource(change)}

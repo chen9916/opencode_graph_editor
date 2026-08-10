@@ -88,6 +88,8 @@ describe("architecture resource state", () => {
   test("routes an Add Node journal to the graph represented by the editor change", () => {
     const created = snapshot("new_graph", "New Graph")
     const change: ArchitectureDraftChange = {
+      server: "server",
+      directory: "/repo",
       base: created,
       origin: created,
       conflicts: [],
@@ -114,6 +116,8 @@ describe("architecture resource state", () => {
 
     expect(
       architectureDraftHasVisibleChanges({
+        server: "server",
+        directory: "/repo",
         base: saved,
         origin: saved,
         resource: saved.resource,
@@ -123,6 +127,8 @@ describe("architecture resource state", () => {
     ).toBe(false)
     expect(
       architectureDraftHasVisibleChanges({
+        server: "server",
+        directory: "/repo",
         base: saved,
         origin: live,
         resource: live.resource,
@@ -132,6 +138,8 @@ describe("architecture resource state", () => {
     ).toBe(true)
     expect(
       architectureDraftHasVisibleChanges({
+        server: "server",
+        directory: "/repo",
         base: saved,
         origin: saved,
         conflicts: [],
@@ -146,6 +154,8 @@ describe("architecture resource state", () => {
 
     expect(
       architectureDraftCanSkipSave({
+        server: "server",
+        directory: "/repo",
         base: saved,
         origin: saved,
         resource: saved.resource,

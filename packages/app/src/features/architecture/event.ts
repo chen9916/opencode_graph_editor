@@ -30,7 +30,7 @@ type ArchitectureLocalSave = {
 }
 
 type ArchitectureLocalDraftOperation = ArchitectureLocalSave & {
-  readonly operation: "save" | "reload"
+  readonly operation: "save" | "reload" | "patch"
 }
 
 type ArchitectureLocalSaveState = {
@@ -40,6 +40,7 @@ type ArchitectureLocalSaveState = {
 
 const localSaves = new Map<string, ArchitectureLocalSaveState>()
 const localDraftOperations = new Map<string, ArchitectureLocalDraftOperationState>()
+const localDraftEchoes = new Map<string, ArchitectureLocalDraftEchoState>()
 
 export function beginArchitectureLocalSave(input: ArchitectureLocalSave) {
   const key = localSaveKey(input)
@@ -99,13 +100,29 @@ export function captureArchitectureLocalDraftOperationEvent(input: {
 }) {
   const key = localSaveKey({ server: input.server, directory: input.directory, resourceID: input.event.resourceID })
   const state = localDraftOperations.get(key)
-  if (!state) return false
-  localDraftOperations.set(key, { ...state, event: input.event })
-  return true
+  if (state) {
+    localDraftOperations.set(key, { ...state, event: input.event })
+    return true
+  }
+  return localDraftEchoes.get(key)?.events.some((event) => sameDraftEvent(event, input.event)) ?? false
 }
 
 export function getArchitectureLocalDraftOperationEvent(input: ArchitectureLocalSave) {
   return localDraftOperations.get(localSaveKey(input))?.event
+}
+
+export function rememberArchitectureLocalDraftOperationEvent(input: {
+  readonly server: string
+  readonly directory: string
+  readonly event: ArchitectureResourceDraftEventInfo
+}) {
+  const key = localSaveKey({ server: input.server, directory: input.directory, resourceID: input.event.resourceID })
+  const current = localDraftEchoes.get(key)
+  if (current) clearTimeout(current.timeout)
+  const events = [input.event, ...(current?.events ?? [])].slice(0, 8)
+  const timeout = setTimeout(() => localDraftEchoes.delete(key), 5_000)
+  unrefTimeout(timeout)
+  localDraftEchoes.set(key, { events, timeout })
 }
 
 export function architectureResourceEventInfo(
@@ -250,10 +267,27 @@ type ArchitectureLocalDraftOperationState = {
   event?: ArchitectureResourceDraftEventInfo
 }
 
+type ArchitectureLocalDraftEchoState = {
+  readonly events: ReadonlyArray<ArchitectureResourceDraftEventInfo>
+  readonly timeout: ReturnType<typeof setTimeout>
+}
+
 function latestResourceEvent(
   current: ArchitectureResourceEventInfo | undefined,
   next: ArchitectureResourceEventInfo,
 ) {
   if (current?.revision !== undefined && next.revision !== undefined && current.revision > next.revision) return current
   return next
+}
+
+function sameDraftEvent(left: ArchitectureResourceDraftEventInfo, right: ArchitectureResourceDraftEventInfo) {
+  if (left.resourceID !== right.resourceID || left.action !== right.action) return false
+  if (left.revision === undefined || left.digest === undefined) return false
+  return left.revision === right.revision && left.digest === right.digest
+}
+
+function unrefTimeout(timeout: ReturnType<typeof setTimeout>) {
+  if (typeof timeout !== "object" || !timeout || !("unref" in timeout)) return
+  const unref = timeout.unref
+  if (typeof unref === "function") unref.call(timeout)
 }

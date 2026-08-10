@@ -30,11 +30,20 @@ export type ArchitectureDraft = {
 }
 
 export type ArchitectureDraftChange = {
+  readonly server: string
+  readonly directory: string
   readonly base: ArchitectureSnapshot
   readonly origin: ArchitectureSnapshot
   readonly resource: ArchitectureResource
   readonly operations: ReadonlyArray<ArchitectureOperation>
   readonly conflicts: ReadonlyArray<ArchitectureConflict>
+}
+
+export type ArchitectureViewportChange = {
+  readonly server: string
+  readonly directory: string
+  readonly resourceID: string
+  readonly viewport: ArchitectureViewport
 }
 
 export type ArchitectureSelectionPrompt = {
@@ -118,6 +127,8 @@ export type ArchitectureLabels = {
 }
 
 export type ArchitecturePanelProps = {
+  readonly server: string
+  readonly directory: string
   readonly direction: Direction
   readonly mobile: boolean
   readonly snapshot: ArchitectureSnapshot
@@ -128,7 +139,7 @@ export type ArchitecturePanelProps = {
   readonly action?: ArchitectureCommandAction
   readonly labels: ArchitectureLabels
   readonly onJournal: (change: ArchitectureDraftChange) => void
-  readonly onViewport: (viewport: ArchitectureViewport) => void
+  readonly onViewport: (change: ArchitectureViewportChange) => void
   readonly onSave: (change: ArchitectureDraftChange) => void
   readonly onDuplicate: (change: ArchitectureDraftChange) => void
   readonly onAskSelection?: (input: ArchitectureSelectionPrompt) => void

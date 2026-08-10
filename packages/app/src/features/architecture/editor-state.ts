@@ -72,6 +72,8 @@ export function architectureEditorLoadPlan(input: {
 }
 
 export function currentArchitectureDraftChange(input: {
+  readonly server: string
+  readonly directory: string
   readonly base: ArchitectureSnapshot
   readonly historyOrigin: ArchitectureSnapshot
   readonly historyBase: ArchitectureResource
@@ -89,6 +91,8 @@ export function currentArchitectureDraftChange(input: {
       input.base,
       input.historyOrigin,
       input.conflicts,
+      input.server,
+      input.directory,
     )
   return draftChange(
     applyOperations(input.historyBase, input.initialOperations),
@@ -96,6 +100,8 @@ export function currentArchitectureDraftChange(input: {
     input.base,
     input.historyOrigin,
     input.conflicts,
+    input.server,
+    input.directory,
   )
 }
 
@@ -105,6 +111,8 @@ export function draftChange(
   base: ArchitectureSnapshot,
   origin: ArchitectureSnapshot,
   conflicts: ReadonlyArray<ArchitectureConflict>,
+  server: string,
+  directory: string,
 ): ArchitectureDraftChange {
-  return { base, origin, resource, operations, conflicts }
+  return { server, directory, base, origin, resource, operations, conflicts }
 }

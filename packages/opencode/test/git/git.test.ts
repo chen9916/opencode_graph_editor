@@ -77,6 +77,25 @@ describe("Git", () => {
     }),
   )
 
+  it.live("status() and diff() respect core.symlinks=false checkouts", () =>
+    Effect.gen(function* () {
+      const tmp = yield* scopedTmpdir({ git: true })
+      yield* Effect.promise(async () => {
+        await $`git config core.symlinks false`.cwd(tmp.path).quiet()
+        await fs.writeFile(path.join(tmp.path, "link.txt"), "target.txt", "utf-8")
+        const blob = (await $`git hash-object -w link.txt`.cwd(tmp.path).quiet().text()).trim()
+        await $`git update-index --add --cacheinfo ${`120000,${blob},link.txt`}`.cwd(tmp.path).quiet()
+        await $`git commit --no-gpg-sign -m "add symlink entry"`.cwd(tmp.path).quiet()
+      })
+
+      const git = yield* Git.Service
+      const [status, diff] = yield* Effect.all([git.status(tmp.path), git.diff(tmp.path, "HEAD")], { concurrency: 2 })
+
+      expect(status).toEqual([])
+      expect(diff).toEqual([])
+    }),
+  )
+
   it.live("diff(), stats(), and mergeBase() parse tracked changes", () =>
     Effect.gen(function* () {
       const tmp = yield* scopedTmpdir({ git: true })

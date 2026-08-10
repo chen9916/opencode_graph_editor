@@ -105,6 +105,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const loadedResourceID = useRef(base.resource.id)
   const loadedReloadGeneration = useRef(props.reloadGeneration)
   const canvas = useRef<HTMLDivElement>(null)
+  const visibleViewport = useRef<ArchitectureViewport | undefined>(props.viewport)
   const viewportMotion = useRef<ViewportMotion>({ active: false, velocity: { x: 0, y: 0 } })
   const reconnectedEdgeIDs = useRef(new Set<string>())
   const locallyAuthoredResourceKeys = useRef(new Set<string>())
@@ -125,6 +126,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }))
   const [selection, setSelection] = useState<Selection>(emptySelection)
   const [flow, setFlow] = useState<ReactFlowInstance<ArchitectureFlowNode, ArchitectureFlowEdge>>()
+  const [flowReloadKey, setFlowReloadKey] = useState(0)
   const [filter, setFilter] = useState({ text: "", tag: "" })
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
@@ -133,6 +135,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [editedHintNodeIDs, setEditedHintNodeIDs] = useState<ReadonlyArray<string>>([])
   const operations = flattenJournal(editor.past)
   latestChange.current = currentArchitectureDraftChange({
+    server: props.server,
+    directory: props.directory,
     base,
     historyOrigin,
     historyBase,
@@ -213,6 +217,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       base,
       historyOrigin,
       props.draft?.conflicts ?? [],
+      props.server,
+      props.directory,
     )
     props.onJournal(latestChange.current)
   }
@@ -245,6 +251,46 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     setSelection((current) => (sameSelection(current, selected) ? current : selected))
     setNodes((current) => applyNodeSelection(current, selected))
     setEdges((current) => applyEdgeSelection(current, selected))
+  }
+
+  const replaceFlowElements = (resource: ArchitectureResource) => {
+    const next = toReactFlow(resource, updateNodeText, {
+      label: props.labels.connectionStyle,
+      styles: {
+        rectangular: props.labels.rectangular,
+        curved: props.labels.curved,
+        straight: props.labels.straight,
+      },
+      onChange: (edgeID, style) => changeEdgeStyle(edgeID, style),
+    })
+    const visible = new Set(resource.nodes.filter((node) => nodeMatchesFilter(node, filter)).map((node) => node.id))
+    const editedHints = new Set(editedHintNodeIDs)
+    const selected = selectionInResource(pendingSelection.current ?? selectionRef.current, resource)
+    pendingSelection.current = undefined
+    selectionRef.current = selected
+    setSelection((current) => (sameSelection(current, selected) ? current : selected))
+    setNodes(
+      next.nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          dimmed: filterActive && !visible.has(node.id),
+          editedHint: editedHints.has(node.id),
+          onEditedHintSeen: clearEditedNodeHint,
+        },
+        selected: selected.nodeIDs.includes(node.id),
+      })),
+    )
+    setEdges(
+      next.edges.map((edge) => {
+        const dimmed = filterActive && (!visible.has(edge.source) || !visible.has(edge.target))
+        return {
+          ...edge,
+          data: edge.data ? { ...edge.data, dimmed } : edge.data,
+          selected: selected.edgeIDs.includes(edge.id),
+        }
+      }),
+    )
   }
 
   const select = (next: SingleSelection | undefined) => {
@@ -327,12 +373,25 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     loadedReloadGeneration.current = plan.loadedReloadGeneration
     const nextResource = plan.editor.resource
     const localEcho = plan.kind === "sync" && consumeLocalResource(nextResource)
-    latestChange.current = draftChange(nextResource, initial, base, historyOrigin, props.draft?.conflicts ?? [])
+    latestChange.current = draftChange(
+      nextResource,
+      initial,
+      base,
+      historyOrigin,
+      props.draft?.conflicts ?? [],
+      props.server,
+      props.directory,
+    )
     setEditor(plan.editor)
     if (plan.kind === "resource" || plan.kind === "reload") {
       locallyAuthoredResourceKeys.current.clear()
       if (plan.transient.clearEditedHints) setEditedHintNodeIDs([])
       if (plan.transient.clearSelection) resetTransientLoadState({ closePanels: plan.transient.closePanels })
+      replaceFlowElements(nextResource)
+      if (plan.kind === "reload") {
+        setFlow(undefined)
+        setFlowReloadKey((current) => current + 1)
+      }
       return
     }
     if (localEcho) {
@@ -357,45 +416,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }, [base.digest, base.resource.id, initialKey, props.reloadGeneration])
 
   useLayoutEffect(() => {
-    const next = toReactFlow(editor.resource, updateNodeText, {
-      label: props.labels.connectionStyle,
-      styles: {
-        rectangular: props.labels.rectangular,
-        curved: props.labels.curved,
-        straight: props.labels.straight,
-      },
-      onChange: (edgeID, style) => changeEdgeStyle(edgeID, style),
-    })
-    const visible = new Set(
-      editor.resource.nodes.filter((node) => nodeMatchesFilter(node, filter)).map((node) => node.id),
-    )
-    const editedHints = new Set(editedHintNodeIDs)
-    const selected = selectionInResource(pendingSelection.current ?? selectionRef.current, editor.resource)
-    pendingSelection.current = undefined
-    selectionRef.current = selected
-    setSelection((current) => (sameSelection(current, selected) ? current : selected))
-    setNodes(
-      next.nodes.map((node) => ({
-        ...node,
-        data: {
-          ...node.data,
-          dimmed: filterActive && !visible.has(node.id),
-          editedHint: editedHints.has(node.id),
-          onEditedHintSeen: clearEditedNodeHint,
-        },
-        selected: selected.nodeIDs.includes(node.id),
-      })),
-    )
-    setEdges(
-      next.edges.map((edge) => {
-        const dimmed = filterActive && (!visible.has(edge.source) || !visible.has(edge.target))
-        return {
-          ...edge,
-          data: edge.data ? { ...edge.data, dimmed } : edge.data,
-          selected: selected.edgeIDs.includes(edge.id),
-        }
-      }),
-    )
+    replaceFlowElements(editor.resource)
   }, [editor.resource, filter.tag, filter.text, filterActive, resourceTagColorsKey, editedHintNodeIDsKey, setEdges, setNodes])
 
   const undo = () => {
@@ -416,6 +437,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       base,
       historyOrigin,
       props.draft?.conflicts ?? [],
+      props.server,
+      props.directory,
     )
     props.onJournal(latestChange.current)
   }
@@ -438,6 +461,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       base,
       historyOrigin,
       props.draft?.conflicts ?? [],
+      props.server,
+      props.directory,
     )
     props.onJournal(latestChange.current)
   }
@@ -539,7 +564,16 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
 
   useEffect(() => {
     const action = props.action
-    if (!action || !architectureCommandMatches(action, base.resource.id) || handledAction.current === action.id) return
+    if (!action) return
+    if (
+      !architectureCommandMatches(action, {
+        server: props.server,
+        directory: props.directory,
+        resourceID: base.resource.id,
+      }) ||
+      handledAction.current === action.id
+    )
+      return
     handledAction.current = action.id
     if (action.type === "save") props.onSave(latestChange.current!)
     if (action.type === "reload") props.onReload()
@@ -551,7 +585,15 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     if (action.type === "exportPatch") props.onExport(operations)
     if (action.type === "exportResource") props.onExportResource(editor.resource)
     if (action.type === "duplicateResource") props.onDuplicate(latestChange.current!)
-  }, [props.action?.id, props.action?.resourceID, base.resource.id])
+  }, [
+    props.action?.id,
+    props.action?.server,
+    props.action?.directory,
+    props.action?.resourceID,
+    props.server,
+    props.directory,
+    base.resource.id,
+  ])
 
   const onSelectionChange = (change: OnSelectionChangeParams<ArchitectureFlowNode, ArchitectureFlowEdge>) => {
     const next = selectionFromChange(change)
@@ -668,6 +710,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   const trackViewportMove = (event: MouseEvent | TouchEvent | null, viewport: ArchitectureViewport) => {
+    visibleViewport.current = viewport
     if (!viewportMotion.current.active || !isViewportMotionEvent(event)) return
     const time = performance.now()
     const last = viewportMotion.current.last
@@ -685,7 +728,13 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   const finishViewportMove = (event: MouseEvent | TouchEvent | null, viewport: ArchitectureViewport) => {
-    props.onViewport(viewport)
+    visibleViewport.current = viewport
+    props.onViewport({
+      server: props.server,
+      directory: props.directory,
+      resourceID: base.resource.id,
+      viewport,
+    })
     const motion = viewportMotion.current
     viewportMotion.current = { active: false, velocity: { x: 0, y: 0 } }
     if (!flow || !motion.active || !isViewportMotionEvent(event)) return
@@ -712,6 +761,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         y: current.y + momentum.y * delta,
         zoom: current.zoom,
       }
+      visibleViewport.current = current
       momentum = {
         x: momentum.x * Math.exp(-delta / 150),
         y: momentum.y * Math.exp(-delta / 150),
@@ -719,7 +769,12 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       void flow.setViewport(current)
       if (Math.hypot(momentum.x, momentum.y) < 0.025 || elapsed > 420) {
         viewportMotion.current = { active: false, velocity: { x: 0, y: 0 } }
-        props.onViewport(current)
+        props.onViewport({
+          server: props.server,
+          directory: props.directory,
+          resourceID: base.resource.id,
+          viewport: current,
+        })
         return
       }
       viewportMotion.current = {
@@ -861,6 +916,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
           }}
         >
           <ReactFlow<ArchitectureFlowNode, ArchitectureFlowEdge>
+            key={`${base.resource.id}:reload:${flowReloadKey}`}
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
@@ -958,7 +1014,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             onMoveStart={startViewportMove}
             onMove={trackViewportMove}
             onMoveEnd={finishViewportMove}
-            defaultViewport={props.viewport}
+            defaultViewport={visibleViewport.current ?? props.viewport}
             connectionMode={ConnectionMode.Loose}
             selectionKeyCode="Shift"
             selectionMode={SelectionMode.Partial}
@@ -969,7 +1025,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             nodesConnectable
             nodesDraggable
             edgesReconnectable
-            fitView={!props.viewport}
+            fitView={!visibleViewport.current && !props.viewport}
             proOptions={{ hideAttribution: true }}
           >
             <SelectionLassoCleanup />

@@ -12,8 +12,6 @@ const cfg = [
   "-c",
   "core.longpaths=true",
   "-c",
-  "core.symlinks=true",
-  "-c",
   "core.quotepath=false",
 ] as const
 

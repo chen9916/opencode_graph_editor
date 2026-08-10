@@ -20,4 +20,19 @@ describe("architecture resource header", () => {
     expect(source).not.toContain('<ButtonV2 variant="ghost" onClick={requestDuplicateResource}')
     expect(source).not.toContain('<ButtonV2 variant="ghost" onClick={removeResource}')
   })
+
+  test("keeps graph save and reload available as direct header actions", async () => {
+    const source = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
+
+    expect(source).toContain('dispatchArchitectureCommand("save", event.currentTarget)')
+    expect(source).toContain("onClick={() => reload()}")
+  })
+
+  test("captures the reload target before opening discard confirmation", async () => {
+    const source = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
+
+    expect(source).toContain("const reloadResource = async (scope: ReturnType<typeof operationScope>)")
+    expect(source).toContain("const scope = operationScope(id)")
+    expect(source).toContain("confirm(labels().discardConfirm, labels().reload, () => void reloadResource(scope))")
+  })
 })

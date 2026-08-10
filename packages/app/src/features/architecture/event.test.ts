@@ -12,6 +12,7 @@ import {
   beginArchitectureLocalSave,
   captureArchitectureLocalDraftOperationEvent,
   isArchitectureLocalSaveEvent,
+  rememberArchitectureLocalDraftOperationEvent,
 } from "./event"
 
 describe("architecture resource events", () => {
@@ -125,6 +126,30 @@ describe("architecture resource events", () => {
         server: "http://127.0.0.1:4096",
         directory: "C:/repo",
         event,
+      }),
+    ).toBe(false)
+  })
+
+  test("suppresses late draft echo events after the local patch response settles", () => {
+    const event = { resourceID: "design", action: "updated" as const, revision: 4, digest: "draft" }
+    rememberArchitectureLocalDraftOperationEvent({
+      server: "http://127.0.0.1:4096",
+      directory: "C:/repo",
+      event,
+    })
+
+    expect(
+      captureArchitectureLocalDraftOperationEvent({
+        server: "http://127.0.0.1:4096",
+        directory: "C:/repo",
+        event,
+      }),
+    ).toBe(true)
+    expect(
+      captureArchitectureLocalDraftOperationEvent({
+        server: "http://127.0.0.1:4096",
+        directory: "C:/repo",
+        event: { ...event, digest: "external" },
       }),
     ).toBe(false)
   })

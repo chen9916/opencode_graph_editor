@@ -26,6 +26,8 @@ describe("architecture editor draft state", () => {
     }
 
     const change = currentArchitectureDraftChange({
+      server: "server",
+      directory: "/repo",
       base: snapshot(resource()),
       historyOrigin: snapshot(resource("AI"), "AI"),
       historyBase: resource("AI"),
@@ -37,12 +39,16 @@ describe("architecture editor draft state", () => {
       conflicts: [],
     })
 
+    expect(change.server).toBe("server")
+    expect(change.directory).toBe("/repo")
     expect(change.resource.nodes[0]?.text).toBe("AI")
     expect(change.operations).toEqual([operation])
   })
 
   test("save commands use the latest in-memory editor resource once the canvas is loaded", () => {
     const change = currentArchitectureDraftChange({
+      server: "server",
+      directory: "/repo",
       base: snapshot(resource()),
       historyOrigin: snapshot(resource()),
       historyBase: resource(),
@@ -155,5 +161,14 @@ describe("architecture editor draft state", () => {
     expect(
       architectureEditorInitialKey({ base: snapshot(), initialOperations: [first], reloadGeneration: 0 }),
     ).not.toBe(architectureEditorInitialKey({ base: snapshot(), initialOperations: [second], reloadGeneration: 0 }))
+  })
+
+  test("mounted editor reloads replace React Flow state instead of waiting for a resource remount", async () => {
+    const source = await Bun.file(new URL("./architecture-editor.react.tsx", import.meta.url)).text()
+
+    expect(source).toContain("replaceFlowElements(nextResource)")
+    expect(source).toContain('if (plan.kind === "reload")')
+    expect(source).toContain("setFlowReloadKey((current) => current + 1)")
+    expect(source).toContain('key={`${base.resource.id}:reload:${flowReloadKey}`}')
   })
 })

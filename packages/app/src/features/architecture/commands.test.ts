@@ -11,22 +11,74 @@ import {
 
 describe("architecture commands", () => {
   test("scopes a queued Add Node command to its admitted resource", () => {
-    const action: ArchitectureCommandAction = { id: 1, type: "addNode", resourceID: "new_graph" }
+    const action: ArchitectureCommandAction = {
+      id: 1,
+      type: "addNode",
+      server: "http://127.0.0.1:4096",
+      directory: "C:/repo",
+      resourceID: "new_graph",
+    }
 
     expect(architectureCommandMatches(action, "new_graph")).toBe(true)
     expect(architectureCommandMatches(action, "auth_resourceID")).toBe(false)
+    expect(
+      architectureCommandMatches(action, {
+        server: "http://127.0.0.1:4096",
+        directory: "C:/repo",
+        resourceID: "new_graph",
+      }),
+    ).toBe(true)
+    expect(
+      architectureCommandMatches(action, {
+        server: "http://127.0.0.1:4096",
+        directory: "D:/other",
+        resourceID: "new_graph",
+      }),
+    ).toBe(false)
   })
 
   test("dispatches reusable resource-level commands", () => {
-    const received: string[] = []
-    const listener = (event: Event) => received.push((event as CustomEvent<string>).detail)
+    const panel = document.createElement("div")
+    panel.setAttribute("data-architecture-panel", "")
+    document.body.append(panel)
+    const received: Array<{ readonly type: string; readonly target?: EventTarget | null }> = []
+    const listener = (event: Event) =>
+      received.push((event as CustomEvent<{ type: string; target?: EventTarget | null }>).detail)
     document.addEventListener(ARCHITECTURE_COMMAND_EVENT, listener)
 
     dispatchArchitectureCommand("exportResource")
     dispatchArchitectureCommand("duplicateResource")
 
     document.removeEventListener(ARCHITECTURE_COMMAND_EVENT, listener)
-    expect(received).toEqual(["exportResource", "duplicateResource"])
+    panel.remove()
+    expect(received.map((item) => item.type)).toEqual(["exportResource", "duplicateResource"])
+    expect(received.every((item) => item.target === panel)).toBe(true)
+  })
+
+  test("dispatches keybound graph commands to the editor event target", () => {
+    const panel = document.createElement("div")
+    const editor = document.createElement("div")
+    const pane = document.createElement("div")
+    const outside = document.createElement("button")
+    const received: Array<EventTarget | null | undefined> = []
+    const listener = (event: Event) =>
+      received.push((event as CustomEvent<{ target?: EventTarget | null }>).detail.target)
+
+    panel.setAttribute("data-architecture-panel", "")
+    editor.className = "architecture-editor"
+    editor.append(pane)
+    panel.append(editor)
+    document.body.append(panel, outside)
+    outside.focus()
+    document.addEventListener(ARCHITECTURE_COMMAND_EVENT, listener)
+
+    expect(architectureEditorCommandTarget(key("s", { target: pane }))).toBe(true)
+    dispatchArchitectureCommand("save")
+
+    document.removeEventListener(ARCHITECTURE_COMMAND_EVENT, listener)
+    panel.remove()
+    outside.remove()
+    expect(received).toEqual([pane])
   })
 
   test("uses standard editor keybinds for graph save, reload, undo, and redo", () => {
