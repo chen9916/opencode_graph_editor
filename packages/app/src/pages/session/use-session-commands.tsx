@@ -21,7 +21,11 @@ import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionOwnership } from "./session-ownership"
 import { useLocal } from "@/context/local"
 import { useServerArchitectureAvailable } from "@/context/server-sdk"
-import { dispatchArchitectureCommand } from "@/features/architecture/commands"
+import {
+  architectureCommandKeybinds,
+  architectureEditorCommandTarget,
+  dispatchArchitectureCommand,
+} from "@/features/architecture/commands"
 
 export type SessionCommandContext = {
   navigateMessageByOffset: (offset: number) => void
@@ -144,17 +148,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const terminalCommand = withCategory(language.t("command.category.terminal"))
   const mcpCommand = withCategory(language.t("command.category.mcp"))
   const permissionsCommand = withCategory(language.t("command.category.permissions"))
-  const graphEditorFocused = (event: KeyboardEvent) => {
-    const target =
-      event.target instanceof Element
-        ? event.target
-        : typeof document !== "undefined" && document.activeElement instanceof Element
-          ? document.activeElement
-          : undefined
-    if (!target?.closest(".architecture-editor")) return false
-    return !target.closest("input, textarea, select, [contenteditable='true']")
-  }
-
   const isAutoAcceptActive = () => {
     const sessionID = params.id
     if (sessionID) return permission.isAutoAccepting(sessionID, sdk().directory)
@@ -594,47 +587,54 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
           viewCommand({
             id: "architecture.save",
             title: language.t("command.architecture.save"),
-            keybind: "mod+s",
-            when: graphEditorFocused,
+            keybind: architectureCommandKeybinds.save,
+            when: architectureEditorCommandTarget,
             onSelect: () => dispatchArchitectureCommand("save"),
           }),
           viewCommand({
             id: "architecture.reload",
             title: language.t("command.architecture.reload"),
+            keybind: architectureCommandKeybinds.reload,
+            when: architectureEditorCommandTarget,
             onSelect: () => dispatchArchitectureCommand("reload"),
           }),
           viewCommand({
             id: "architecture.fitView",
             title: language.t("command.architecture.fitView"),
-            keybind: "mod+0",
-            when: graphEditorFocused,
+            keybind: architectureCommandKeybinds.fitView,
+            when: architectureEditorCommandTarget,
             onSelect: () => dispatchArchitectureCommand("fitView"),
           }),
           viewCommand({
             id: "architecture.undo",
             title: language.t("command.architecture.undo"),
-            keybind: "mod+z",
-            when: graphEditorFocused,
+            keybind: architectureCommandKeybinds.undo,
+            when: architectureEditorCommandTarget,
             onSelect: () => dispatchArchitectureCommand("undo"),
           }),
           viewCommand({
             id: "architecture.redo",
             title: language.t("command.architecture.redo"),
-            keybind: "mod+shift+z",
-            when: graphEditorFocused,
+            keybind: architectureCommandKeybinds.redo,
+            when: architectureEditorCommandTarget,
             onSelect: () => dispatchArchitectureCommand("redo"),
           }),
           viewCommand({
             id: "architecture.delete",
             title: language.t("command.architecture.delete"),
-            keybind: "backspace,delete",
-            when: graphEditorFocused,
+            keybind: architectureCommandKeybinds.delete,
+            when: architectureEditorCommandTarget,
             onSelect: () => dispatchArchitectureCommand("delete"),
           }),
           viewCommand({
             id: "architecture.addNode",
             title: language.t("command.architecture.addNode"),
             onSelect: () => dispatchArchitectureCommand("addNode"),
+          }),
+          viewCommand({
+            id: "architecture.exportPatch",
+            title: language.t("architecture.action.exportPatch"),
+            onSelect: () => dispatchArchitectureCommand("exportPatch"),
           }),
         ]
       : []),

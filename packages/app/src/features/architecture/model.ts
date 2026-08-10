@@ -7,7 +7,9 @@ export type ArchitectureFlowNode = Node<
     readonly tagColors?: ArchitectureResource["tagColors"]
     readonly tagColorsKey: string
     readonly dimmed?: boolean
+    readonly editedHint?: boolean
     readonly onTextChange: (node: ArchitectureNode, text: string) => void
+    readonly onEditedHintSeen?: (nodeID: string) => void
   },
   "architecture"
 >

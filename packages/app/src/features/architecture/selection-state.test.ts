@@ -3,6 +3,7 @@ import {
   additiveSelectionModifierAfterKeyboardChange,
   hasAdditiveSelectionModifier,
   mergeSelection,
+  selectedNodesForContextDelete,
   selectionForGestureChange,
   type Selection,
 } from "./selection-state"
@@ -82,6 +83,40 @@ describe("architecture selection state", () => {
     expect(hasAdditiveSelectionModifier({ shiftKey: false, ctrlKey: true, metaKey: false })).toBe(true)
     expect(hasAdditiveSelectionModifier({ shiftKey: false, ctrlKey: false, metaKey: true })).toBe(true)
     expect(hasAdditiveSelectionModifier({ shiftKey: false, ctrlKey: false, metaKey: false })).toBe(false)
+  })
+
+  test("targets every selected node for node context-menu deletion", () => {
+    expect(
+      selectedNodesForContextDelete(
+        { type: "node", id: "selected-node" },
+        {
+          nodeIDs: ["selected-node", "other-node"],
+          edgeIDs: ["selected-edge"],
+          primary: { type: "edge", id: "selected-edge" },
+        },
+      ),
+    ).toEqual({
+      nodeIDs: ["selected-node", "other-node"],
+      edgeIDs: [],
+      primary: { type: "node", id: "selected-node" },
+    })
+  })
+
+  test("falls back to the context node when it is outside the current selection", () => {
+    expect(
+      selectedNodesForContextDelete(
+        { type: "node", id: "context-node" },
+        {
+          nodeIDs: ["other-node"],
+          edgeIDs: ["selected-edge"],
+          primary: { type: "node", id: "other-node" },
+        },
+      ),
+    ).toEqual({
+      nodeIDs: ["context-node"],
+      edgeIDs: [],
+      primary: { type: "node", id: "context-node" },
+    })
   })
 
   test("keeps an additive drag-box gesture latched after modifier keyup", () => {

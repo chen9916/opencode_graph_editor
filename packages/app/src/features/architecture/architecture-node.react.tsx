@@ -21,6 +21,7 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
   const [activeSocket, setActiveSocket] = useState<ArchitectureConnectionSide>()
   const cancelled = useRef(false)
   const revealSocket = (event: PointerEvent<HTMLDivElement>) => {
+    props.data.onEditedHintSeen?.(node.id)
     const rect = event.currentTarget.getBoundingClientRect()
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
@@ -49,6 +50,7 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
       className={architectureNodeClass()}
       data-active-socket={activeSocket}
       data-dimmed={props.data.dimmed || undefined}
+      data-edited-hint={props.data.editedHint || undefined}
       data-selected={props.selected || undefined}
       onPointerMove={revealSocket}
       onPointerLeave={() => setActiveSocket(undefined)}

@@ -34,6 +34,12 @@ import type {
   ArchitectureViewport,
 } from "./contract"
 import { architectureCommandMatches } from "./commands"
+import {
+  architectureEditedNodeHintsForResourceSync,
+  architectureResourceHintKey,
+  clearArchitectureEditedNodeHint,
+  filterArchitectureEditedNodeHints,
+} from "./edit-hint"
 import { applyOperations, flattenJournal, operationID } from "./journal"
 import { tagColorsKey, toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } from "./model"
 import { ArchitectureEdgeView } from "./architecture-edge.react"
@@ -42,6 +48,7 @@ import {
   additiveSelectionModifierAfterKeyboardChange,
   hasAdditiveSelectionModifier,
   selectionForGestureChange,
+  selectedNodesForContextDelete,
   type Selection,
   type SelectionGesture,
 } from "./selection-state"
@@ -93,6 +100,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const canvas = useRef<HTMLDivElement>(null)
   const viewportMotion = useRef<ViewportMotion>({ active: false, velocity: { x: 0, y: 0 } })
   const reconnectedEdgeIDs = useRef(new Set<string>())
+  const locallyAuthoredResourceKeys = useRef(new Set<string>())
   const selectionRef = useRef<Selection>(emptySelection)
   const pendingSelection = useRef<Selection>()
   const selectionGesture = useRef<SelectionGesture>()
@@ -114,6 +122,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenu>()
   const [askPopover, setAskPopover] = useState<AskPopover>()
+  const [editedHintNodeIDs, setEditedHintNodeIDs] = useState<ReadonlyArray<string>>([])
   const operations = flattenJournal(editor.past)
   const dirty = !!props.draft?.live || operations.length > 0 || (props.draft?.conflicts.length ?? 0) > 0
   const tags = unique(editor.resource.nodes.flatMap((node) => node.tags))
@@ -127,6 +136,30 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     .map((node) => [node.id, node.layout.position.x, node.layout.position.y, node.text, ...node.tags].join("\u001f"))
     .join("\u001e")
   const resourceTagColorsKey = tagColorsKey(editor.resource.tagColors)
+  const editedHintNodeIDsKey = editedHintNodeIDs.join(",")
+
+  const keepExistingEditedNodeHints = (resource: ArchitectureResource) => {
+    setEditedHintNodeIDs((current) =>
+      filterArchitectureEditedNodeHints(
+        current,
+        resource.nodes.map((node) => node.id),
+      ),
+    )
+  }
+
+  const rememberLocalResource = (resource: ArchitectureResource) => {
+    locallyAuthoredResourceKeys.current.add(architectureResourceHintKey(resource))
+    if (locallyAuthoredResourceKeys.current.size <= 12) return
+    const oldest = locallyAuthoredResourceKeys.current.values().next().value
+    if (oldest) locallyAuthoredResourceKeys.current.delete(oldest)
+  }
+
+  const consumeLocalResource = (resource: ArchitectureResource) =>
+    locallyAuthoredResourceKeys.current.delete(architectureResourceHintKey(resource))
+
+  const clearEditedNodeHint = (nodeID: string) => {
+    setEditedHintNodeIDs((current) => clearArchitectureEditedNodeHint(current, nodeID))
+  }
 
   const commit = (batch: ReadonlyArray<ArchitectureOperation>) => {
     if (batch.length === 0) return
@@ -135,7 +168,9 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       past: [...editor.past, batch],
       future: [],
     }
+    rememberLocalResource(next.resource)
     setEditor(next)
+    keepExistingEditedNodeHints(next.resource)
     props.onJournal(
       draftChange(next.resource, flattenJournal(next.past), base, historyOrigin, props.draft?.conflicts ?? []),
     )
@@ -239,17 +274,42 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     const resourceChanged = loadedResourceID.current !== base.resource.id
     loaded.current = initialKey
     loadedResourceID.current = base.resource.id
+    const nextResource = applyOperations(historyBase, initial)
+    const localEcho = consumeLocalResource(nextResource)
     setEditor({
-      resource: applyOperations(historyBase, initial),
+      resource: nextResource,
       past: initial.map((operation) => [operation]),
       future: [],
     })
-    if (!resourceChanged) return
-    select(undefined)
-    setContextMenu(undefined)
-    setAskPopover(undefined)
-    setOutlineOpen(false)
-    setInspectorOpen(false)
+    if (resourceChanged) {
+      locallyAuthoredResourceKeys.current.clear()
+      setEditedHintNodeIDs([])
+      select(undefined)
+      setContextMenu(undefined)
+      setAskPopover(undefined)
+      setOutlineOpen(false)
+      setInspectorOpen(false)
+      return
+    }
+    if (localEcho) {
+      setEditedHintNodeIDs((current) =>
+        architectureEditedNodeHintsForResourceSync({
+          current,
+          previous: editor.resource,
+          next: nextResource,
+          external: false,
+        }),
+      )
+      return
+    }
+    setEditedHintNodeIDs((current) =>
+      architectureEditedNodeHintsForResourceSync({
+        current,
+        previous: editor.resource,
+        next: nextResource,
+        external: true,
+      }),
+    )
   }, [base.digest, base.resource.id, initialKey])
 
   useLayoutEffect(() => {
@@ -265,6 +325,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     const visible = new Set(
       editor.resource.nodes.filter((node) => nodeMatchesFilter(node, filter)).map((node) => node.id),
     )
+    const editedHints = new Set(editedHintNodeIDs)
     const selected = selectionInResource(pendingSelection.current ?? selectionRef.current, editor.resource)
     pendingSelection.current = undefined
     selectionRef.current = selected
@@ -275,6 +336,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         data: {
           ...node.data,
           dimmed: filterActive && !visible.has(node.id),
+          editedHint: editedHints.has(node.id),
+          onEditedHintSeen: clearEditedNodeHint,
         },
         selected: selected.nodeIDs.includes(node.id),
       })),
@@ -289,20 +352,23 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         }
       }),
     )
-  }, [editor.resource, filter.tag, filter.text, filterActive, resourceTagColorsKey, setEdges, setNodes])
+  }, [editor.resource, filter.tag, filter.text, filterActive, resourceTagColorsKey, editedHintNodeIDsKey, setEdges, setNodes])
 
   const undo = () => {
     const batch = editor.past.at(-1)
     if (!batch) return
     const past = editor.past.slice(0, -1)
+    const nextResource = applyOperations(historyBase, flattenJournal(past))
+    rememberLocalResource(nextResource)
     setEditor({
-      resource: applyOperations(historyBase, flattenJournal(past)),
+      resource: nextResource,
       past,
       future: [batch, ...editor.future],
     })
+    keepExistingEditedNodeHints(nextResource)
     props.onJournal(
       draftChange(
-        applyOperations(historyBase, flattenJournal(past)),
+        nextResource,
         flattenJournal(past),
         base,
         historyOrigin,
@@ -315,14 +381,17 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     const batch = editor.future[0]
     if (!batch) return
     const past = [...editor.past, batch]
+    const nextResource = applyOperations(historyBase, flattenJournal(past))
+    rememberLocalResource(nextResource)
     setEditor({
-      resource: applyOperations(historyBase, flattenJournal(past)),
+      resource: nextResource,
       past,
       future: editor.future.slice(1),
     })
+    keepExistingEditedNodeHints(nextResource)
     props.onJournal(
       draftChange(
-        applyOperations(historyBase, flattenJournal(past)),
+        nextResource,
         flattenJournal(past),
         base,
         historyOrigin,
@@ -394,19 +463,32 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       return
     }
     if (!hasSelection) return
-    const selectedNodeIDs = new Set(selection.nodeIDs)
+    removeSelectedItems(selection, props.labels.deleteSelectionConfirm)
+  }
+
+  const removeNodeContextSelection = (menu: { readonly id: string; readonly selection: Selection }) => {
+    const selected = selectedNodesForContextDelete({ type: "node", id: menu.id }, menu.selection)
+    if (selected.nodeIDs.length === 1) {
+      removeSelection({ type: "node", id: selected.nodeIDs[0]! })
+      return
+    }
+    removeSelectedItems(selected, props.labels.deleteSelectionConfirm)
+  }
+
+  const removeSelectedItems = (selected: Selection, confirmation: string) => {
+    const selectedNodeIDs = new Set(selected.nodeIDs)
     const cascadedEdgeIDs = editor.resource.edges
       .filter((edge) => selectedNodeIDs.has(edge.source) || selectedNodeIDs.has(edge.target))
       .map((edge) => edge.id)
     const operations: ReadonlyArray<ArchitectureOperation> = [
-      ...selection.nodeIDs.map(
+      ...selected.nodeIDs.map(
         (nodeID): ArchitectureOperation => ({ id: operationID(), type: "node.remove", nodeID, cascade: true }),
       ),
-      ...selection.edgeIDs
+      ...selected.edgeIDs
         .filter((edgeID) => !cascadedEdgeIDs.includes(edgeID))
         .map((edgeID): ArchitectureOperation => ({ id: operationID(), type: "edge.remove", edgeID })),
     ]
-    props.onConfirm(props.labels.deleteSelectionConfirm, props.labels.delete, () => {
+    props.onConfirm(confirmation, props.labels.delete, () => {
       commit(operations)
       select(undefined)
       setContextMenu(undefined)
@@ -425,6 +507,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     if (action.type === "undo") undo()
     if (action.type === "redo") redo()
     if (action.type === "delete") removeSelection()
+    if (action.type === "exportPatch") props.onExport(operations)
   }, [props.action?.id, props.action?.resourceID, base.resource.id])
 
   const onSelectionChange = (change: OnSelectionChangeParams<ArchitectureFlowNode, ArchitectureFlowEdge>) => {
@@ -629,53 +712,6 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
         event.currentTarget.focus({ preventScroll: true })
       }}
     >
-      <header className="architecture-editor__toolbar">
-        <div className="architecture-editor__heading">
-          <div>
-            <div className="architecture-editor__title" dir="auto">
-              {editor.resource.name}
-            </div>
-            <div className="architecture-editor__summary">
-              {props.labels.revision(base.resource.revision)} · {props.labels.nodes(editor.resource.nodes.length)} ·{" "}
-              {props.labels.edges(editor.resource.edges.length)}
-            </div>
-          </div>
-          <div className="architecture-editor__actions">
-            <button type="button" onClick={() => addNode()} disabled={props.busy}>
-              {props.labels.addNode}
-            </button>
-            <button type="button" onClick={undo} disabled={editor.past.length === 0 || props.busy}>
-              {props.labels.undo}
-            </button>
-            <button type="button" onClick={redo} disabled={editor.future.length === 0 || props.busy}>
-              {props.labels.redo}
-            </button>
-            <button type="button" onClick={fitSelection}>
-              {selection.nodeIDs.length > 0 ? props.labels.fitSelection : props.labels.fitView}
-            </button>
-            <button type="button" onClick={props.onReload} disabled={props.busy}>
-              {props.labels.reload}
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                props.onSave(
-                  draftChange(editor.resource, operations, base, historyOrigin, props.draft?.conflicts ?? []),
-                )
-              }
-              disabled={!dirty || props.busy}
-            >
-              {props.labels.save}
-            </button>
-            <button type="button" onClick={() => props.onExport(operations)} disabled={!dirty}>
-              {props.labels.exportPatch}
-            </button>
-            <button type="button" onClick={() => removeSelection()} disabled={!hasSelection || props.busy}>
-              {props.labels.delete}
-            </button>
-          </div>
-        </div>
-      </header>
       <div className="architecture-editor__body" dir="ltr">
         <button
           type="button"
@@ -954,7 +990,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
                     type="button"
                     role="menuitem"
                     className="architecture-editor__danger"
-                    onClick={() => removeSelection({ type: "node", id: contextMenu.id })}
+                    onClick={() => removeNodeContextSelection(contextMenu)}
                   >
                     {props.labels.delete}
                   </button>
@@ -1691,7 +1727,7 @@ function isViewportPanStartEvent(event: MouseEvent | TouchEvent | null) {
   if (!isViewportMotionEvent(event)) return false
   if (!(event.target instanceof Element)) return true
   return !event.target.closest(
-    ".react-flow__node, .react-flow__edge, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .architecture-editor__toolbar, .architecture-editor__side-toggle, .architecture-editor__context-menu, .architecture-editor__ask-popover, .architecture-editor__wire-toolbar",
+    ".react-flow__node, .react-flow__edge, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .architecture-editor__side-toggle, .architecture-editor__context-menu, .architecture-editor__ask-popover, .architecture-editor__wire-toolbar",
   )
 }
 

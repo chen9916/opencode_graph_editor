@@ -8,6 +8,7 @@ import { State } from "./state"
 export const ID = Agent.ID
 export type ID = typeof ID.Type
 export const defaultID = ID.make("build")
+const removedID = ID.make("ask")
 
 export const Color = Agent.Color
 
@@ -48,12 +49,16 @@ const layer = Layer.effect(
     const state = State.create<Data, Draft>({
       initial: () => ({ agents: new Map() }),
       draft: (draft) => ({
-        list: () => Array.fromIterable(draft.agents.values()) as Info[],
-        get: (id) => draft.agents.get(id),
+        list: () => Array.fromIterable(draft.agents.values()).filter((agent) => agent.id !== removedID) as Info[],
+        get: (id) => (id === removedID ? undefined : draft.agents.get(id)),
         default: (id) => {
-          draft.default = id
+          draft.default = id === removedID ? undefined : id
         },
         update: (id, fn) => {
+          if (id === removedID) {
+            draft.agents.delete(id)
+            return
+          }
           const current = draft.agents.get(id) ?? (Info.empty(id) as Types.DeepMutable<Info>)
           if (!draft.agents.has(id)) draft.agents.set(id, current)
           fn(current)
@@ -65,7 +70,7 @@ const layer = Layer.effect(
       }),
     })
     const selectable = (agent: Info | undefined) =>
-      agent && agent.mode !== "subagent" && !agent.hidden ? agent : undefined
+      agent && agent.id !== removedID && agent.mode !== "subagent" && !agent.hidden ? agent : undefined
     const selectedDefault = () => {
       const data = state.get()
       const configured = data.default ? selectable(data.agents.get(data.default)) : undefined
@@ -82,25 +87,31 @@ const layer = Layer.effect(
       transform: state.transform,
       reload: state.reload,
       get: Effect.fn("AgentV2.get")(function* (id) {
+        if (id === removedID) return undefined
         return state.get().agents.get(id)
       }),
       default: Effect.fn("AgentV2.default")(function* () {
         return selectedDefault()
       }),
       resolve: Effect.fn("AgentV2.resolve")(function* (id) {
-        if (id !== undefined) return state.get().agents.get(ID.make(id))
+        if (id !== undefined) {
+          const selected = ID.make(id)
+          if (selected === removedID) return undefined
+          return state.get().agents.get(selected)
+        }
         return selectedDefault()
       }),
       select: Effect.fn("AgentV2.select")(function* (id) {
         if (id !== undefined) {
           const selected = ID.make(id)
+          if (selected === removedID) return { id: selected, info: undefined }
           return { id: selected, info: state.get().agents.get(selected) }
         }
         const info = selectedDefault()
         return { id: info?.id ?? defaultID, info }
       }),
       all: Effect.fn("AgentV2.all")(function* () {
-        return Array.fromIterable(state.get().agents.values())
+        return Array.fromIterable(state.get().agents.values()).filter((agent) => agent.id !== removedID)
       }),
     })
   }),

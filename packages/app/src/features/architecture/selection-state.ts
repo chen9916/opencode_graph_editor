@@ -33,6 +33,11 @@ export function selectionForGestureChange(
   return mergeSelection(gesture.base, next)
 }
 
+export function selectedNodesForContextDelete(target: { readonly type: "node"; readonly id: string }, current: Selection) {
+  const nodeIDs = current.nodeIDs.includes(target.id) ? current.nodeIDs : [target.id]
+  return { nodeIDs, edgeIDs: [], primary: target } satisfies Selection
+}
+
 export function mergeSelection(base: Selection, next: Selection): Selection {
   const nodeIDs = mergeIDs(base.nodeIDs, next.nodeIDs)
   const edgeIDs = mergeIDs(base.edgeIDs, next.edgeIDs)

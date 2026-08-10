@@ -234,6 +234,13 @@ export const CodeModeTool = Tool.define(
           } satisfies Tool.ExecuteResult<Metadata>
         }
         const agent = yield* agents.get(ctx.agent)
+        if (!agent) {
+          return {
+            title: CODE_MODE_TOOL,
+            metadata: { toolCalls: [], error: true },
+            output: `Agent not found: ${ctx.agent}`,
+          } satisfies Tool.ExecuteResult<Metadata>
+        }
         const session = yield* sessions.get(ctx.sessionID).pipe(Effect.orDie)
         const activeInstance = yield* InstanceRef
         const ruleset = Permission.merge(agent.permission, session.permission ?? [])

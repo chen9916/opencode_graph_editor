@@ -1,553 +1,202 @@
 {
   "version": 2,
-  "revision": 3,
+  "revision": 14,
   "id": "ui-graph-editor-tabs",
   "name": "UI System: Graph Editor Tabs",
   "tagColors": {
     "boundary": "#64748b",
     "capability": "#7c3aed",
-    "change-hotspot": "#be123c",
-    "commands": "#ea580c",
     "controller": "#9333ea",
     "data": "#dc2626",
     "desktop": "#0891b2",
     "editor": "#ca8a04",
     "implemented": "#10b981",
     "mobile": "#16a34a",
-    "needs-visual-check": "#a855f7",
-    "problem": "#ef4444",
-    "proposed": "#22c55e",
-    "rejected": "#6b7280",
+    "planned": "#f59e0b",
     "session": "#4f46e5",
-    "tabs": "#2563eb",
-    "unimplemented": "#f97316"
+    "tabs": "#2563eb"
   },
   "nodes": [
     {
       "id": "api-wrappers",
-      "text": "Architecture API wrappers\n`features/architecture/api.ts` calls generated server architecture client methods for list, create, get, draft patch, commit, reload, and remove.",
+      "text": "Server resource and draft API\nUI calls resource list/create/get/remove/reset plus draft get/patch/commit/discard/reload operations.",
       "tags": [
-        "data"
+        "boundary",
+        "data",
+        "implemented"
       ],
       "layout": {
         "position": {
-          "x": 1600,
-          "y": 190
+          "x": 117.69093862477479,
+          "y": 430.9879923585008
         }
       }
     },
     {
       "id": "architecture-island",
-      "text": "`ArchitectureIsland`\nSolid-to-React bridge lazy-loads `react`, `react-dom/client`, and `architecture-editor.react` so React Flow stays out of the initial bundle.",
+      "text": "Renderer boundary\n`ArchitectureIsland` lazily bridges Solid to React/React Flow; desktop resolves renderer dependencies and `direction`/`mobile` props drive responsive placement while the canvas stays LTR.",
       "tags": [
         "boundary",
-        "controller",
-        "editor"
+        "desktop",
+        "implemented",
+        "mobile"
       ],
       "layout": {
         "position": {
-          "x": 1920,
-          "y": 190
+          "x": 960,
+          "y": 180
         }
       }
     },
     {
       "id": "architecture-panel",
-      "text": "`ArchitecturePanel` Solid controller\nLoads resources/drafts, persists selected resource, local draft journal, and per-resource viewport under `Persist.serverWorkspace`.",
+      "text": "Graph panel controller\nLoads and switches resources, persists selection and viewport, journals drafts, reconciles events and conflicts, and coordinates Save, reload, and resource deletion.",
       "tags": [
         "controller",
-        "data"
+        "data",
+        "implemented"
       ],
       "layout": {
         "position": {
-          "x": 1280,
-          "y": 190
-        }
-      }
-    },
-    {
-      "id": "architecture-tab-id",
-      "text": "`SESSION_ARCHITECTURE_TAB`\nSpecial tab value `architecture`. `openSessionTab` and `closeSessionTab` treat it like review: selectable detail tab, not a normal file tab.",
-      "tags": [
-        "change-hotspot",
-        "tabs"
-      ],
-      "layout": {
-        "position": {
-          "x": 320,
-          "y": 190
+          "x": 640,
+          "y": 180
         }
       }
     },
     {
       "id": "ask-selection",
-      "text": "Ask selected Graph context\nEditor selection flows through `ArchitecturePanel.askSelection` into an `@graph` mention plus selection text and `sendFollowupDraft`.",
+      "text": "AI context integration\nResource mentions identify managed Graph context; selected nodes can be sent as follow-up prompt context.",
       "tags": [
         "editor",
+        "implemented",
         "session"
       ],
       "layout": {
         "position": {
-          "x": 2560,
-          "y": 280
+          "x": 1600,
+          "y": 180
         }
       }
     },
     {
       "id": "capability-gate",
-      "text": "Server architecture capability\n`useServerArchitectureAvailable` probes the authenticated architecture route and gates Graph UI visibility across the session UI.",
+      "text": "Architecture capability\n`useServerArchitectureAvailable` probes the authenticated architecture route and gates Graph visibility in session UI.",
       "tags": [
         "boundary",
-        "capability"
+        "capability",
+        "implemented"
       ],
       "layout": {
         "position": {
           "x": 0,
-          "y": 0
+          "y": 180
         }
       }
     },
     {
-      "id": "change-hotspots",
-      "text": "Change hotspots for upcoming Graph tab work\nStart with `layout-tabs.ts`, `helpers.ts`, `session.tsx`, `SessionSidePanel`, `SessionHeader`, and `use-session-commands`; only change panel/editor code when behavior inside the tab changes.",
+      "id": "edited-node-hint-demo",
+      "text": "Remote-edit hint demo\nAgent test update: this node was changed remotely and should glow until your pointer moves over it.",
       "tags": [
-        "change-hotspot"
+        "editor",
+        "implemented"
       ],
       "layout": {
         "position": {
-          "x": 653.829155112887,
-          "y": 611.9608005732881
+          "x": 952.2541701953398,
+          "y": 1060.5842738720473
         }
       }
     },
     {
-      "id": "command-palette-actions",
-      "text": "Command palette Graph actions\n`use-session-commands.tsx` registers `architecture.open` plus editor-scoped save, reload, fit view, undo, redo, and create commands.",
+      "id": "fix-edited-node-hint",
+      "text": "Implemented fix: remote edit hint\nWhen an agent or external resource sync creates, changes, or moves a node, show a subtle temporary color or glow until the user's pointer moves over it. Local edits, drags, undo, and redo do not add the hint; the state stays out of Graph context.",
       "tags": [
-        "change-hotspot",
-        "commands"
+        "editor",
+        "implemented"
       ],
       "layout": {
         "position": {
-          "x": 640,
-          "y": 380
+          "x": 1005.3836007342154,
+          "y": 673.2704990822306
         }
       }
     },
     {
-      "id": "create-session-tabs",
-      "text": "`createSessionTabs`\nFilters `context`, `review`, and Graph out of `panelTabs`; keeps Graph as active/closable only when the architecture accessor is true.",
+      "id": "fix-multi-select-delete",
+      "text": "Planned fix: multi-select deletion\nNode context-menu Delete should remove every currently selected node, not only the node that opened the menu; preserve selection cleanup and undo behavior.",
       "tags": [
-        "change-hotspot",
-        "tabs"
-      ],
-      "layout": {
-        "position": {
-          "x": 640,
-          "y": 190
-        }
-      }
-    },
-    {
-      "id": "current-coupling-review-panel",
-      "text": "Current coupling to review/detail panel\nDesktop Graph open path calls `view().reviewPanel.open()` and activates `SESSION_ARCHITECTURE_TAB`, so Graph availability is coupled to the file-changes side panel shell.",
-      "tags": [
-        "desktop",
-        "problem",
-        "tabs"
-      ],
-      "layout": {
-        "position": {
-          "x": 642,
-          "y": 1074
-        }
-      }
-    },
-    {
-      "id": "decision-new-chat-split-shell",
-      "text": "Decision: new chat uses the normal split session shell\nDiscard the whole-screen new chat view. Even before any message exists, the page should look like the regular session workspace: chat/composer on the left, and the right side panel available when opened.",
-      "tags": [
-        "decision",
+        "editor",
         "implemented",
-        "needs-visual-check",
-        "planned",
-        "session",
-        "tabs"
-      ],
-      "layout": {
-        "position": {
-          "x": 249.22012119445662,
-          "y": 1436.657438368529
-        }
-      }
-    },
-    {
-      "id": "desired-direct-graph-entry",
-      "text": "Desired: direct Graph entry from fresh project/new chat\nGraph should be reachable from a fresh project chat before any messages exist. The route should use the normal split session workspace rather than a whole-screen new-chat-only view.",
-      "tags": [
-        "decision",
-        "proposed",
-        "session",
-        "tabs",
-        "unimplemented"
-      ],
-      "layout": {
-        "position": {
-          "x": 962,
-          "y": 1074
-        }
-      }
-    },
-    {
-      "id": "desktop-side-panel",
-      "text": "Desktop side panel tab strip\n`SessionSidePanel` renders a Graph tab beside Context/Review/File tabs and mounts `ArchitecturePanel` in `Tabs.Content`.",
-      "tags": [
-        "change-hotspot",
-        "desktop",
-        "tabs"
-      ],
-      "layout": {
-        "position": {
-          "x": 960,
-          "y": 80
-        }
-      }
-    },
-    {
-      "id": "editor-command-bridge",
-      "text": "Editor command event bridge\n`ARCHITECTURE_COMMAND_EVENT` converts app command palette actions into per-resource editor actions in `ArchitectureEditor`.",
-      "tags": [
-        "commands",
-        "editor"
-      ],
-      "layout": {
-        "position": {
-          "x": 2240,
-          "y": 410
-        }
-      }
-    },
-    {
-      "id": "graph-access-before-message",
-      "text": "Graph accessible before first message\nOpening the Graph control should show the Graph editor in the right side panel even when the current chat/session has no user or assistant messages.",
-      "tags": [
-        "implemented",
-        "needs-visual-check",
-        "planned",
-        "session",
-        "tabs"
-      ],
-      "layout": {
-        "position": {
-          "x": 659.8138811797082,
-          "y": 1714.3257114229782
-        }
-      }
-    },
-    {
-      "id": "left-chat-right-panel-model",
-      "text": "Target layout model\nLeft: new chat timeline/composer area.\nRight: optional side panel containing Graph, review/changes, context, or file tabs when explicitly opened.",
-      "tags": [
-        "decision",
-        "implemented",
-        "needs-visual-check",
-        "planned",
-        "session"
-      ],
-      "layout": {
-        "position": {
-          "x": 964.0400844836781,
-          "y": 1475.8619851747715
-        }
-      }
-    },
-    {
-      "id": "live-draft-sync",
-      "text": "Live draft synchronizer\nJournal, live-draft, and rebase logic align local operations with remote draft snapshots before commit and conflict handling.",
-      "tags": [
-        "controller",
-        "data"
-      ],
-      "layout": {
-        "position": {
-          "x": 1600,
-          "y": 570
-        }
-      }
-    },
-    {
-      "id": "mobile-composer-rule",
-      "text": "Composer visibility rule\nOn mobile, the composer region is hidden while `mobileChanges()` or `mobileArchitecture()` is active, giving Graph full-content space.",
-      "tags": [
-        "mobile",
-        "session"
-      ],
-      "layout": {
-        "position": {
-          "x": 960,
-          "y": 500
-        }
-      }
-    },
-    {
-      "id": "mobile-content-tab",
-      "text": "Mobile content tab\n`session.tsx` adds a third mobile tab when Graph capability is available; `mobileArchitecture` renders `ArchitecturePanel` full height.",
-      "tags": [
-        "change-hotspot",
-        "mobile",
-        "tabs"
-      ],
-      "layout": {
-        "position": {
-          "x": 960,
-          "y": 300
-        }
-      }
-    },
-    {
-      "id": "new-chat-no-empty-fullscreen",
-      "text": "Remove special empty/fullscreen new-chat behavior\nA fresh project chat should not hide the surrounding session workspace chrome just because there are no messages yet.",
-      "tags": [
-        "change-hotspot",
-        "implemented",
-        "needs-visual-check",
         "planned"
       ],
       "layout": {
         "position": {
-          "x": 643.8905753357079,
-          "y": 1494.013667764731
+          "x": 640,
+          "y": 680
         }
       }
     },
     {
-      "id": "node-edge-views",
-      "text": "Node and edge views\nCustom React Flow components render text/tags, handles, selected wires, and the inline wire style toolbar.",
+      "id": "fix-remove-editor-toolbar",
+      "text": "Implemented fix: remove editor action bar\nThe top action bar is gone and right-click menus are unchanged. Standard shortcuts: Ctrl+Z undo, Ctrl+Shift+Z redo, Ctrl+S save, Ctrl+R reload. Add node, Fit view, Delete, and export remain available through the command infrastructure and context actions.",
       "tags": [
-        "editor"
+        "editor",
+        "implemented"
       ],
       "layout": {
         "position": {
-          "x": 2560,
-          "y": 20
+          "x": 1385.3940585575629,
+          "y": 719.7472220900985
         }
       }
     },
     {
-      "id": "option-dedicated-graph-action",
-      "text": "Selected direction: direct Graph action opens the right panel\nImplemented in code by making fresh/new chat use the normal session workspace shell and allowing the architecture side panel to render before a session has messages.",
+      "id": "fix-resource-selector-stale",
+      "text": "Planned fix: stable resource selector\nHovering another resource must not change the active graph. Only an explicit selection should switch resources; keep the selector and loaded graph synchronized so it cannot snap to the first graph or claim it is already active.",
       "tags": [
-        "commands",
-        "decision",
-        "implemented",
-        "needs-visual-check",
-        "proposed"
+        "controller",
+        "data",
+        "planned"
       ],
       "layout": {
         "position": {
-          "x": 1314.6656690628051,
-          "y": 1195.907622152865
-        }
-      }
-    },
-    {
-      "id": "option-top-level-session-view",
-      "text": "Rejected for now: separate top-level Graph view\nDo not solve this by replacing the workspace with a full-screen Graph/new-chat mode. Prefer the normal left-chat/right-panel session shell.",
-      "tags": [
-        "change-hotspot",
-        "proposed",
-        "rejected",
-        "unimplemented"
-      ],
-      "layout": {
-        "position": {
-          "x": 1309.171709882097,
-          "y": 975.8855267452687
-        }
-      }
-    },
-    {
-      "id": "problem-new-session-no-graph-entry",
-      "text": "Problem: new project session cannot reach Graph view\nStarting a new session from a project leaves Graph navigation trapped behind the side-panel/detail area that is primarily modeled around file changes/review.",
-      "tags": [
-        "change-hotspot",
-        "problem"
-      ],
-      "layout": {
-        "position": {
-          "x": 322,
-          "y": 1074
+          "x": 302,
+          "y": 662
         }
       }
     },
     {
       "id": "react-flow-editor",
-      "text": "`ArchitectureEditor` React Flow editor\nOwns canvas state: projected nodes/edges, selection, filters, outline, inspector, context menu, wire routing, and undo/redo.",
+      "text": "React Flow editor\nEdits text nodes, free-form tags and colors, explicit four-side connections, filters, selection/inspector, undo/redo, export, and edge routing.",
       "tags": [
-        "editor"
-      ],
-      "layout": {
-        "position": {
-          "x": 2240,
-          "y": 190
-        }
-      }
-    },
-    {
-      "id": "resource-header",
-      "text": "Resource header\nSelect, New, and Delete controls switch or mutate managed Graph resources before the React editor is mounted.",
-      "tags": [
-        "controller",
-        "data"
-      ],
-      "layout": {
-        "position": {
-          "x": 1600,
-          "y": 0
-        }
-      }
-    },
-    {
-      "id": "rtl-mobile-style",
-      "text": "RTL and mobile props\n`direction` and `mobile` props drive controls/minimap placement and responsive behavior; the graph canvas body remains LTR for geometry.",
-      "tags": [
-        "boundary",
         "editor",
-        "mobile"
+        "implemented"
       ],
       "layout": {
         "position": {
-          "x": 2560,
-          "y": 500
-        }
-      }
-    },
-    {
-      "id": "server-events-cache",
-      "text": "Server events and cache reconciliation\n`event.ts` parses `architecture.resource.*` and draft events, suppresses local-save echo, and updates or refetches query cache.",
-      "tags": [
-        "boundary",
-        "data"
-      ],
-      "layout": {
-        "position": {
-          "x": 1600,
-          "y": 380
-        }
-      }
-    },
-    {
-      "id": "session-header-action",
-      "text": "Session header Graph action\nDesktop-only button shown when capability is true; opens the review/detail panel and activates `SESSION_ARCHITECTURE_TAB`.",
-      "tags": [
-        "commands",
-        "desktop"
-      ],
-      "layout": {
-        "position": {
-          "x": 640,
-          "y": 0
+          "x": 1280,
+          "y": 180
         }
       }
     },
     {
       "id": "session-route-shell",
-      "text": "Session route shell\n`packages/app/src/pages/session.tsx` owns desktop/mobile session layout state, `activeTab`, and `mobileArchitecture`.",
+      "text": "Session navigation\nDesktop opens Graph in the special side-panel tab; mobile exposes a full-content Architecture tab and hides the composer while it is active.",
       "tags": [
+        "implemented",
+        "mobile",
         "session",
         "tabs"
       ],
       "layout": {
         "position": {
           "x": 320,
-          "y": 0
-        }
-      }
-    },
-    {
-      "id": "titlebar-boundary",
-      "text": "Titlebar/tab strip boundary\nTitlebar tabs switch sessions and drafts; the Graph editor tab lives inside one session's side-panel/content area.",
-      "tags": [
-        "boundary",
-        "tabs"
-      ],
-      "layout": {
-        "position": {
-          "x": 0,
-          "y": 370
-        }
-      }
-    },
-    {
-      "id": "watcher-boundary",
-      "text": "Managed storage watcher boundary\n`.opencode/architecture` is ignored by the app file watcher and Vite dev watcher to avoid Graph save feedback loops.",
-      "tags": [
-        "boundary",
-        "data"
-      ],
-      "layout": {
-        "position": {
-          "x": 1280,
-          "y": 580
-        }
-      }
-    },
-    {
-      "id": "window-tabs",
-      "text": "Window-level tab system\n`TabsProvider` manages open session/draft tabs for the whole window. Graph is not a window-level tab.",
-      "tags": [
-        "boundary",
-        "tabs"
-      ],
-      "layout": {
-        "position": {
-          "x": 0,
-          "y": 190
+          "y": 180
         }
       }
     }
   ],
   "edges": [
-    {
-      "id": "api-to-events",
-      "source": "api-wrappers",
-      "target": "server-events-cache",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
-      "style": "rectangular"
-    },
-    {
-      "id": "ask-to-session",
-      "source": "ask-selection",
-      "target": "session-route-shell",
-      "sourceHandle": "top",
-      "targetHandle": "right",
-      "style": "curved"
-    },
-    {
-      "id": "bridge-to-editor",
-      "source": "editor-command-bridge",
-      "target": "react-flow-editor",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "rectangular"
-    },
-    {
-      "id": "capability-to-commands",
-      "source": "capability-gate",
-      "target": "command-palette-actions",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "curved"
-    },
-    {
-      "id": "capability-to-header",
-      "source": "capability-gate",
-      "target": "session-header-action",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "curved"
-    },
     {
       "id": "capability-to-session",
       "source": "capability-gate",
@@ -557,97 +206,9 @@
       "style": "rectangular"
     },
     {
-      "id": "commands-to-bridge",
-      "source": "command-palette-actions",
-      "target": "editor-command-bridge",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "curved"
-    },
-    {
-      "id": "commands-to-tab",
-      "source": "command-palette-actions",
-      "target": "architecture-tab-id",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "current-coupling-to-architecture-tab",
-      "source": "current-coupling-review-panel",
-      "target": "architecture-tab-id",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "current-coupling-to-desktop-panel",
-      "source": "current-coupling-review-panel",
-      "target": "desktop-side-panel",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "decision-to-graph-before-message",
-      "source": "decision-new-chat-split-shell",
-      "target": "graph-access-before-message",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "decision-to-layout-model",
-      "source": "decision-new-chat-split-shell",
-      "target": "left-chat-right-panel-model",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "decision-to-remove-fullscreen",
-      "source": "decision-new-chat-split-shell",
-      "target": "new-chat-no-empty-fullscreen",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "desired-to-new-chat-decision",
-      "source": "desired-direct-graph-entry",
-      "target": "decision-new-chat-split-shell",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
-      "style": "rectangular"
-    },
-    {
-      "id": "desired-to-option-a",
-      "source": "desired-direct-graph-entry",
-      "target": "option-top-level-session-view",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "desired-to-option-b",
-      "source": "desired-direct-graph-entry",
-      "target": "option-dedicated-graph-action",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "desktop-to-panel",
-      "source": "desktop-side-panel",
-      "target": "architecture-panel",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "draft-sync-to-api",
-      "source": "live-draft-sync",
-      "target": "api-wrappers",
+      "id": "edited-node-hint-demo-to-fix",
+      "source": "edited-node-hint-demo",
+      "target": "fix-edited-node-hint",
       "sourceHandle": "top",
       "targetHandle": "bottom",
       "style": "rectangular"
@@ -661,73 +222,33 @@
       "style": "rectangular"
     },
     {
-      "id": "editor-to-rtl",
-      "source": "react-flow-editor",
-      "target": "rtl-mobile-style",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
+      "id": "fix-delete-selected-to-editor",
+      "source": "fix-multi-select-delete",
+      "target": "react-flow-editor",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
     },
     {
-      "id": "editor-to-views",
-      "source": "react-flow-editor",
-      "target": "node-edge-views",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
+      "id": "fix-edit-hint-to-editor",
+      "source": "fix-edited-node-hint",
+      "target": "react-flow-editor",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
     },
     {
-      "id": "events-to-panel",
-      "source": "server-events-cache",
+      "id": "fix-remove-toolbar-to-editor",
+      "source": "fix-remove-editor-toolbar",
+      "target": "react-flow-editor",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "fix-selector-to-panel",
+      "source": "fix-resource-selector-stale",
       "target": "architecture-panel",
-      "sourceHandle": "left",
-      "targetHandle": "right",
-      "style": "curved"
-    },
-    {
-      "id": "graph-before-message-to-desktop-panel",
-      "source": "graph-access-before-message",
-      "target": "desktop-side-panel",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "header-to-desktop",
-      "source": "session-header-action",
-      "target": "desktop-side-panel",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "hotspots-to-desktop",
-      "source": "change-hotspots",
-      "target": "desktop-side-panel",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "hotspots-to-mobile",
-      "source": "change-hotspots",
-      "target": "mobile-content-tab",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "hotspots-to-panel",
-      "source": "change-hotspots",
-      "target": "architecture-panel",
-      "sourceHandle": "right",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "hotspots-to-tabs",
-      "source": "change-hotspots",
-      "target": "architecture-tab-id",
       "sourceHandle": "top",
       "targetHandle": "bottom",
       "style": "curved"
@@ -741,67 +262,11 @@
       "style": "rectangular"
     },
     {
-      "id": "layout-model-to-session-shell",
-      "source": "left-chat-right-panel-model",
-      "target": "session-route-shell",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "mobile-to-composer",
-      "source": "mobile-content-tab",
-      "target": "mobile-composer-rule",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
-      "style": "rectangular"
-    },
-    {
-      "id": "mobile-to-panel",
-      "source": "mobile-content-tab",
-      "target": "architecture-panel",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "model-to-desktop",
-      "source": "create-session-tabs",
-      "target": "desktop-side-panel",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "option-a-to-session-shell",
-      "source": "option-top-level-session-view",
-      "target": "session-route-shell",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "option-b-to-header",
-      "source": "option-dedicated-graph-action",
-      "target": "session-header-action",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
       "id": "panel-to-api",
       "source": "architecture-panel",
       "target": "api-wrappers",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "panel-to-draft-sync",
-      "source": "architecture-panel",
-      "target": "live-draft-sync",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "style": "rectangular"
     },
     {
@@ -813,91 +278,11 @@
       "style": "rectangular"
     },
     {
-      "id": "panel-to-resource-header",
-      "source": "architecture-panel",
-      "target": "resource-header",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "problem-to-current-coupling",
-      "source": "problem-new-session-no-graph-entry",
-      "target": "current-coupling-review-panel",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "problem-to-desired",
-      "source": "problem-new-session-no-graph-entry",
-      "target": "desired-direct-graph-entry",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "remove-fullscreen-to-hotspots",
-      "source": "new-chat-no-empty-fullscreen",
-      "target": "change-hotspots",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "session-to-mobile",
+      "id": "session-to-panel",
       "source": "session-route-shell",
-      "target": "mobile-content-tab",
+      "target": "architecture-panel",
       "sourceHandle": "right",
       "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "session-to-model",
-      "source": "session-route-shell",
-      "target": "create-session-tabs",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "session-to-tab-id",
-      "source": "session-route-shell",
-      "target": "architecture-tab-id",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
-      "style": "rectangular"
-    },
-    {
-      "id": "tab-id-to-model",
-      "source": "architecture-tab-id",
-      "target": "create-session-tabs",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "titlebar-to-session",
-      "source": "titlebar-boundary",
-      "target": "session-route-shell",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "curved"
-    },
-    {
-      "id": "watcher-to-api",
-      "source": "watcher-boundary",
-      "target": "api-wrappers",
-      "sourceHandle": "right",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "window-to-titlebar",
-      "source": "window-tabs",
-      "target": "titlebar-boundary",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
       "style": "rectangular"
     }
   ]

@@ -238,6 +238,35 @@ it.instance(
 )
 
 it.instance(
+  "configured ask agent is ignored",
+  () =>
+    Effect.gen(function* () {
+      expect(yield* load((svc) => svc.get("ask"))).toBeUndefined()
+      expect(yield* load((svc) => svc.get("renamed"))).toBeUndefined()
+
+      const agents = yield* load((svc) => svc.list())
+      expect(agents.map((agent) => agent.name)).not.toContain("ask")
+      expect(yield* load((svc) => svc.defaultAgent())).toBe("build")
+    }),
+  {
+    config: {
+      default_agent: "ask",
+      agent: {
+        ask: {
+          description: "Ask questions",
+          mode: "primary",
+        },
+        renamed: {
+          name: "ask",
+          description: "Renamed ask",
+          mode: "primary",
+        },
+      },
+    },
+  },
+)
+
+it.instance(
   "custom agent config overrides native agent properties",
   () =>
     Effect.gen(function* () {

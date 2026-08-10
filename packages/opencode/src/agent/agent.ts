@@ -64,7 +64,7 @@ const GeneratedAgent = Schema.Struct({
 })
 
 export interface Interface {
-  readonly get: (agent: string) => Effect.Effect<Info>
+  readonly get: (agent: string) => Effect.Effect<Info | undefined>
   readonly list: () => Effect.Effect<Info[]>
   readonly defaultInfo: () => Effect.Effect<Info>
   readonly defaultAgent: () => Effect.Effect<string>
@@ -86,6 +86,7 @@ type State = Omit<Interface, "generate">
 export class Service extends Context.Service<Service, Interface>()("@opencode/Agent") {}
 
 export const use = serviceUse(Service)
+const removedAgent = "ask"
 
 const layer = Layer.effect(
   Service,
@@ -298,6 +299,10 @@ const layer = Layer.effect(
         }
 
         for (const [key, value] of Object.entries(cfg.agent ?? {})) {
+          if (key === removedAgent || value.name === removedAgent) {
+            delete agents[key]
+            continue
+          }
           if (value.disable) {
             delete agents[key]
             continue
@@ -343,7 +348,9 @@ const layer = Layer.effect(
         }
 
         const get = Effect.fnUntraced(function* (agent: string) {
-          return agents[agent]
+          const item = agents[agent]
+          if (agent === removedAgent || item?.name === removedAgent) return undefined
+          return item
         })
 
         const list = Effect.fnUntraced(function* () {
@@ -351,6 +358,7 @@ const layer = Layer.effect(
           return pipe(
             agents,
             values(),
+            (items) => items.filter((item) => item.name !== removedAgent),
             sortBy(
               [(x) => (cfg.default_agent ? x.name === cfg.default_agent : x.name === "build"), "desc"],
               [(x) => x.name, "asc"],
@@ -360,14 +368,17 @@ const layer = Layer.effect(
 
         const defaultInfo = Effect.fnUntraced(function* () {
           const c = yield* config.get()
-          if (c.default_agent) {
+          if (c.default_agent && c.default_agent !== removedAgent) {
             const agent = agents[c.default_agent]
             if (!agent) throw new Error(`default agent "${c.default_agent}" not found`)
             if (agent.mode === "subagent") throw new Error(`default agent "${c.default_agent}" is a subagent`)
             if (agent.hidden === true) throw new Error(`default agent "${c.default_agent}" is hidden`)
+            if (agent.name === removedAgent) throw new Error(`default agent "${c.default_agent}" not found`)
             return agent
           }
-          const visible = Object.values(agents).find((a) => a.mode !== "subagent" && a.hidden !== true)
+          const visible = Object.values(agents).find(
+            (a) => a.name !== removedAgent && a.mode !== "subagent" && a.hidden !== true,
+          )
           if (!visible) throw new Error("no primary visible agent found")
           return visible
         })

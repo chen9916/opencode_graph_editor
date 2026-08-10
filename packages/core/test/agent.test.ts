@@ -99,6 +99,31 @@ describe("AgentV2", () => {
     }),
   )
 
+  it.effect("keeps the removed ask agent unavailable", () =>
+    Effect.gen(function* () {
+      const agent = yield* AgentV2.Service
+      const ask = AgentV2.ID.make("ask")
+      const build = AgentV2.ID.make("build")
+
+      yield* agent.transform((editor) => {
+        editor.update(ask, (info) => {
+          info.description = "Ask questions"
+          info.mode = "primary"
+        })
+        editor.default(ask)
+        editor.update(build, (info) => {
+          info.mode = "primary"
+        })
+      })
+
+      expect(yield* agent.get(ask)).toBeUndefined()
+      expect(yield* agent.resolve("ask")).toBeUndefined()
+      expect((yield* agent.select("ask")).info).toBeUndefined()
+      expect((yield* agent.all()).map((info) => info.id)).toEqual([build])
+      expect((yield* agent.default())?.id).toBe(build)
+    }),
+  )
+
   it.effect("does not ambiently opt built-in agents into bash", () =>
     Effect.gen(function* () {
       const agent = yield* AgentV2.Service

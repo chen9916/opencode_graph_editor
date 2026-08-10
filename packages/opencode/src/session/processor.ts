@@ -384,7 +384,7 @@ const layer = Layer.effect(
               sessionID: ctx.assistantMessage.sessionID,
               metadata: { tool: value.name, input },
               always: [value.name],
-              ruleset: agent.permission,
+              ruleset: agent?.permission ?? [],
             })
             return
           }
