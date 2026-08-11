@@ -1123,10 +1123,103 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
                 </ul>
               </section>
             )}
+            <RuntimeDebugView runtimeView={props.runtimeView} labels={props.labels} />
           </aside>
         )}
       </div>
     </div>
+  )
+}
+
+function RuntimeDebugView(props: {
+  readonly runtimeView: ArchitecturePanelProps["runtimeView"]
+  readonly labels: ArchitecturePanelProps["labels"]
+}) {
+  const value = (item: string | number | undefined) =>
+    item === undefined || item === "" ? props.labels.debug.none : item
+  return (
+    <details className="architecture-editor__runtime-debug">
+      <summary>{props.labels.debug.title}</summary>
+      <dl>
+        <dt>{props.labels.debug.resourceID}</dt>
+        <dd>
+          <bdi>{value(props.runtimeView.selectedResourceID)}</bdi>
+        </dd>
+        <dt>{props.labels.debug.dirty}</dt>
+        <dd>{props.runtimeView.dirty ? props.labels.debug.yes : props.labels.debug.no}</dd>
+        <dt>{props.labels.debug.dirtyReasons}</dt>
+        <dd>
+          {props.runtimeView.dirtyReasons.length > 0 ? (
+            <ul>
+              {props.runtimeView.dirtyReasons.map((reason) => (
+                <li key={reason}>{props.labels.debug.reasons[reason]}</li>
+              ))}
+            </ul>
+          ) : (
+            props.labels.debug.none
+          )}
+        </dd>
+        <dt>{props.labels.debug.syncStatus}</dt>
+        <dd>{props.labels.debug.statuses[props.runtimeView.syncStatus]}</dd>
+        <dt>{props.labels.debug.pendingOperations}</dt>
+        <dd>{props.runtimeView.operationCount}</dd>
+        <dt>{props.labels.debug.conflicts}</dt>
+        <dd>{props.runtimeView.conflictCount}</dd>
+        <dt>{props.labels.debug.liveInstance}</dt>
+        <dd>{props.runtimeView.hasLiveInstance ? props.labels.debug.yes : props.labels.debug.no}</dd>
+        <dt>{props.labels.debug.savedRevision}</dt>
+        <dd>{value(props.runtimeView.savedRevision)}</dd>
+        <dt>{props.labels.debug.savedDigest}</dt>
+        <dd>
+          <bdi>{value(props.runtimeView.savedDigest)}</bdi>
+        </dd>
+        <dt>{props.labels.debug.visibleRevision}</dt>
+        <dd>{value(props.runtimeView.visibleRevision)}</dd>
+        <dt>{props.labels.debug.visibleDigest}</dt>
+        <dd>
+          <bdi>{value(props.runtimeView.visibleDigest)}</bdi>
+        </dd>
+      </dl>
+      <section className="architecture-editor__runtime-debug-activity">
+        <h4>{props.labels.debug.activity}</h4>
+        {props.runtimeView.debugEvents.length > 0 ? (
+          <ol>
+            {props.runtimeView.debugEvents.map((event) => (
+              <li key={event.id}>
+                <time>{new Date(event.at).toLocaleTimeString()}</time>
+                <span>
+                  {props.labels.debug.eventTypes[event.type]} · {props.labels.debug.eventStatuses[event.status]}
+                </span>
+                <small>
+                  {event.operationCount === undefined ? undefined : (
+                    <span>
+                      {props.labels.debug.pendingOperations}: {event.operationCount}
+                    </span>
+                  )}
+                  {event.conflictCount === undefined ? undefined : (
+                    <span>
+                      {props.labels.debug.conflicts}: {event.conflictCount}
+                    </span>
+                  )}
+                  {event.revision === undefined ? undefined : (
+                    <span>
+                      {props.labels.debug.visibleRevision}: {event.revision}
+                    </span>
+                  )}
+                  {event.digest === undefined ? undefined : (
+                    <span>
+                      {props.labels.debug.visibleDigest}: <bdi>{event.digest}</bdi>
+                    </span>
+                  )}
+                </small>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>{props.labels.debug.noActivity}</p>
+        )}
+      </section>
+    </details>
   )
 }
 

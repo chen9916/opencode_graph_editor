@@ -32,6 +32,50 @@ export type ArchitecturePendingOverlay = {
   readonly instance?: ArchitectureLiveInstance
 }
 
+export type ArchitectureRuntimeDirtyReason = "pending-operations" | "pending-conflicts" | "live-instance"
+export type ArchitectureRuntimeSyncStatus =
+  | "unselected"
+  | "loading"
+  | "clean"
+  | "live-instance"
+  | "local-pending"
+  | "conflicted"
+  | "pending-covered"
+export type ArchitectureRuntimeDebugEventType = "journal" | "sync" | "server-event" | "save" | "reload"
+export type ArchitectureRuntimeDebugEventStatus = "recorded" | "received" | "started" | "succeeded" | "failed"
+
+export type ArchitectureRuntimeDebugEvent = {
+  readonly id: string
+  readonly type: ArchitectureRuntimeDebugEventType
+  readonly status: ArchitectureRuntimeDebugEventStatus
+  readonly at: number
+  readonly resourceID: string
+  readonly operationCount?: number
+  readonly conflictCount?: number
+  readonly revision?: number
+  readonly digest?: string
+}
+
+export type ArchitectureRuntimeView = {
+  readonly selectedResourceID?: string
+  readonly snapshot?: ArchitectureSnapshot
+  readonly visibleSnapshot?: ArchitectureSnapshot
+  readonly pending?: ArchitecturePendingOverlay
+  readonly pendingCovered: boolean
+  readonly visibleResource?: ArchitectureResource
+  readonly dirty: boolean
+  readonly dirtyReasons: ReadonlyArray<ArchitectureRuntimeDirtyReason>
+  readonly operationCount: number
+  readonly conflictCount: number
+  readonly hasLiveInstance: boolean
+  readonly savedRevision?: number
+  readonly savedDigest?: string
+  readonly visibleRevision?: number
+  readonly visibleDigest?: string
+  readonly syncStatus: ArchitectureRuntimeSyncStatus
+  readonly debugEvents: ReadonlyArray<ArchitectureRuntimeDebugEvent>
+}
+
 export type ArchitectureInstanceChange = {
   readonly server: string
   readonly directory: string
@@ -127,6 +171,29 @@ export type ArchitectureLabels = {
   readonly saveFailed: string
   readonly askSelectionFailed: string
   readonly conflictReasons: Record<ArchitectureConflict["reason"], string>
+  readonly debug: {
+    readonly title: string
+    readonly resourceID: string
+    readonly dirty: string
+    readonly dirtyReasons: string
+    readonly syncStatus: string
+    readonly pendingOperations: string
+    readonly conflicts: string
+    readonly liveInstance: string
+    readonly savedRevision: string
+    readonly savedDigest: string
+    readonly visibleRevision: string
+    readonly visibleDigest: string
+    readonly yes: string
+    readonly no: string
+    readonly none: string
+    readonly statuses: Record<ArchitectureRuntimeSyncStatus, string>
+    readonly reasons: Record<ArchitectureRuntimeDirtyReason, string>
+    readonly activity: string
+    readonly noActivity: string
+    readonly eventTypes: Record<ArchitectureRuntimeDebugEventType, string>
+    readonly eventStatuses: Record<ArchitectureRuntimeDebugEventStatus, string>
+  }
 }
 
 export type ArchitecturePanelProps = {
@@ -135,6 +202,7 @@ export type ArchitecturePanelProps = {
   readonly direction: Direction
   readonly mobile: boolean
   readonly snapshot: ArchitectureSnapshot
+  readonly runtimeView: ArchitectureRuntimeView
   readonly liveInstanceVersion: number
   readonly pending?: ArchitecturePendingOverlay
   readonly viewport?: ArchitectureViewport

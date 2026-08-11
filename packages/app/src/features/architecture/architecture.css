@@ -556,6 +556,84 @@
   margin: 0;
 }
 
+.architecture-editor__runtime-debug {
+  margin-block-start: 18px;
+  padding-block-start: 14px;
+  border-block-start: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+  font-size: 11px;
+}
+
+.architecture-editor__runtime-debug summary {
+  cursor: pointer;
+  color: var(--color-v2-text-primary, var(--color-text-base));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.architecture-editor__runtime-debug dl {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
+  gap: 6px 8px;
+  margin-block: 10px 0;
+}
+
+.architecture-editor__runtime-debug dt,
+.architecture-editor__runtime-debug dd {
+  min-inline-size: 0;
+  margin: 0;
+}
+
+.architecture-editor__runtime-debug dd {
+  color: var(--color-v2-text-primary, var(--color-text-base));
+  overflow-wrap: anywhere;
+}
+
+.architecture-editor__runtime-debug ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-inline-start: 16px;
+}
+
+.architecture-editor__runtime-debug-activity {
+  margin-block-start: 12px;
+}
+
+.architecture-editor__runtime-debug-activity h4 {
+  margin: 0 0 8px;
+  color: var(--color-v2-text-primary, var(--color-text-base));
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.architecture-editor__runtime-debug-activity ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-inline-start: 18px;
+}
+
+.architecture-editor__runtime-debug-activity li {
+  display: grid;
+  gap: 2px;
+}
+
+.architecture-editor__runtime-debug-activity time,
+.architecture-editor__runtime-debug-activity small {
+  color: var(--color-v2-text-muted, var(--color-text-weak));
+}
+
+.architecture-editor__runtime-debug-activity small {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.architecture-editor__runtime-debug-activity p {
+  margin: 0;
+}
+
 .architecture-node {
   --architecture-node-accent: var(--architecture-accent);
   position: relative;
