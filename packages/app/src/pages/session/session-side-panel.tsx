@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, createMemo, lazy, onCleanup, type JSX } from "solid-js"
+import { ErrorBoundary, For, Match, Show, Switch, createEffect, createMemo, lazy, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { DragDropProvider as DndKitProvider, PointerSensor } from "@dnd-kit/solid"
@@ -68,6 +68,14 @@ const ArchitecturePanel = lazy(() => import("@/features/architecture/architectur
 
 function renderDiff(value: ReviewDiff): value is RenderDiff {
   return typeof value.file === "string"
+}
+
+function SidePanelMessage(props: { readonly value: string }) {
+  return (
+    <div class="h-full min-h-0 flex items-center justify-center px-6 text-center">
+      <div class="max-w-80 text-13-regular text-text-weak">{props.value}</div>
+    </div>
+  )
 }
 
 export function SessionSidePanel(props: {
@@ -252,6 +260,11 @@ export function SessionSidePanel(props: {
   })
   const openFileKeybind = createMemo(() => command.keybindParts("file.open"))
   const closeTabKeybind = createMemo(() => command.keybindParts("tab.close"))
+  const architecturePanel = () => (
+    <ErrorBoundary fallback={() => <SidePanelMessage value={language.t("architecture.panel.error")} />}>
+      <ArchitecturePanel />
+    </ErrorBoundary>
+  )
   const [store, setStore] = createStore({
     activeDraggable: undefined as string | undefined,
     architectureMounted: false,
@@ -534,7 +547,7 @@ export function SessionSidePanel(props: {
                               classList={{ hidden: activeTab() !== SESSION_ARCHITECTURE_TAB }}
                               inert={activeTab() !== SESSION_ARCHITECTURE_TAB || undefined}
                             >
-                              <ArchitecturePanel />
+                              {architecturePanel()}
                             </Tabs.Content>
                           </Show>
 
@@ -787,7 +800,7 @@ export function SessionSidePanel(props: {
                             classList={{ hidden: activeTab() !== SESSION_ARCHITECTURE_TAB }}
                             inert={activeTab() !== SESSION_ARCHITECTURE_TAB || undefined}
                           >
-                            <ArchitecturePanel />
+                            {architecturePanel()}
                           </Tabs.Content>
                         </Show>
 

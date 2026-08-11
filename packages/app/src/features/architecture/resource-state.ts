@@ -23,6 +23,18 @@ export function resolveArchitectureResourceID(
   return selectedID ?? resources?.[0]?.id
 }
 
+export function missingSelectedArchitectureResourceID(input: {
+  readonly selectedID: string | undefined
+  readonly resources: ArchitectureListResourcesOutput["data"] | undefined
+  readonly snapshot: ArchitectureSnapshot | undefined
+  readonly resourceError: unknown
+}) {
+  if (!input.selectedID || !input.resourceError || !input.resources) return
+  if (input.snapshot?.resource.id === input.selectedID) return
+  if (input.resources.some((resource) => resource.id === input.selectedID)) return
+  return input.selectedID
+}
+
 export function selectedArchitectureSnapshot(
   resourceID: string | undefined,
   snapshot: ArchitectureSnapshot | undefined,

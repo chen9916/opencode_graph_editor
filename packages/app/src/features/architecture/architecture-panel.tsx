@@ -78,6 +78,7 @@ import {
   architectureResourceSelectionOptions,
   architectureResourceSummary,
   latestArchitectureSnapshot,
+  missingSelectedArchitectureResourceID,
   resolveArchitectureResourceSelection,
   resolveArchitectureResourceID,
   selectedArchitectureSnapshot,
@@ -263,6 +264,20 @@ function ArchitecturePanelWorkspace() {
       architectureResourceInstanceQueryKey(workspace.url, workspace.directory, id),
       (current) => discardSavedArchitectureLiveInstanceCache(current, snapshot),
     )
+  })
+
+  createEffect(() => {
+    const missing = missingSelectedArchitectureResourceID({
+      selectedID: persistedState.selectedID,
+      resources: resources.data,
+      snapshot: resource.data,
+      resourceError: resource.error,
+    })
+    if (!persistedReady() || !missing) return
+    batch(() => {
+      if (persistedState.selectedID === missing) setPersistedState("selectedID", undefined)
+      setPersistedState("pendingOverlays", missing, undefined)
+    })
   })
 
   createEffect(() => {

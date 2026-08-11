@@ -9,6 +9,7 @@ import {
   architectureResourceSelectionOptions,
   architectureResourceSummary,
   latestArchitectureSnapshot,
+  missingSelectedArchitectureResourceID,
   reconcileArchitectureSavedEvent,
   resolveArchitectureResourceSelection,
   resolveArchitectureResourceID,
@@ -53,6 +54,36 @@ describe("architecture resource state", () => {
     expect(optimistic.map((resource) => resource.id)).toEqual(["auth_resourceID", "new_graph"])
     expect(resolveArchitectureResourceID(created.resource.id, optimistic)).toBe("new_graph")
     expect(resolveArchitectureResourceID(created.resource.id, [auth])).toBe("new_graph")
+  })
+
+  test("reports a persisted selection as missing only after the resource load fails", () => {
+    const auth = architectureResourceSummary(snapshot("auth_resourceID", "Auth"))
+    const billing = snapshot("billing_resourceID", "Billing")
+
+    expect(
+      missingSelectedArchitectureResourceID({
+        selectedID: "new_graph",
+        resources: [auth],
+        snapshot: undefined,
+        resourceError: undefined,
+      }),
+    ).toBeUndefined()
+    expect(
+      missingSelectedArchitectureResourceID({
+        selectedID: "new_graph",
+        resources: [auth],
+        snapshot: undefined,
+        resourceError: new Error("missing"),
+      }),
+    ).toBe("new_graph")
+    expect(
+      missingSelectedArchitectureResourceID({
+        selectedID: billing.resource.id,
+        resources: [auth],
+        snapshot: billing,
+        resourceError: new Error("stale list"),
+      }),
+    ).toBeUndefined()
   })
 
   test("ignores highlighted resources until the selector commits a selection", () => {
