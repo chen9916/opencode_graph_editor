@@ -1,15 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import type { ArchitectureDraftChange, ArchitectureDraftSnapshot, ArchitectureLiveDraft, ArchitectureSnapshot } from "./contract"
-import { beginArchitectureLocalSave, isArchitectureLocalSaveEvent } from "./event"
+import type { ArchitectureDraftChange, ArchitectureSnapshot } from "./contract"
 import {
-  architectureDraftIsDirty,
   architectureDraftCanSkipSave,
   architectureDraftHasVisibleChanges,
+  architectureDraftIsDirty,
   architectureDraftResourceID,
-  architectureReloadSuccessState,
   architectureResourceSelectionOptions,
   architectureResourceSummary,
-  architectureSaveSuccessState,
   latestArchitectureSnapshot,
   reconcileArchitectureSavedEvent,
   resolveArchitectureResourceSelection,
@@ -17,14 +14,27 @@ import {
   selectedArchitectureSnapshot,
   selectedArchitectureResourceSummary,
   updateArchitectureResourceSummaries,
-  visibleArchitectureDraft,
 } from "./resource-state"
 
-const snapshot = (id: string, name: string): ArchitectureSnapshot => ({
-  digest: `${id}-digest`,
+const snapshot = (id: string, name: string, digest = `${id}-digest`): ArchitectureSnapshot => ({
+  digest,
   storage: { root: "/repo/.opencode/architecture", path: `.opencode/architecture/resources/${id}.json` },
   resource: { version: 2, revision: 0, id, name, nodes: [], edges: [] },
 })
+
+const change = (overrides: Partial<ArchitectureDraftChange> = {}): ArchitectureDraftChange => {
+  const saved = snapshot("design", "Design")
+  return {
+    server: "server",
+    directory: "/repo",
+    base: saved,
+    origin: saved,
+    resource: saved.resource,
+    operations: [],
+    conflicts: [],
+    ...overrides,
+  }
+}
 
 describe("architecture resource state", () => {
   test("preserves an explicit selection while the resource list is stale", () => {
@@ -85,14 +95,44 @@ describe("architecture resource state", () => {
     expect(selectedArchitectureSnapshot("billing_resourceID", billing)).toBe(billing)
   })
 
+  test("dirty state is driven by local operations and conflicts", () => {
+    expect(architectureDraftHasVisibleChanges(change())).toBe(false)
+    expect(
+      architectureDraftHasVisibleChanges(
+        change({
+          operations: [{ id: "move", type: "node.position", nodeID: "node", position: { x: 12, y: 8 } }],
+        }),
+      ),
+    ).toBe(true)
+    expect(
+      architectureDraftCanSkipSave(
+        change({
+          operations: [],
+          conflicts: [
+            {
+              operation: { id: "conflict", type: "node.remove", nodeID: "missing", cascade: true },
+              reason: "missing",
+            },
+          ],
+        }),
+      ),
+    ).toBe(false)
+    expect(architectureDraftIsDirty({ draft: change() })).toBe(false)
+    expect(architectureDraftIsDirty({ draft: { ...change(), live: { source: "live" } } })).toBe(true)
+    expect(
+      architectureDraftIsDirty({
+        draft: change({
+          operations: [{ id: "move", type: "node.position", nodeID: "node", position: { x: 12, y: 8 } }],
+        }),
+      }),
+    ).toBe(true)
+  })
+
   test("routes an Add Node journal to the graph represented by the editor change", () => {
     const created = snapshot("new_graph", "New Graph")
-    const change: ArchitectureDraftChange = {
-      server: "server",
-      directory: "/repo",
+    const changeValue = change({
       base: created,
       origin: created,
-      conflicts: [],
       resource: {
         ...created.resource,
         nodes: [{ id: "node", text: "New node", tags: [], layout: { position: { x: 0, y: 0 } } }],
@@ -104,173 +144,31 @@ describe("architecture resource state", () => {
           node: { id: "node", text: "New node", tags: [], layout: { position: { x: 0, y: 0 } } },
         },
       ],
-    }
-
-    expect(architectureDraftResourceID(change)).toBe("new_graph")
-    expect(architectureDraftResourceID(change)).not.toBe("auth_resourceID")
-  })
-
-  test("detects whether duplicate should use visible draft changes", () => {
-    const saved = snapshot("design", "Design")
-    const live = { ...snapshot("design", "Design"), digest: "live-digest" }
-
-    expect(
-      architectureDraftHasVisibleChanges({
-        server: "server",
-        directory: "/repo",
-        base: saved,
-        origin: saved,
-        resource: saved.resource,
-        operations: [],
-        conflicts: [],
-      }),
-    ).toBe(false)
-    expect(
-      architectureDraftHasVisibleChanges({
-        server: "server",
-        directory: "/repo",
-        base: saved,
-        origin: live,
-        resource: live.resource,
-        operations: [],
-        conflicts: [],
-      }),
-    ).toBe(true)
-    expect(
-      architectureDraftHasVisibleChanges({
-        server: "server",
-        directory: "/repo",
-        base: saved,
-        origin: saved,
-        conflicts: [],
-        resource: { ...saved.resource, name: "Visible rename" },
-        operations: [{ id: "rename", type: "resource.update", name: "Visible rename" }],
-      }),
-    ).toBe(true)
-  })
-
-  test("clean Save can skip patch and commit work", () => {
-    const saved = snapshot("design", "Design")
-
-    expect(
-      architectureDraftCanSkipSave({
-        server: "server",
-        directory: "/repo",
-        base: saved,
-        origin: saved,
-        resource: saved.resource,
-        operations: [],
-        conflicts: [],
-      }),
-    ).toBe(true)
-  })
-
-  test("successful Save plus a concurrent own draft discard clears dirty state and advances renderer generation", () => {
-    const saved = { ...snapshot("design", "Saved"), resource: { ...snapshot("design", "Saved").resource, revision: 2 } }
-    const state = architectureSaveSuccessState({
-      current: snapshot("design", "Draft"),
-      saved,
-      draft: live("design", "Draft"),
-      draftEvent: { resourceID: "design", action: "discarded", revision: 2, digest: saved.digest },
-      reloadGeneration: 4,
     })
 
-    expect(state.snapshot).toEqual(saved)
-    expect(state.draft).toBeNull()
-    expect(state.reloadGeneration).toBe(5)
-    expect(
-      architectureDraftIsDirty({
-        draft: visibleArchitectureDraft({
-          base: state.snapshot,
-          origin: state.snapshot,
-          operations: [],
-          conflicts: [],
-          live: state.draft ?? undefined,
-        }),
-      }),
-    ).toBe(false)
+    expect(architectureDraftResourceID(changeValue)).toBe("new_graph")
   })
 
-  test("successful Reload plus a concurrent draft event keeps the authoritative saved snapshot and advances renderer generation", () => {
-    const reloaded: ArchitectureDraftSnapshot = { source: "saved", snapshot: snapshot("design", "Saved") }
-    const state = architectureReloadSuccessState({
-      reloaded,
-      draftEvent: { resourceID: "design", action: "updated", revision: 1, digest: "stale" },
-      reloadGeneration: 2,
+  test("selection and summary helpers keep the latest saved snapshot visible", async () => {
+    const saved = snapshot("design", "Saved")
+    const newer = { ...snapshot("design", "Saved", "next-digest"), resource: { ...saved.resource, revision: 2 } }
+
+    expect(latestArchitectureSnapshot(saved, newer)).toBe(newer)
+    expect(architectureResourceSummary(saved)).toEqual({
+      id: "design",
+      name: "Saved",
+      revision: 0,
+      digest: "design-digest",
+      nodes: 0,
+      edges: 0,
     })
-
-    expect(state.snapshot).toEqual(reloaded.snapshot)
-    expect(state.draft).toBeNull()
-    expect(state.reloadGeneration).toBe(3)
-  })
-
-  test("saved-covered live draft is not dirty", () => {
-    const saved = { ...snapshot("design", "Saved"), resource: { ...snapshot("design", "Saved").resource, revision: 3 } }
-    const draft = visibleArchitectureDraft({
-      base: saved,
-      origin: saved,
-      operations: [],
-      conflicts: [],
-      live: { source: "live", snapshot: saved },
-    })
-
-    expect(draft).toBeUndefined()
-    expect(architectureDraftIsDirty({ draft })).toBe(false)
-  })
-
-  test("save settling does not replace an already cached newer saved revision", () => {
-    const s1 = snapshot("design", "S1")
-    const s2 = { ...snapshot("design", "S2"), resource: { ...snapshot("design", "S2").resource, revision: 2 } }
-    const summaries = updateArchitectureResourceSummaries(
-      [architectureResourceSummary(s2)],
-      architectureResourceSummary(s1),
-    )
-
-    expect(latestArchitectureSnapshot(s2, s1)).toBe(s2)
-    expect(summaries).toEqual([architectureResourceSummary(s2)])
-  })
-
-  test("keeps newly saved nodes visible when a late refetch returns the previous revision", () => {
-    const old = snapshot("design", "Design")
-    const saved = {
-      ...snapshot("design", "Design"),
-      digest: "design-digest-2",
-      resource: {
-        ...old.resource,
-        revision: 2,
-        nodes: [{ id: "new", text: "New node", tags: [], layout: { position: { x: 0, y: 0 } } }],
-      },
-    }
-
-    expect(latestArchitectureSnapshot(saved, old)).toBe(saved)
-  })
-
-  test("reconciles a newer saved event suppressed during a failed Save", async () => {
-    const finish = beginArchitectureLocalSave({ server: "server", directory: "/repo", resourceID: "design" })
-    const current = snapshot("design", "S1")
-    const newest = {
-      ...snapshot("design", "S3"),
-      digest: "design-digest-3",
-      resource: { ...snapshot("design", "S3").resource, revision: 3 },
-    }
-    expect(
-      isArchitectureLocalSaveEvent({
-        server: "server",
-        directory: "/repo",
-        event: { resourceID: "design", revision: 3, digest: newest.digest },
-      }),
-    ).toBe(true)
 
     const reconciled = await reconcileArchitectureSavedEvent({
-      current,
-      event: finish(),
-      observe: async () => newest,
+      current: saved,
+      event: { resourceID: "design", revision: 2, digest: newer.digest },
+      observe: async () => newer,
     })
 
-    expect(reconciled).toEqual({ snapshot: newest, invalidate: false })
+    expect(reconciled).toEqual({ snapshot: newer, invalidate: false })
   })
 })
-
-function live(id: string, name: string): ArchitectureLiveDraft {
-  return { source: "live", snapshot: snapshot(id, name) }
-}

@@ -23,7 +23,7 @@ import { useLocal } from "@/context/local"
 import { useServerArchitectureAvailable } from "@/context/server-sdk"
 import {
   architectureCommandKeybinds,
-  architectureEditorCommandTarget,
+  architecturePanelCommandTarget,
   dispatchArchitectureCommand,
 } from "@/features/architecture/commands"
 
@@ -588,42 +588,42 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
             id: "architecture.save",
             title: language.t("command.architecture.save"),
             keybind: architectureCommandKeybinds.save,
-            when: architectureEditorCommandTarget,
+            when: architecturePanelCommandTarget,
             onSelect: () => dispatchArchitectureCommand("save"),
           }),
           viewCommand({
             id: "architecture.reload",
             title: language.t("command.architecture.reload"),
             keybind: architectureCommandKeybinds.reload,
-            when: architectureEditorCommandTarget,
+            when: architecturePanelCommandTarget,
             onSelect: () => dispatchArchitectureCommand("reload"),
           }),
           viewCommand({
             id: "architecture.fitView",
             title: language.t("command.architecture.fitView"),
             keybind: architectureCommandKeybinds.fitView,
-            when: architectureEditorCommandTarget,
+            when: architecturePanelCommandTarget,
             onSelect: () => dispatchArchitectureCommand("fitView"),
           }),
           viewCommand({
             id: "architecture.undo",
             title: language.t("command.architecture.undo"),
             keybind: architectureCommandKeybinds.undo,
-            when: architectureEditorCommandTarget,
+            when: architecturePanelCommandTarget,
             onSelect: () => dispatchArchitectureCommand("undo"),
           }),
           viewCommand({
             id: "architecture.redo",
             title: language.t("command.architecture.redo"),
             keybind: architectureCommandKeybinds.redo,
-            when: architectureEditorCommandTarget,
+            when: architecturePanelCommandTarget,
             onSelect: () => dispatchArchitectureCommand("redo"),
           }),
           viewCommand({
             id: "architecture.delete",
             title: language.t("command.architecture.delete"),
             keybind: architectureCommandKeybinds.delete,
-            when: architectureEditorCommandTarget,
+            when: architecturePanelCommandTarget,
             onSelect: () => dispatchArchitectureCommand("delete"),
           }),
           viewCommand({

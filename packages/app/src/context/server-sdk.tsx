@@ -11,7 +11,7 @@ import { ServerConnection, useServer } from "./server"
 import { createRefCountMap } from "@/utils/refcount"
 import { useGlobal } from "./global"
 import { ServerScope } from "@/utils/server-scope"
-import { detectServerArchitecture, detectServerProtocol, type ServerProtocol } from "@/utils/server-protocol"
+import { detectServerProtocol, type ServerProtocol } from "@/utils/server-protocol"
 import { createCompatibleApi, type CompatibleApi } from "@/utils/server-compat"
 
 const isAbortError = (error: unknown) =>
@@ -212,11 +212,8 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     () => protocol,
     (value) => value,
   )
-  const architecture = detectServerArchitecture(server.http, platform.fetch ?? globalThis.fetch)
-  const [architectureAvailable] = createResource(
-    () => architecture,
-    (value) => value,
-  )
+  const architecture = Promise.resolve(true)
+  const architectureAvailable = createMemo(() => true)
   const emitter = createGlobalEmitter<{
     [key: string]: ServerEvent
   }>()

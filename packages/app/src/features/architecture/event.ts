@@ -128,6 +128,7 @@ export function rememberArchitectureLocalDraftOperationEvent(input: {
 export function architectureResourceEventInfo(
   event: ArchitectureResourceEvent,
 ): ArchitectureResourceEventInfo | undefined {
+  if (event.type.startsWith("architecture.resource.draft.")) return
   if (!event.type.startsWith("architecture.resource.")) return
   const payload = architectureEventPayload(event)
   const resourceID = typeof payload?.resourceID === "string" ? payload.resourceID : undefined

@@ -1,0 +1,606 @@
+{
+  "version": 2,
+  "revision": 8,
+  "id": "design_fefdc9c4b001CSs9CR9JX3NRZB",
+  "name": "Graph 1",
+  "tagColors": {
+    "ai": "#2563eb",
+    "api": "#4f46e5",
+    "app": "#84cc16",
+    "client": "#7c3aed",
+    "context": "#38bdf8",
+    "core": "#b91c1c",
+    "current-system": "#111827",
+    "custom-build": "#f97316",
+    "editor": "#16a34a",
+    "entrypoint": "#f59e0b",
+    "event": "#eab308",
+    "guardrail": "#6b7280",
+    "live-draft": "#06b6d4",
+    "local": "#22c55e",
+    "model": "#64748b",
+    "schema": "#9333ea",
+    "server": "#dc2626",
+    "state": "#0d9488",
+    "storage": "#92400e",
+    "sync": "#14b8a6",
+    "tools": "#0284c7"
+  },
+  "nodes": [
+    {
+      "id": "node_current_backend_live_draft",
+      "text": "Backend live graph draft\nShared in-memory managed draft for the open resource. UI sync and AI graph_* edits meet here; draft events let the editor adopt/refetch changes before Save.",
+      "tags": [
+        "core",
+        "current-system",
+        "event",
+        "live-draft",
+        "state"
+      ],
+      "layout": {
+        "position": {
+          "x": 920,
+          "y": 40
+        }
+      }
+    },
+    {
+      "id": "node_current_client_sdk",
+      "text": "Local Graph bridge\nUI and Graph tools call the local backend boundary. No external networking mental model, no Graph availability probe, and no raw JSON edits from the renderer.",
+      "tags": [
+        "app",
+        "current-system",
+        "local",
+        "sync"
+      ],
+      "layout": {
+        "position": {
+          "x": 320,
+          "y": 40
+        }
+      }
+    },
+    {
+      "id": "node_current_core_service",
+      "text": "Core architecture service\nApplies UI and AI graph patches to managed live drafts, checks revisions/digests, validates operations, publishes draft/saved events, and commits Save to storage.",
+      "tags": [
+        "core",
+        "current-system",
+        "local",
+        "server"
+      ],
+      "layout": {
+        "position": {
+          "x": 620,
+          "y": 40
+        }
+      }
+    },
+    {
+      "id": "node_current_editor_ux",
+      "text": "Editor UX controls\nOutline + Properties panels, filters, context menus, undo/redo, export, loading/error/empty states.",
+      "tags": [
+        "app",
+        "current-system",
+        "editor"
+      ],
+      "layout": {
+        "position": {
+          "x": -600,
+          "y": 300
+        }
+      }
+    },
+    {
+      "id": "node_current_guardrail",
+      "text": "Custom product boundary\nThis Graph feature is for this local OpenCode build: a shared communication workspace, not a public compatibility layer or dependency scanner.",
+      "tags": [
+        "current-system",
+        "custom-build",
+        "guardrail",
+        "model"
+      ],
+      "layout": {
+        "position": {
+          "x": 620,
+          "y": -360
+        }
+      }
+    },
+    {
+      "id": "node_current_journal",
+      "text": "Local journal + viewport\nKeeps the canvas responsive and crash/reload recoverable. Manual UI edits are also synchronized into the backend live draft.",
+      "tags": [
+        "current-system",
+        "editor",
+        "state",
+        "sync"
+      ],
+      "layout": {
+        "position": {
+          "x": -280,
+          "y": 300
+        }
+      }
+    },
+    {
+      "id": "node_current_mention_filtering",
+      "text": "@Graph mention + media filtering\nMentions stay visible in chat, while managed graph JSON is omitted from provider file/media parts.",
+      "tags": [
+        "ai",
+        "context",
+        "current-system"
+      ],
+      "layout": {
+        "position": {
+          "x": 20,
+          "y": -320
+        }
+      }
+    },
+    {
+      "id": "node_current_react_editor",
+      "text": "Lazy React Flow Graph editor\nThe UI you see: resource switch/create/delete, text nodes, free-form tags, drag persistence, selected-node/wire highlighting.",
+      "tags": [
+        "app",
+        "current-system",
+        "editor"
+      ],
+      "layout": {
+        "position": {
+          "x": -600,
+          "y": 40
+        }
+      }
+    },
+    {
+      "id": "node_current_resource_model",
+      "text": "Resource model\nMany named resources; nodes are text/tags/positions; edges store source/target handles/style; status is just a tag; no stored cross-resource refs.",
+      "tags": [
+        "current-system",
+        "model"
+      ],
+      "layout": {
+        "position": {
+          "x": 920,
+          "y": -180
+        }
+      }
+    },
+    {
+      "id": "node_current_schema",
+      "text": "Schema layer\nValidates graph resources and edit inputs: nodes, tags, positions, handles, styles, revisions, digests, and operation shapes.",
+      "tags": [
+        "current-system",
+        "model",
+        "schema"
+      ],
+      "layout": {
+        "position": {
+          "x": 620,
+          "y": -180
+        }
+      }
+    },
+    {
+      "id": "node_current_session_surface",
+      "text": "Session surfaces\nCustom local build assumes Graph is available: desktop side panel + mobile Graph tab, no /api/architecture/resource capability probe.",
+      "tags": [
+        "app",
+        "current-system",
+        "custom-build",
+        "entrypoint"
+      ],
+      "layout": {
+        "position": {
+          "x": -920,
+          "y": 300
+        }
+      }
+    },
+    {
+      "id": "node_current_system_context",
+      "text": "Bounded dynamic System Context\nAI sees selected/named Graph summaries and exact IDs/aliases from managed resources, not raw graph JSON media.",
+      "tags": [
+        "ai",
+        "context",
+        "current-system"
+      ],
+      "layout": {
+        "position": {
+          "x": -280,
+          "y": -320
+        }
+      }
+    },
+    {
+      "id": "node_current_wire_model",
+      "text": "Wire model + routing UI\nExplicit top/right/bottom/left endpoints and rectangular/curved/straight routes persist for users and AI to inspect/edit.",
+      "tags": [
+        "current-system",
+        "editor",
+        "model"
+      ],
+      "layout": {
+        "position": {
+          "x": -280,
+          "y": -160
+        }
+      }
+    },
+    {
+      "id": "node_msodnwlx",
+      "text": "Saved resource JSON\nDisk storage under .opencode/architecture/resources/<resource-id>.json. This changes only through managed Save, not direct UI/AI file edits.",
+      "tags": [
+        "current-system",
+        "model",
+        "storage"
+      ],
+      "layout": {
+        "position": {
+          "x": 1220,
+          "y": 40
+        }
+      }
+    },
+    {
+      "id": "node_msodobgy",
+      "text": "AI assistant + Graph context\nUses @Graph mentions and bounded resource summaries; no dedicated in-editor AI button.",
+      "tags": [
+        "ai",
+        "current-system",
+        "entrypoint"
+      ],
+      "layout": {
+        "position": {
+          "x": -943.77590850591,
+          "y": -325.9439771264774
+        }
+      }
+    },
+    {
+      "id": "node_msodojhd",
+      "text": "Editor-visible graph state\nReact Flow projection from saved snapshot + backend live draft + local journal. AI/tool draft events can update what you see before disk Save.",
+      "tags": [
+        "current-system",
+        "editor",
+        "live-draft",
+        "state"
+      ],
+      "layout": {
+        "position": {
+          "x": -280,
+          "y": 40
+        }
+      }
+    },
+    {
+      "id": "node_msodotvs",
+      "text": "Native managed graph_* tools\nAI creates/updates nodes, tags, colors, wires, layout, and Save/Reload by patching the managed backend live draft through core services.",
+      "tags": [
+        "ai",
+        "current-system",
+        "live-draft",
+        "tools"
+      ],
+      "layout": {
+        "position": {
+          "x": -600,
+          "y": -320
+        }
+      }
+    },
+    {
+      "id": "node_msodp7k2",
+      "text": "Explicit Save boundary\nSave first synchronizes visible editor changes into the live draft, then commits that draft to the saved JSON resource on disk.",
+      "tags": [
+        "current-system",
+        "editor",
+        "sync"
+      ],
+      "layout": {
+        "position": {
+          "x": 20,
+          "y": -80
+        }
+      }
+    },
+    {
+      "id": "node_msodpc1x",
+      "text": "Reload boundary\nReload discards the backend live draft and local journal for this resource, then shows the saved resource again.",
+      "tags": [
+        "current-system",
+        "editor",
+        "sync"
+      ],
+      "layout": {
+        "position": {
+          "x": 20,
+          "y": 160
+        }
+      }
+    },
+    {
+      "id": "node_msodq6qn",
+      "text": "Human manual edits\nCanvas edits, inline text, tags, wire controls, panels, and commands update local UI immediately and sync to the backend live draft.",
+      "tags": [
+        "current-system",
+        "editor",
+        "entrypoint",
+        "live-draft"
+      ],
+      "layout": {
+        "position": {
+          "x": -920,
+          "y": 40
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_current_backend_live_draft_to_editor",
+      "source": "node_current_backend_live_draft",
+      "target": "node_msodojhd",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_backend_live_draft_to_reload",
+      "source": "node_msodpc1x",
+      "target": "node_current_backend_live_draft",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_backend_live_draft_to_save",
+      "source": "node_current_backend_live_draft",
+      "target": "node_msodp7k2",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_backend_live_draft_to_storage",
+      "source": "node_current_backend_live_draft",
+      "target": "node_msodnwlx",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_bridge_to_core",
+      "source": "node_current_client_sdk",
+      "target": "node_current_core_service",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_client_to_session",
+      "source": "node_current_session_surface",
+      "target": "node_current_client_sdk",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_context_to_ai",
+      "source": "node_current_system_context",
+      "target": "node_msodobgy",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_core_to_backend_live_draft",
+      "source": "node_current_core_service",
+      "target": "node_current_backend_live_draft",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_core_to_context",
+      "source": "node_current_core_service",
+      "target": "node_current_system_context",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_core_to_schema",
+      "source": "node_current_core_service",
+      "target": "node_current_schema",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_core_to_storage",
+      "source": "node_current_core_service",
+      "target": "node_msodnwlx",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_draft_to_journal",
+      "source": "node_msodojhd",
+      "target": "node_current_journal",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_draft_to_wire_model",
+      "source": "node_msodojhd",
+      "target": "node_current_wire_model",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_editor_to_draft",
+      "source": "node_current_react_editor",
+      "target": "node_msodojhd",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_guardrail_to_ai",
+      "source": "node_current_guardrail",
+      "target": "node_msodobgy",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_guardrail_to_resource_model",
+      "source": "node_current_guardrail",
+      "target": "node_current_resource_model",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_journal_to_bridge",
+      "source": "node_current_journal",
+      "target": "node_current_client_sdk",
+      "sourceHandle": "right",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_journal_to_draft",
+      "source": "node_current_journal",
+      "target": "node_msodojhd",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_mention_to_ai",
+      "source": "node_current_mention_filtering",
+      "target": "node_msodobgy",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_current_mention_to_context",
+      "source": "node_current_mention_filtering",
+      "target": "node_current_system_context",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_reload_to_client",
+      "source": "node_msodpc1x",
+      "target": "node_current_client_sdk",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_resource_model_to_storage",
+      "source": "node_current_resource_model",
+      "target": "node_msodnwlx",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_schema_to_resource_model",
+      "source": "node_current_schema",
+      "target": "node_current_resource_model",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_session_to_editor",
+      "source": "node_current_session_surface",
+      "target": "node_current_react_editor",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_ux_to_editor",
+      "source": "node_current_editor_ux",
+      "target": "node_current_react_editor",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_current_wire_to_resource_model",
+      "source": "node_current_wire_model",
+      "target": "node_current_resource_model",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_msodp29h_s5caxk",
+      "source": "node_msodobgy",
+      "target": "node_msodotvs",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_msodp3rr_58mpba",
+      "source": "node_msodotvs",
+      "target": "node_current_core_service",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_msodpi3h_mdvlge",
+      "source": "node_msodnwlx",
+      "target": "node_msodpc1x",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_msodpjv6_sl00bw",
+      "source": "node_msodp7k2",
+      "target": "node_current_client_sdk",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_msodpkrs_g78r9n",
+      "source": "node_msodpc1x",
+      "target": "node_msodojhd",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_msodqf56_lcp24c",
+      "source": "node_msodq6qn",
+      "target": "node_current_react_editor",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "edge_msodr8k6_gtj493",
+      "source": "node_msodojhd",
+      "target": "node_msodp7k2",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    }
+  ]
+}

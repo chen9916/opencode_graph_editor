@@ -3,7 +3,7 @@ import { matchKeybind, parseKeybind } from "@/context/command"
 import {
   architectureCommandKeybinds,
   architectureCommandMatches,
-  architectureEditorCommandTarget,
+  architecturePanelCommandTarget,
   ARCHITECTURE_COMMAND_EVENT,
   dispatchArchitectureCommand,
   type ArchitectureCommandAction,
@@ -55,7 +55,7 @@ describe("architecture commands", () => {
     expect(received.every((item) => item.target === panel)).toBe(true)
   })
 
-  test("dispatches keybound graph commands to the editor event target", () => {
+  test("dispatches keybound graph commands to the panel event target", () => {
     const panel = document.createElement("div")
     const editor = document.createElement("div")
     const pane = document.createElement("div")
@@ -72,7 +72,7 @@ describe("architecture commands", () => {
     outside.focus()
     document.addEventListener(ARCHITECTURE_COMMAND_EVENT, listener)
 
-    expect(architectureEditorCommandTarget(key("s", { target: pane }))).toBe(true)
+    expect(architecturePanelCommandTarget(key("s", { target: pane }))).toBe(true)
     dispatchArchitectureCommand("save")
 
     document.removeEventListener(ARCHITECTURE_COMMAND_EVENT, listener)
@@ -90,24 +90,29 @@ describe("architecture commands", () => {
     )
   })
 
-  test("scopes graph shortcuts to the editor without hijacking text fields", () => {
+  test("scopes graph shortcuts to the panel without hijacking text fields", () => {
+    const panel = document.createElement("div")
     const editor = document.createElement("div")
+    const header = document.createElement("button")
     const pane = document.createElement("div")
     const input = document.createElement("input")
     const editable = document.createElement("div")
     const outside = document.createElement("button")
 
+    panel.setAttribute("data-architecture-panel", "")
     editor.className = "architecture-editor"
     editable.contentEditable = "true"
     editor.append(pane, input, editable)
-    document.body.append(editor, outside)
+    panel.append(header, editor)
+    document.body.append(panel, outside)
 
-    expect(architectureEditorCommandTarget(key("z", { target: pane }))).toBe(true)
-    expect(architectureEditorCommandTarget(key("z", { target: input }))).toBe(false)
-    expect(architectureEditorCommandTarget(key("z", { target: editable }))).toBe(false)
-    expect(architectureEditorCommandTarget(key("z", { target: outside }))).toBe(false)
+    expect(architecturePanelCommandTarget(key("z", { target: header }))).toBe(true)
+    expect(architecturePanelCommandTarget(key("z", { target: pane }))).toBe(true)
+    expect(architecturePanelCommandTarget(key("z", { target: input }))).toBe(false)
+    expect(architecturePanelCommandTarget(key("z", { target: editable }))).toBe(false)
+    expect(architecturePanelCommandTarget(key("z", { target: outside }))).toBe(false)
 
-    editor.remove()
+    panel.remove()
     outside.remove()
   })
 

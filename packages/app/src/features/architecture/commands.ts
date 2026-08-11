@@ -49,14 +49,14 @@ export function architectureCommandMatches(
   )
 }
 
-export function architectureEditorCommandTarget(event: KeyboardEvent) {
+export function architecturePanelCommandTarget(event: KeyboardEvent) {
   const target =
     event.target instanceof Element
       ? event.target
       : typeof document !== "undefined" && document.activeElement instanceof Element
         ? document.activeElement
         : undefined
-  if (!target?.closest(".architecture-editor")) return false
+  if (!target?.closest(ARCHITECTURE_PANEL_TARGET)) return false
   if (target instanceof HTMLElement && target.isContentEditable) return false
   if (target.closest("input, textarea, select, [contenteditable='true']")) return false
   lastArchitectureCommandTarget = target

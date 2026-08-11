@@ -41,9 +41,6 @@ import {
   filterArchitectureEditedNodeHints,
 } from "./edit-hint"
 import {
-  architectureEditorInitialKey,
-  architectureEditorLoadPlan,
-  currentArchitectureDraftChange,
   draftChange,
   type ArchitectureEditorHistory,
 } from "./editor-state"
@@ -93,17 +90,9 @@ const emptySelection: Selection = { nodeIDs: [], edgeIDs: [] }
 export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const base = props.draft?.base ?? props.snapshot
   const initial = props.draft?.operations ?? []
-  const historyOrigin = props.draft?.origin ?? props.draft?.live?.snapshot ?? base
+  const historyOrigin = props.draft?.origin ?? base
   const historyBase = props.draft?.journalBase ?? historyOrigin.resource
-  const initialKey = architectureEditorInitialKey({
-    base,
-    liveSnapshot: props.draft?.live?.snapshot,
-    initialOperations: initial,
-    reloadGeneration: props.reloadGeneration,
-  })
-  const loaded = useRef(initialKey)
   const loadedResourceID = useRef(base.resource.id)
-  const loadedReloadGeneration = useRef(props.reloadGeneration)
   const canvas = useRef<HTMLDivElement>(null)
   const visibleViewport = useRef<ArchitectureViewport | undefined>(props.viewport)
   const viewportMotion = useRef<ViewportMotion>({ active: false, velocity: { x: 0, y: 0 } })
@@ -126,7 +115,6 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }))
   const [selection, setSelection] = useState<Selection>(emptySelection)
   const [flow, setFlow] = useState<ReactFlowInstance<ArchitectureFlowNode, ArchitectureFlowEdge>>()
-  const [flowReloadKey, setFlowReloadKey] = useState(0)
   const [filter, setFilter] = useState({ text: "", tag: "" })
   const [outlineOpen, setOutlineOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
@@ -134,19 +122,15 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [askPopover, setAskPopover] = useState<AskPopover>()
   const [editedHintNodeIDs, setEditedHintNodeIDs] = useState<ReadonlyArray<string>>([])
   const operations = flattenJournal(editor.past)
-  latestChange.current = currentArchitectureDraftChange({
-    server: props.server,
-    directory: props.directory,
+  latestChange.current = draftChange(
+    editor.resource,
+    operations,
     base,
     historyOrigin,
-    historyBase,
-    initialOperations: initial,
-    loadedKey: loaded.current,
-    initialKey,
-    editorResource: editor.resource,
-    editorOperations: operations,
-    conflicts: props.draft?.conflicts ?? [],
-  })
+    props.draft?.conflicts ?? [],
+    props.server,
+    props.directory,
+  )
   const dirty = architectureDraftIsDirty({ draft: props.draft, operations })
   const tags = unique(editor.resource.nodes.flatMap((node) => node.tags))
   const controlsPosition = props.direction === "rtl" ? "bottom-right" : "bottom-left"
@@ -160,6 +144,29 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     .join("\u001e")
   const resourceTagColorsKey = tagColorsKey(editor.resource.tagColors)
   const editedHintNodeIDsKey = editedHintNodeIDs.join(",")
+
+  useLayoutEffect(() => {
+    const resourceChanged = loadedResourceID.current !== base.resource.id
+    loadedResourceID.current = base.resource.id
+    locallyAuthoredResourceKeys.current.clear()
+    const nextResource = applyOperations(historyBase, initial)
+    setEditor({
+      resource: nextResource,
+      past: initial.map((operation) => [operation]),
+      future: [],
+    })
+    latestChange.current = draftChange(
+      nextResource,
+      initial,
+      base,
+      historyOrigin,
+      props.draft?.conflicts ?? [],
+      props.server,
+      props.directory,
+    )
+    setEditedHintNodeIDs([])
+    resetTransientLoadState({ closePanels: resourceChanged })
+  }, [base])
 
   const keepExistingEditedNodeHints = (resource: ArchitectureResource) => {
     setEditedHintNodeIDs((current) =>
@@ -176,9 +183,6 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     const oldest = locallyAuthoredResourceKeys.current.values().next().value
     if (oldest) locallyAuthoredResourceKeys.current.delete(oldest)
   }
-
-  const consumeLocalResource = (resource: ArchitectureResource) =>
-    locallyAuthoredResourceKeys.current.delete(architectureResourceHintKey(resource))
 
   const clearEditedNodeHint = (nodeID: string) => {
     setEditedHintNodeIDs((current) => clearArchitectureEditedNodeHint(current, nodeID))
@@ -357,63 +361,17 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   useEffect(() => () => cancelViewportInertia(viewportMotion.current), [])
 
   useLayoutEffect(() => {
-    const plan = architectureEditorLoadPlan({
-      loadedKey: loaded.current,
-      loadedResourceID: loadedResourceID.current,
-      loadedReloadGeneration: loadedReloadGeneration.current,
-      initialKey,
-      resourceID: base.resource.id,
-      reloadGeneration: props.reloadGeneration,
-      historyBase,
-      initialOperations: initial,
+    const resourceChanged = loadedResourceID.current !== base.resource.id
+    loadedResourceID.current = base.resource.id
+    const nextResource = applyOperations(historyBase, initial)
+    setEditor({
+      resource: nextResource,
+      past: initial.map((operation) => [operation]),
+      future: [],
     })
-    if (plan.kind === "unchanged") return
-    loaded.current = plan.loadedKey
-    loadedResourceID.current = plan.loadedResourceID
-    loadedReloadGeneration.current = plan.loadedReloadGeneration
-    const nextResource = plan.editor.resource
-    const localEcho = plan.kind === "sync" && consumeLocalResource(nextResource)
-    latestChange.current = draftChange(
-      nextResource,
-      initial,
-      base,
-      historyOrigin,
-      props.draft?.conflicts ?? [],
-      props.server,
-      props.directory,
-    )
-    setEditor(plan.editor)
-    if (plan.kind === "resource" || plan.kind === "reload") {
-      locallyAuthoredResourceKeys.current.clear()
-      if (plan.transient.clearEditedHints) setEditedHintNodeIDs([])
-      if (plan.transient.clearSelection) resetTransientLoadState({ closePanels: plan.transient.closePanels })
-      replaceFlowElements(nextResource)
-      if (plan.kind === "reload") {
-        setFlow(undefined)
-        setFlowReloadKey((current) => current + 1)
-      }
-      return
-    }
-    if (localEcho) {
-      setEditedHintNodeIDs((current) =>
-        architectureEditedNodeHintsForResourceSync({
-          current,
-          previous: editor.resource,
-          next: nextResource,
-          external: false,
-        }),
-      )
-      return
-    }
-    setEditedHintNodeIDs((current) =>
-      architectureEditedNodeHintsForResourceSync({
-        current,
-        previous: editor.resource,
-        next: nextResource,
-        external: true,
-      }),
-    )
-  }, [base.digest, base.resource.id, initialKey, props.reloadGeneration])
+    setEditedHintNodeIDs([])
+    resetTransientLoadState({ closePanels: resourceChanged })
+  }, [base])
 
   useLayoutEffect(() => {
     replaceFlowElements(editor.resource)
@@ -916,7 +874,6 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
           }}
         >
           <ReactFlow<ArchitectureFlowNode, ArchitectureFlowEdge>
-            key={`${base.resource.id}:reload:${flowReloadKey}`}
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}

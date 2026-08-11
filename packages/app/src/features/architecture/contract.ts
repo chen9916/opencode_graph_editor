@@ -133,7 +133,6 @@ export type ArchitecturePanelProps = {
   readonly mobile: boolean
   readonly snapshot: ArchitectureSnapshot
   readonly draft?: ArchitectureDraft
-  readonly reloadGeneration: number
   readonly viewport?: ArchitectureViewport
   readonly busy: boolean
   readonly action?: ArchitectureCommandAction

@@ -32,6 +32,15 @@ describe("architecture resource events", () => {
     ).toEqual({ resourceID: "design", revision: 3, digest: "def" })
   })
 
+  test("keeps live draft events out of saved resource reconciliation", () => {
+    expect(
+      architectureResourceEventInfo({
+        type: "architecture.resource.draft.updated",
+        properties: { resourceID: "design", revision: 2, digest: "live" },
+      }),
+    ).toBeUndefined()
+  })
+
   test("detects resource list and snapshot freshness", () => {
     const event = { resourceID: "design", revision: 2, digest: "abc" }
     expect(
