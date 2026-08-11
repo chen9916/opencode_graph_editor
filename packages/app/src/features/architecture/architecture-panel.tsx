@@ -44,6 +44,7 @@ import {
 } from "./commands"
 import type {
   ArchitectureInstanceChange,
+  ArchitectureConflictExplanation,
   ArchitectureLabels,
   ArchitectureLiveInstanceCache,
   ArchitectureOperation,
@@ -56,11 +57,7 @@ import type {
 } from "./contract"
 import {
   architectureResourceEventInfo,
-  architectureInstanceEventIsStale,
-  architectureResourceInstanceEventCache,
   architectureResourceInstanceEventInfo,
-  architectureSnapshotMatchesEvent,
-  architectureSummaryMatchesEvent,
 } from "./event"
 import { createArchitectureCacheOrder, guardedArchitectureCacheResponse } from "./cache-order"
 import { downloadArchitectureResourceExport } from "./export"
@@ -75,16 +72,24 @@ import {
   architectureInstanceCanSkipSave,
   architectureInstanceIsDirty,
   architectureInstanceResourceID,
-  architectureResourceSelectionOptions,
   architectureResourceSummary,
   latestArchitectureSnapshot,
   missingSelectedArchitectureResourceID,
   resolveArchitectureResourceSelection,
   resolveArchitectureResourceID,
-  selectedArchitectureResourceSummary,
   updateArchitectureResourceSummaries,
 } from "./resource-state"
-import { architectureRuntimeView } from "./runtime-view"
+import {
+  architectureFailedDebugEvent,
+  architectureJournalDebugEvent,
+  architectureReloadStartedDebugEvent,
+  architectureResourceServerDebugEvent,
+  architectureSaveStartedDebugEvent,
+  architectureSnapshotDebugEvent,
+  prependArchitectureRuntimeDebugEvent,
+} from "./runtime-debug"
+import { architectureRuntimeController } from "./runtime-controller"
+import { architectureLiveInstanceEventPlan, architectureResourceEventRefreshPlan } from "./sync-events"
 import { architectureSelectionText } from "./selection-prompt"
 import "./architecture-panel.css"
 
@@ -166,19 +171,8 @@ function ArchitecturePanelWorkspace() {
     return id ? persistedState.pendingOverlays[id] : undefined
   })
   const localDirty = () => architectureInstanceIsDirty({ pending: localPendingOverlay() })
-  const appendDebugEvent = (
-    resourceID: string,
-    event: Omit<ArchitectureRuntimeDebugEvent, "id" | "at" | "resourceID">,
-  ) => {
-    setState("debugEvents", resourceID, (current) => [
-      {
-        ...event,
-        id: `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-        at: Date.now(),
-        resourceID,
-      },
-      ...(current ?? []),
-    ].slice(0, 8))
+  const appendDebugEvent = (event: ArchitectureRuntimeDebugEvent) => {
+    setState("debugEvents", event.resourceID, (current) => prependArchitectureRuntimeDebugEvent(current, event))
   }
   const resource = createQuery(() => {
     const id = resourceID()
@@ -220,21 +214,17 @@ function ArchitecturePanelWorkspace() {
       reconcile: latestArchitectureLiveInstanceCache,
     }
   })
-  const runtimeView = createMemo(() =>
-    architectureRuntimeView({
+  const runtimeController = createMemo(() =>
+    architectureRuntimeController({
       selectedResourceID: resourceID(),
+      resources: resources.data,
       saved: resource.data,
       live: liveInstance.data,
       pending: localPendingOverlay(),
+      debugEvents: resourceID() ? state.debugEvents[resourceID()!] : undefined,
     }),
   )
-  const runtimeViewWithDebug = createMemo(() => {
-    const current = runtimeView()
-    return {
-      ...current,
-      debugEvents: current.selectedResourceID ? (state.debugEvents[current.selectedResourceID] ?? []) : [],
-    }
-  })
+  const runtimeView = () => runtimeController().runtimeView
   const instanceSynchronizer = (scope: ReturnType<typeof operationScope>) => {
     const key = `${scope.server}\0${scope.directory}\0${scope.resourceID}`
     const current = instanceSynchronizers.get(key)
@@ -243,12 +233,14 @@ function ArchitecturePanelWorkspace() {
       patch: (base, operations) => updateArchitectureResourceInstance(scope.api, scope.directory, base, operations),
       update: (updated) => {
         if (updated)
-          appendDebugEvent(scope.resourceID, {
-            type: "sync",
-            status: "succeeded",
-            revision: updated.snapshot.resource.revision,
-            digest: updated.snapshot.digest,
-          })
+          appendDebugEvent(
+            architectureSnapshotDebugEvent({
+              resourceID: scope.resourceID,
+              type: "sync",
+              status: "succeeded",
+              snapshot: updated.snapshot,
+            }),
+          )
         setArchitectureQueryData<ArchitectureLiveInstanceCache>(
           architectureResourceInstanceQueryKey(scope.server, scope.directory, scope.resourceID),
           (current) => adoptArchitectureLiveInstanceCache(current, updated),
@@ -256,12 +248,14 @@ function ArchitecturePanelWorkspace() {
       },
       adopt: (instance) => {
         if (instance)
-          appendDebugEvent(scope.resourceID, {
-            type: "sync",
-            status: "received",
-            revision: instance.snapshot.resource.revision,
-            digest: instance.snapshot.digest,
-          })
+          appendDebugEvent(
+            architectureSnapshotDebugEvent({
+              resourceID: scope.resourceID,
+              type: "sync",
+              status: "received",
+              snapshot: instance.snapshot,
+            }),
+          )
         setArchitectureQueryData<ArchitectureLiveInstanceCache>(
           architectureResourceInstanceQueryKey(scope.server, scope.directory, scope.resourceID),
           instance,
@@ -271,12 +265,10 @@ function ArchitecturePanelWorkspace() {
     instanceSynchronizers.set(key, created)
     return created
   }
-  const pending = createMemo(() => runtimeView().pending)
-  const dirty = () => runtimeView().dirty
-  const resourceOptions = createMemo(() =>
-    architectureResourceSelectionOptions(resources.data, runtimeView().visibleSnapshot),
-  )
-  const selectedResource = createMemo(() => selectedArchitectureResourceSummary(resourceID(), resourceOptions()))
+  const pending = createMemo(() => runtimeController().pending)
+  const dirty = () => runtimeController().dirty
+  const resourceOptions = createMemo(() => runtimeController().resourceOptions)
+  const selectedResource = createMemo(() => runtimeController().selectedResource)
   const viewport = createMemo(() => {
     const id = resourceID()
     return id ? persistedState.viewports[id] : undefined
@@ -313,9 +305,34 @@ function ArchitecturePanelWorkspace() {
 
   createEffect(() => {
     const id = resourceID()
-    if (!id || !runtimeView().pendingCovered) return
+    if (!id || runtimeController().pendingCoveredResourceID !== id) return
     setPersistedState("pendingOverlays", id, undefined)
   })
+
+  const conflictReasonLabel = (reason: ArchitectureConflictExplanation["reason"]) => {
+    if (reason === "changed") return language.t("architecture.conflict.changed")
+    if (reason === "missing") return language.t("architecture.conflict.missing")
+    return language.t("architecture.conflict.exists")
+  }
+  const operationTypeLabel = (type: ArchitectureOperation["type"]) => {
+    if (type === "resource.update") return language.t("architecture.operation.resourceUpdate")
+    if (type === "tag.color") return language.t("architecture.operation.tagColor")
+    if (type === "node.create") return language.t("architecture.operation.nodeCreate")
+    if (type === "node.update") return language.t("architecture.operation.nodeUpdate")
+    if (type === "node.position") return language.t("architecture.operation.nodePosition")
+    if (type === "node.remove") return language.t("architecture.operation.nodeRemove")
+    if (type === "edge.create") return language.t("architecture.operation.edgeCreate")
+    if (type === "edge.update") return language.t("architecture.operation.edgeUpdate")
+    return language.t("architecture.operation.edgeRemove")
+  }
+  const conflictTargetLabel = (target: ArchitectureConflictExplanation["target"]) => {
+    if (target.kind === "tag") return language.t("architecture.conflict.target.tag", { id: target.id ?? "" })
+    if (target.kind === "node") return language.t("architecture.conflict.target.node", { id: target.id ?? "" })
+    if (target.kind === "edge") return language.t("architecture.conflict.target.edge", { id: target.id ?? "" })
+    return target.id
+      ? language.t("architecture.conflict.target.resource", { id: target.id })
+      : language.t("architecture.conflict.target.graph")
+  }
 
   const labels = createMemo<ArchitectureLabels>(() => ({
     title: language.t("architecture.panel.title"),
@@ -349,6 +366,7 @@ function ArchitecturePanelWorkspace() {
     allTags: language.t("architecture.filter.allTags"),
     clearFilters: language.t("architecture.filter.clear"),
     addNode: language.t("architecture.action.addNode"),
+    defaultNodeText: language.t("architecture.node.defaultText"),
     save: language.t("architecture.action.save"),
     reload: language.t("architecture.action.reload"),
     fitView: language.t("architecture.action.fitView"),
@@ -382,6 +400,12 @@ function ArchitecturePanelWorkspace() {
       missing: language.t("architecture.conflict.missing"),
       exists: language.t("architecture.conflict.exists"),
     },
+    conflictExplanation: (explanation) =>
+      language.t("architecture.conflict.explanation", {
+        reason: conflictReasonLabel(explanation.reason),
+        operation: operationTypeLabel(explanation.operationType),
+        target: conflictTargetLabel(explanation.target),
+      }),
     debug: {
       title: language.t("architecture.debug.title"),
       resourceID: language.t("architecture.debug.resourceID"),
@@ -428,6 +452,18 @@ function ArchitecturePanelWorkspace() {
         succeeded: language.t("architecture.debug.eventStatus.succeeded"),
         failed: language.t("architecture.debug.eventStatus.failed"),
       },
+      operationTypes: {
+        "resource.update": operationTypeLabel("resource.update"),
+        "tag.color": operationTypeLabel("tag.color"),
+        "node.create": operationTypeLabel("node.create"),
+        "node.update": operationTypeLabel("node.update"),
+        "node.position": operationTypeLabel("node.position"),
+        "node.remove": operationTypeLabel("node.remove"),
+        "edge.create": operationTypeLabel("edge.create"),
+        "edge.update": operationTypeLabel("edge.update"),
+        "edge.remove": operationTypeLabel("edge.remove"),
+      },
+      eventOperations: (operations) => language.t("architecture.debug.eventOperations", { operations }),
     },
   }))
 
@@ -448,29 +484,22 @@ function ArchitecturePanelWorkspace() {
       })
       if (instanceEventInfo) {
         if (instanceEventInfo.resourceID === resourceID())
-          appendDebugEvent(instanceEventInfo.resourceID, {
-            type: "server-event",
-            status: "received",
-            revision: instanceEventInfo.revision,
-            digest: instanceEventInfo.digest,
-          })
+          appendDebugEvent(architectureResourceServerDebugEvent(instanceEventInfo))
         const instanceKey = architectureResourceInstanceQueryKey(current.url, current.directory, instanceEventInfo.resourceID)
         const resourceKey = architectureResourceQueryKey(current.url, current.directory, instanceEventInfo.resourceID)
-        if (architectureInstanceEventIsStale(queryClient.getQueryData<ArchitectureSnapshot>(resourceKey), instanceEventInfo))
-          return
-        const eventInstance = architectureResourceInstanceEventCache(instanceEventInfo)
-        if (eventInstance === null) {
-          setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, null)
-          if (instanceEventInfo.resourceID === resourceID()) {
+        const plan = architectureLiveInstanceEventPlan({
+          snapshot: queryClient.getQueryData<ArchitectureSnapshot>(resourceKey),
+          event: instanceEventInfo,
+        })
+        if (plan.action === "ignore-stale") return
+        if (plan.action === "adopt-cache") {
+          setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, (current) =>
+            plan.cache ? adoptArchitectureLiveInstanceCache(current, plan.cache) : plan.cache,
+          )
+          if (plan.cache === null && instanceEventInfo.resourceID === resourceID()) {
             void queryClient.refetchQueries({ queryKey: resourcesKey, exact: true, type: "active" })
             void queryClient.refetchQueries({ queryKey: resourceKey, exact: true, type: "active" })
           }
-          return
-        }
-        if (eventInstance) {
-          setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, (current) =>
-            adoptArchitectureLiveInstanceCache(current, eventInstance),
-          )
           return
         }
         void queryClient.refetchQueries({ queryKey: instanceKey, exact: true, type: "active" })
@@ -483,13 +512,16 @@ function ArchitecturePanelWorkspace() {
       })
       if (!eventInfo) return
       if (eventInfo.resourceID === resourceID())
-        appendDebugEvent(eventInfo.resourceID, {
-          type: "server-event",
-          status: "received",
-          revision: eventInfo.revision,
-          digest: eventInfo.digest,
-        })
-      if (type === "architecture.resource.removed") {
+        appendDebugEvent(architectureResourceServerDebugEvent(eventInfo))
+      const plan = architectureResourceEventRefreshPlan({
+        eventType: type,
+        currentResourceID: resourceID(),
+        dirty: dirty(),
+        resources: queryClient.getQueryData(resourcesKey),
+        snapshot: queryClient.getQueryData(architectureResourceQueryKey(current.url, current.directory, eventInfo.resourceID)),
+        event: eventInfo,
+      })
+      if (plan.removed) {
         setArchitectureQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
           removeResourceSummary(current, eventInfo.resourceID),
         )
@@ -503,22 +535,20 @@ function ArchitecturePanelWorkspace() {
         return
       }
 
-      if (eventInfo.resourceID === resourceID() && dirty()) return
-      if (!architectureSummaryMatchesEvent(queryClient.getQueryData(resourcesKey), eventInfo))
+      if (plan.updateResources)
         void queryClient.refetchQueries({
           queryKey: resourcesKey,
           exact: true,
           type: "active",
         })
 
-      if (eventInfo.resourceID !== resourceID()) return
+      if (!plan.updateResource) return
       const resourceKey = architectureResourceQueryKey(current.url, current.directory, eventInfo.resourceID)
-      if (!architectureSnapshotMatchesEvent(queryClient.getQueryData(resourceKey), eventInfo))
-        void queryClient.refetchQueries({
-          queryKey: resourceKey,
-          exact: true,
-          type: "active",
-        })
+      void queryClient.refetchQueries({
+        queryKey: resourceKey,
+        exact: true,
+        type: "active",
+      })
     })
     onCleanup(unsubscribe)
   })
@@ -545,13 +575,7 @@ function ArchitecturePanelWorkspace() {
     const id = architectureInstanceResourceID(change)
     const workspace = sdk()
     if (change.server !== workspace.url || change.directory !== workspace.directory) return
-    appendDebugEvent(id, {
-      type: "journal",
-      status: "recorded",
-      operationCount: change.operations.length,
-      conflictCount: change.conflicts.length,
-      revision: change.resource.revision,
-    })
+    appendDebugEvent(architectureJournalDebugEvent(change))
     setPersistedState(
       "pendingOverlays",
       id,
@@ -587,13 +611,7 @@ function ArchitecturePanelWorkspace() {
     const instanceKey = architectureResourceInstanceQueryKey(scope.server, scope.directory, id)
     const resourcesKey = architectureResourcesQueryKey(scope.server, scope.directory)
     const synchronizer = instanceSynchronizer(scope)
-    appendDebugEvent(id, {
-      type: "save",
-      status: "started",
-      operationCount: change.operations.length,
-      conflictCount: change.conflicts.length,
-      revision: change.resource.revision,
-    })
+    appendDebugEvent(architectureSaveStartedDebugEvent(change))
     try {
       await synchronizer.invalidate()
       const synchronized = await synchronizer.synchronizeAuthoritative(
@@ -611,15 +629,10 @@ function ArchitecturePanelWorkspace() {
         setState("liveInstanceVersions", id, (current) => (current ?? 0) + 1)
       })
       void synchronizer.adopt(null).catch(() => undefined)
-      appendDebugEvent(id, {
-        type: "save",
-        status: "succeeded",
-        revision: saved.resource.revision,
-        digest: saved.digest,
-      })
+      appendDebugEvent(architectureSnapshotDebugEvent({ resourceID: id, type: "save", status: "succeeded", snapshot: saved }))
       return true
     } catch {
-      appendDebugEvent(id, { type: "save", status: "failed" })
+      appendDebugEvent(architectureFailedDebugEvent({ resourceID: id, type: "save" }))
       showToast({ variant: "error", title: labels().saveFailed })
       return false
     } finally {
@@ -659,7 +672,7 @@ function ArchitecturePanelWorkspace() {
     const instanceKey = architectureResourceInstanceQueryKey(scope.server, scope.directory, id)
     const resourcesKey = architectureResourcesQueryKey(scope.server, scope.directory)
     const synchronizer = instanceSynchronizer(scope)
-    appendDebugEvent(id, { type: "reload", status: "started" })
+    appendDebugEvent(architectureReloadStartedDebugEvent(id))
     try {
       await synchronizer.invalidate()
       const reloaded = await reloadArchitectureResourceInstance(scope.api, scope.directory, id)
@@ -675,14 +688,11 @@ function ArchitecturePanelWorkspace() {
         setState("liveInstanceVersions", id, (current) => (current ?? 0) + 1)
       })
       void synchronizer.adopt(null).catch(() => undefined)
-      appendDebugEvent(id, {
-        type: "reload",
-        status: "succeeded",
-        revision: reloaded.snapshot.resource.revision,
-        digest: reloaded.snapshot.digest,
-      })
+      appendDebugEvent(
+        architectureSnapshotDebugEvent({ resourceID: id, type: "reload", status: "succeeded", snapshot: reloaded.snapshot }),
+      )
     } catch {
-      appendDebugEvent(id, { type: "reload", status: "failed" })
+      appendDebugEvent(architectureFailedDebugEvent({ resourceID: id, type: "reload" }))
       showToast({ variant: "error", title: language.t("architecture.panel.error") })
     } finally {
       setState("busy", false)
@@ -989,7 +999,7 @@ function ArchitecturePanelWorkspace() {
                       direction={language.direction()}
                       mobile={mobile()}
                       snapshot={runtimeView().visibleSnapshot!}
-                      runtimeView={runtimeViewWithDebug()}
+                      runtimeView={runtimeView()}
                       liveInstanceVersion={liveInstanceVersion()}
                       pending={pending()}
                       viewport={viewport()}

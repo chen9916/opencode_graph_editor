@@ -6,6 +6,7 @@ import type {
   ArchitectureRuntimeView,
   ArchitectureSnapshot,
 } from "./contract"
+import { architectureConflictExplanations } from "./conflict-explanation"
 import { architectureInstanceIsDirty, architectureVisibleLiveInstance, selectedArchitectureSnapshot } from "./resource-state"
 
 export function architectureRuntimeView(input: {
@@ -44,6 +45,7 @@ export function architectureRuntimeView(input: {
       conflictCount,
       hasLiveInstance,
     }),
+    conflictExplanations: architectureConflictExplanations(visible.pending?.conflicts ?? [], visible.snapshot?.resource),
     debugEvents: [],
   }
 }

@@ -35,6 +35,24 @@ import type {
 } from "./contract"
 import { architectureCommandMatches } from "./commands"
 import {
+  architectureConnectionSide,
+  architectureCreateNodeOperation,
+  architectureDuplicateNodeOperation,
+  architectureEdgeCreateOperation,
+  architectureEdgeHandleOperation,
+  architectureEdgeReconnectOperation,
+  architectureEdgeRemoveOperation,
+  architectureEdgeStyleOperation,
+  architectureNodePositionOperations,
+  architectureNodeRemoveOperation,
+  architectureNodeTextOperation,
+  architectureNodeUpdateOperation,
+  architectureRenameTagOperations,
+  architectureResourceRenameOperation,
+  architectureSelectionDeleteOperations,
+  architectureTagColorOperation,
+} from "./editor-commands"
+import {
   architectureEditedNodeHintsForResourceSync,
   architectureResourceHintKey,
   clearArchitectureEditedNodeHint,
@@ -50,7 +68,6 @@ import {
   syncArchitectureEditorHistorySource,
   undoArchitectureEditorHistory,
 } from "./editor-state"
-import { operationID } from "./journal"
 import { tagColorsKey, toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } from "./model"
 import { architectureInstanceIsDirty } from "./resource-state"
 import { ArchitectureEdgeView } from "./architecture-edge.react"
@@ -223,8 +240,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   const updateNodeText = (node: ArchitectureNode, text: string) => {
-    if (text === node.text) return
-    commit([{ id: operationID(), type: "node.update", node: { ...node, text } }])
+    const operation = architectureNodeTextOperation(node, text)
+    if (operation) commit([operation])
   }
 
   const projected = toReactFlow(editor.resource, updateNodeText, {
@@ -240,9 +257,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState(projected.edges)
 
   const changeEdgeStyle = (edgeID: string, style: ArchitectureEdgeStyle) => {
-    const edge = editor.resource.edges.find((candidate) => candidate.id === edgeID)
-    if (!edge || (edge.style ?? "rectangular") === style) return
-    commit([{ id: operationID(), type: "edge.update", edge: { ...edge, style } }])
+    const operation = architectureEdgeStyleOperation(editor.resource, edgeID, style)
+    if (operation) commit([operation])
   }
 
   const applySelection = (selected: Selection) => {
@@ -396,39 +412,17 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   const addNode = (position?: XYPosition) => {
-    const id = `node_${Date.now().toString(36)}`
-    const node: ArchitectureNode = {
-      id,
-      text: "New node",
-      tags: [],
-      layout: {
-        position: {
-          x: position?.x ?? (editor.resource.nodes.length % 4) * 260,
-          y: position?.y ?? Math.floor(editor.resource.nodes.length / 4) * 170,
-        },
-      },
-    }
-    commit([{ id: operationID(), type: "node.create", node }])
-    select({ type: "node", id })
+    const created = architectureCreateNodeOperation(editor.resource, { position, text: props.labels.defaultNodeText })
+    commit([created.operation])
+    select({ type: "node", id: created.id })
     setContextMenu(undefined)
   }
 
   const duplicateNode = (nodeID: string) => {
-    const current = editor.resource.nodes.find((node) => node.id === nodeID)
-    if (!current) return
-    const id = `node_${Date.now().toString(36)}`
-    commit([
-      {
-        id: operationID(),
-        type: "node.create",
-        node: {
-          ...current,
-          id,
-          layout: { position: { x: current.layout.position.x + 36, y: current.layout.position.y + 36 } },
-        },
-      },
-    ])
-    select({ type: "node", id })
+    const created = architectureDuplicateNodeOperation(editor.resource, nodeID)
+    if (!created) return
+    commit([created.operation])
+    select({ type: "node", id: created.id })
     setContextMenu(undefined)
   }
 
@@ -443,7 +437,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     }
     if (target?.type === "node") {
       props.onConfirm(props.labels.deleteNodeConfirm, props.labels.delete, () => {
-        commit([{ id: operationID(), type: "node.remove", nodeID: target.id, cascade: true }])
+        commit([architectureNodeRemoveOperation(target.id)])
         select(undefined)
         setContextMenu(undefined)
       })
@@ -451,7 +445,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     }
     if (target?.type === "edge") {
       props.onConfirm(props.labels.deleteEdgeConfirm, props.labels.delete, () => {
-        commit([{ id: operationID(), type: "edge.remove", edgeID: target.id }])
+        commit([architectureEdgeRemoveOperation(target.id)])
         select(undefined)
         setContextMenu(undefined)
       })
@@ -471,18 +465,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   const removeSelectedItems = (selected: Selection, confirmation: string) => {
-    const selectedNodeIDs = new Set(selected.nodeIDs)
-    const cascadedEdgeIDs = editor.resource.edges
-      .filter((edge) => selectedNodeIDs.has(edge.source) || selectedNodeIDs.has(edge.target))
-      .map((edge) => edge.id)
-    const operations: ReadonlyArray<ArchitectureOperation> = [
-      ...selected.nodeIDs.map(
-        (nodeID): ArchitectureOperation => ({ id: operationID(), type: "node.remove", nodeID, cascade: true }),
-      ),
-      ...selected.edgeIDs
-        .filter((edgeID) => !cascadedEdgeIDs.includes(edgeID))
-        .map((edgeID): ArchitectureOperation => ({ id: operationID(), type: "edge.remove", edgeID })),
-    ]
+    const operations = architectureSelectionDeleteOperations(editor.resource, selected)
     props.onConfirm(confirmation, props.labels.delete, () => {
       commit(operations)
       select(undefined)
@@ -531,17 +514,10 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   const onConnect = (connection: Connection) => {
-    if (!connection.source || !connection.target) return
-    const edge: ArchitectureEdge = {
-      id: `edge_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-      source: connection.source,
-      target: connection.target,
-      sourceHandle: connectionSide(connection.sourceHandle, "right"),
-      targetHandle: connectionSide(connection.targetHandle, "left"),
-      style: "rectangular",
-    }
-    commit([{ id: operationID(), type: "edge.create", edge }])
-    select({ type: "edge", id: edge.id })
+    const created = architectureEdgeCreateOperation(connection)
+    if (!created) return
+    commit([created.operation])
+    select({ type: "edge", id: created.id })
   }
 
   const menuPosition = (x: number, y: number) => ({
@@ -574,28 +550,15 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   const reconnect = (edgeID: string, connection: Connection) => {
-    if (!connection.source || !connection.target) return
-    const edge = editor.resource.edges.find((candidate) => candidate.id === edgeID)
-    if (!edge) return
+    const operation = architectureEdgeReconnectOperation(editor.resource, edgeID, connection)
+    if (!operation) return
     reconnectedEdgeIDs.current.add(edgeID)
-    commit([
-      {
-        id: operationID(),
-        type: "edge.update",
-        edge: {
-          ...edge,
-          source: connection.source,
-          target: connection.target,
-          sourceHandle: connectionSide(connection.sourceHandle, edge.sourceHandle ?? "right"),
-          targetHandle: connectionSide(connection.targetHandle, edge.targetHandle ?? "left"),
-        },
-      },
-    ])
+    commit([operation])
   }
 
   const disconnect = (edgeID: string) => {
     if (!editor.resource.edges.some((edge) => edge.id === edgeID)) return
-    commit([{ id: operationID(), type: "edge.remove", edgeID }])
+    commit([architectureEdgeRemoveOperation(edgeID)])
     select(undefined)
     setContextMenu(undefined)
   }
@@ -604,13 +567,8 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     nodeIDs: ReadonlyArray<string>,
     movedNodes: ReadonlyArray<ArchitectureFlowNode> = flow?.getNodes() ?? nodes,
   ) => {
-    const operations = nodeIDs.flatMap((nodeID): ArchitectureOperation[] => {
-      const moved = movedNodes.find((node) => node.id === nodeID)
-      const current = editor.resource.nodes.find((node) => node.id === nodeID)
-      if (!moved || !current || samePosition(moved.position, current.layout.position)) return []
-      return [{ id: operationID(), type: "node.position", nodeID, position: moved.position }]
-    })
-    commit(operations)
+    const selected = new Set(nodeIDs)
+    commit(architectureNodePositionOperations(editor.resource, nodeIDs, movedNodes.filter((node) => selected.has(node.id))))
   }
 
   const fitSelection = () => {
@@ -1111,13 +1069,13 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               onEdgeStyle={changeEdgeStyle}
               onCommit={commit}
             />
-            {(props.pending?.conflicts.length ?? 0) > 0 && (
+            {props.runtimeView.conflictExplanations.length > 0 && (
               <section className="architecture-editor__conflicts">
                 <h3>{props.labels.conflicts}</h3>
                 <ul>
-                  {props.pending?.conflicts.map((conflict) => (
-                    <li key={conflict.operation.id}>
-                      <bdi>{conflict.operation.id}</bdi>: {props.labels.conflictReasons[conflict.reason]}
+                  {props.runtimeView.conflictExplanations.map((explanation) => (
+                    <li key={explanation.operationID}>
+                      <bdi>{explanation.operationID}</bdi>: {props.labels.conflictExplanation(explanation)}
                     </li>
                   ))}
                 </ul>
@@ -1196,6 +1154,13 @@ function RuntimeDebugView(props: {
                       {props.labels.debug.pendingOperations}: {event.operationCount}
                     </span>
                   )}
+                  {event.operationTypes?.length ? (
+                    <span>
+                      {props.labels.debug.eventOperations(
+                        event.operationTypes.map((operation) => props.labels.debug.operationTypes[operation]).join(", "),
+                      )}
+                    </span>
+                  ) : undefined}
                   {event.conflictCount === undefined ? undefined : (
                     <span>
                       {props.labels.debug.conflicts}: {event.conflictCount}
@@ -1293,13 +1258,7 @@ function Inspector(props: {
   if (props.selection.primary.type === "edge") {
     const edge = props.selected as ArchitectureEdge
     const updateSide = (field: "sourceHandle" | "targetHandle", side: ArchitectureConnectionSide) =>
-      props.onCommit([
-        {
-          id: operationID(),
-          type: "edge.update",
-          edge: { ...edge, [field]: side },
-        },
-      ])
+      props.onCommit([architectureEdgeHandleOperation(edge, field, side)])
     return (
       <div className="architecture-editor__detail">
         <h3 dir="auto">{edge.id}</h3>
@@ -1311,7 +1270,7 @@ function Inspector(props: {
             {props.labels.sourceSide}
             <select
               value={edge.sourceHandle ?? "right"}
-              onChange={(event) => updateSide("sourceHandle", connectionSide(event.currentTarget.value, "right"))}
+              onChange={(event) => updateSide("sourceHandle", architectureConnectionSide(event.currentTarget.value, "right"))}
             >
               {connectionSides.map((side) => (
                 <option key={side} value={side}>
@@ -1324,7 +1283,7 @@ function Inspector(props: {
             {props.labels.targetSide}
             <select
               value={edge.targetHandle ?? "left"}
-              onChange={(event) => updateSide("targetHandle", connectionSide(event.currentTarget.value, "left"))}
+              onChange={(event) => updateSide("targetHandle", architectureConnectionSide(event.currentTarget.value, "left"))}
             >
               {connectionSides.map((side) => (
                 <option key={side} value={side}>
@@ -1346,7 +1305,7 @@ function Inspector(props: {
     <NodeForm
       node={props.selected as ArchitectureNode}
       labels={props.labels}
-      onChange={(node) => props.onCommit([{ id: operationID(), type: "node.update", node }])}
+      onChange={(node) => props.onCommit([architectureNodeUpdateOperation(node)])}
     />
   )
 }
@@ -1401,7 +1360,7 @@ function ResourceHub(props: {
         <ResourceForm
           resource={props.resource}
           labels={props.labels}
-          onChange={(name) => props.onCommit([{ id: operationID(), type: "resource.update", name }])}
+          onChange={(name) => props.onCommit([architectureResourceRenameOperation(name)])}
         />
       ) : (
         <TagHub resource={props.resource} labels={props.labels} onCommit={props.onCommit} />
@@ -1462,7 +1421,7 @@ function TagHub(props: {
             <TagNameInput
               tag={tag.label}
               labels={props.labels}
-              onRename={(next) => props.onCommit(renameTagOperations(props.resource, tag.label, next))}
+              onRename={(next) => props.onCommit(architectureRenameTagOperations(props.resource, tag.label, next))}
             />
             <span>{props.labels.tagUsage(tag.count)}</span>
           </div>
@@ -1470,25 +1429,14 @@ function TagHub(props: {
             tag={tag.label}
             color={tag.color}
             labels={props.labels}
-            onChange={(color) =>
-              props.onCommit([
-                {
-                  id: operationID(),
-                  type: "tag.color",
-                  tag: tag.label,
-                  color,
-                },
-              ])
-            }
+            onChange={(color) => props.onCommit([architectureTagColorOperation(tag.label, color)])}
           />
           <button
             type="button"
             disabled={!tag.color}
             aria-label={props.labels.clearColor}
             title={props.labels.clearColor}
-            onClick={() =>
-              props.onCommit([{ id: operationID(), type: "tag.color", tag: tag.label, color: undefined }])
-            }
+            onClick={() => props.onCommit([architectureTagColorOperation(tag.label, undefined)])}
           >
             {props.labels.clearFilters}
           </button>
@@ -1639,32 +1587,6 @@ function tagSummaries(resource: ArchitectureResource) {
     color: resource.tagColors?.[label],
     count: resource.nodes.filter((node) => node.tags.includes(label)).length,
   }))
-}
-
-function renameTagOperations(resource: ArchitectureResource, current: string, next: string): ArchitectureOperation[] {
-  const targetExists = resource.nodes.some((node) => node.tags.includes(next))
-  const operations = resource.nodes.flatMap((node): ArchitectureOperation[] => {
-    if (!node.tags.includes(current)) return []
-    return [
-      {
-        id: operationID(),
-        type: "node.update",
-        node: {
-          ...node,
-          tags: unique(node.tags.map((tag) => (tag === current ? next : tag))),
-        },
-      },
-    ]
-  })
-  const color = resource.tagColors?.[current]
-  if (!color) return operations
-  return [
-    { id: operationID(), type: "tag.color", tag: current, color: undefined },
-    ...operations,
-    ...(targetExists || resource.tagColors?.[next]
-      ? []
-      : [{ id: operationID(), type: "tag.color", tag: next, color } satisfies ArchitectureOperation]),
-  ]
 }
 
 function cleanTag(value: string) {
@@ -1823,10 +1745,6 @@ function nodeMatchesFilter(node: ArchitectureNode, filter: { readonly text: stri
   return [node.id, node.text, ...node.tags].join("\n").toLowerCase().includes(filter.text.toLowerCase())
 }
 
-function samePosition(left: XYPosition, right: XYPosition) {
-  return left.x === right.x && left.y === right.y
-}
-
 function isViewportMotionEvent(event: MouseEvent | TouchEvent | null) {
   if (!event) return false
   if (typeof WheelEvent !== "undefined" && event instanceof WheelEvent) return false
@@ -1859,8 +1777,4 @@ function performanceNow() {
 
 function connectionEndedDisconnected(connection: FinalConnectionState | null | undefined) {
   return connection?.toHandle === null && connection.toNode === null
-}
-
-function connectionSide(value: string | null | undefined, fallback: ArchitectureConnectionSide) {
-  return connectionSides.find((side) => side === value) ?? fallback
 }

@@ -51,9 +51,20 @@ export type ArchitectureRuntimeDebugEvent = {
   readonly at: number
   readonly resourceID: string
   readonly operationCount?: number
+  readonly operationTypes?: ReadonlyArray<ArchitectureOperation["type"]>
   readonly conflictCount?: number
   readonly revision?: number
   readonly digest?: string
+}
+
+export type ArchitectureConflictExplanation = {
+  readonly operationID: string
+  readonly operationType: ArchitectureOperation["type"]
+  readonly reason: ArchitectureConflict["reason"]
+  readonly target: {
+    readonly kind: "resource" | "tag" | "node" | "edge"
+    readonly id?: string
+  }
 }
 
 export type ArchitectureRuntimeView = {
@@ -73,6 +84,7 @@ export type ArchitectureRuntimeView = {
   readonly visibleRevision?: number
   readonly visibleDigest?: string
   readonly syncStatus: ArchitectureRuntimeSyncStatus
+  readonly conflictExplanations: ReadonlyArray<ArchitectureConflictExplanation>
   readonly debugEvents: ReadonlyArray<ArchitectureRuntimeDebugEvent>
 }
 
@@ -142,6 +154,7 @@ export type ArchitectureLabels = {
   readonly allTags: string
   readonly clearFilters: string
   readonly addNode: string
+  readonly defaultNodeText: string
   readonly save: string
   readonly reload: string
   readonly fitView: string
@@ -171,6 +184,7 @@ export type ArchitectureLabels = {
   readonly saveFailed: string
   readonly askSelectionFailed: string
   readonly conflictReasons: Record<ArchitectureConflict["reason"], string>
+  readonly conflictExplanation: (explanation: ArchitectureConflictExplanation) => string
   readonly debug: {
     readonly title: string
     readonly resourceID: string
@@ -193,6 +207,8 @@ export type ArchitectureLabels = {
     readonly noActivity: string
     readonly eventTypes: Record<ArchitectureRuntimeDebugEventType, string>
     readonly eventStatuses: Record<ArchitectureRuntimeDebugEventStatus, string>
+    readonly operationTypes: Record<ArchitectureOperation["type"], string>
+    readonly eventOperations: (operations: string) => string
   }
 }
 

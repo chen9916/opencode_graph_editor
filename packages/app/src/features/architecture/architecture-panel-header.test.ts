@@ -8,8 +8,8 @@ describe("architecture resource header", () => {
     if (!fileMenu) throw new Error("Architecture resource File menu was not found")
     expect(fileMenu).toContain('language.t("command.category.file")')
     expect(fileMenu).toContain('<MenuV2.Item onSelect={() => void createResource()}')
-    expect(fileMenu).toContain('<MenuV2.Item onSelect={requestDuplicateResource}')
-    expect(fileMenu).toContain('<MenuV2.Item onSelect={removeResource}')
+    expect(fileMenu).toContain("<MenuV2.Item onSelect={requestDuplicateResource}")
+    expect(fileMenu).toContain("<MenuV2.Item onSelect={removeResource}")
     expect(fileMenu).not.toContain("exportResource")
   })
 
@@ -58,6 +58,6 @@ describe("architecture resource header", () => {
     const source = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
 
     expect(source).toContain("adoptArchitectureLiveInstanceCache")
-    expect(source).toContain("adoptArchitectureLiveInstanceCache(current, eventInstance)")
+    expect(source).toContain("adoptArchitectureLiveInstanceCache(current, plan.cache)")
   })
 })
