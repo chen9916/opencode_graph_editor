@@ -955,7 +955,7 @@ function formatContext(
         .slice(0, 75)
         .map(
           (edge) =>
-            `- ${edge.source}.${edge.sourceHandle ?? "right"} -> ${edge.target}.${edge.targetHandle ?? "left"} (style: ${edge.style ?? "rectangular"})`,
+            `- ${edge.source}.${edge.sourceHandle ?? "right"} -> ${edge.target}.${edge.targetHandle ?? "left"} (style: ${edge.style ?? "curved"})`,
         )
       const compactMention = `@${resource.name.replace(/\s+/g, "")}`
       const lowerCompactMention = compactMention.toLowerCase()

@@ -140,7 +140,6 @@ describe("ArchitectureTools", () => {
           target: "b",
           sourceHandle: "bottom",
           targetHandle: "top",
-          style: "curved",
         }),
       )
       expect(connected.output?.structured).toMatchObject({

@@ -94,7 +94,7 @@ export function prepare(input: typeof Input.Type, resource: Architecture.Resourc
     target: item.target,
     sourceHandle: item.sourceHandle ?? "right",
     targetHandle: item.targetHandle ?? "left",
-    style: item.style ?? "rectangular",
+    style: item.style ?? "curved",
   }))
   const updatedNodeOperations = (input.updateNodes ?? []).map((item): Architecture.Operation => {
     const node = nodes.get(item.nodeID)!
@@ -130,7 +130,7 @@ export function prepare(input: typeof Input.Type, resource: Architecture.Resourc
         target: item.target ?? edge.target,
         sourceHandle: item.sourceHandle ?? edge.sourceHandle ?? "right",
         targetHandle: item.targetHandle ?? edge.targetHandle ?? "left",
-        style: item.style ?? edge.style ?? "rectangular",
+        style: item.style ?? edge.style ?? "curved",
       },
       expectedDigest: item.expectedDigest,
     }

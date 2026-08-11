@@ -31,6 +31,7 @@ describe("architecture flow model", () => {
     expect(edges[0]).toMatchObject({
       sourceHandle: architectureRenderEdgeHandleID("vertical", "source", "bottom"),
       targetHandle: architectureRenderEdgeHandleID("vertical", "target", "top"),
+      data: { style: "curved" },
     })
     expect(architectureRenderEdgeHandleSide(edges[1]?.sourceHandle)).toBe("left")
     expect(architectureRenderEdgeHandleSide(edges[1]?.targetHandle)).toBe("right")

@@ -1,11 +1,5 @@
 import type { Edge, Node } from "@xyflow/react"
-import type {
-  ArchitectureConnectionSide,
-  ArchitectureEdge,
-  ArchitectureEdgeStyle,
-  ArchitectureNode,
-  ArchitectureResource,
-} from "./contract"
+import type { ArchitectureConnectionSide, ArchitectureEdge, ArchitectureNode, ArchitectureResource } from "./contract"
 
 type ArchitectureEndpointHandleType = "source" | "target"
 type Position = { readonly x: number; readonly y: number }
@@ -32,18 +26,11 @@ export type ArchitectureFlowNode = Node<
   "architecture"
 >
 
-export type ArchitectureFlowEdgeControls = {
-  readonly label: string
-  readonly styles: Readonly<Record<ArchitectureEdgeStyle, string>>
-  readonly onChange: (edgeID: string, style: ArchitectureEdgeStyle) => void
-}
-
 export type ArchitectureFlowEdge = Edge<
   {
     readonly edge: ArchitectureEdge
-    readonly style: ArchitectureEdgeStyle
+    readonly style: NonNullable<ArchitectureEdge["style"]>
     readonly dimmed?: boolean
-    readonly controls?: ArchitectureFlowEdgeControls
   },
   "architecture"
 >
@@ -54,7 +41,6 @@ const renderEdgeHandlePrefix = "architecture-edge-anchor:"
 export function toReactFlow(
   resource: ArchitectureResource,
   onTextChange: (node: ArchitectureNode, text: string) => void,
-  controls?: ArchitectureFlowEdgeControls,
 ) {
   const colorsKey = tagColorsKey(resource.tagColors)
   const endpointHandles = architectureFlowEndpointHandles(resource.edges, resource.nodes)
@@ -85,7 +71,7 @@ export function toReactFlow(
           sourceHandle: architectureRenderEdgeHandleID(edge.id, "source", sides.sourceHandle),
           targetHandle: architectureRenderEdgeHandleID(edge.id, "target", sides.targetHandle),
           type: "architecture",
-          data: { edge, style: edge.style ?? "rectangular", controls },
+          data: { edge, style: edge.style ?? "curved" },
         }
       },
     ),

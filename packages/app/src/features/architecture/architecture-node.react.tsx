@@ -116,7 +116,10 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
               setEditing(false)
               return
             }
-            if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) save()
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault()
+              save()
+            }
           }}
         />
       ) : (

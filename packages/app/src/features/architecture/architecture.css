@@ -431,68 +431,6 @@
   white-space: nowrap;
 }
 
-.architecture-editor .react-flow__edge-toolbar {
-  z-index: 60;
-  pointer-events: all;
-}
-
-.architecture-editor__wire-toolbar-anchor {
-  z-index: 60;
-  pointer-events: all;
-}
-
-.architecture-editor__wire-toolbar {
-  position: relative;
-  z-index: 61;
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--color-v2-border-subtle, var(--color-border-weaker-base));
-  border-radius: 999px;
-  background: var(--color-v2-background-bg-raised, var(--color-background-stronger));
-  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
-  pointer-events: auto;
-  transform: translateY(-18px);
-}
-
-.architecture-editor__wire-toolbar button {
-  inline-size: 28px;
-  block-size: 28px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border-radius: 999px;
-  pointer-events: auto;
-}
-
-.architecture-editor__wire-toolbar button[aria-pressed="true"] {
-  border-color: var(--architecture-accent);
-  background: color-mix(in srgb, var(--architecture-accent) 18%, transparent);
-}
-
-.architecture-editor__wire-toolbar button span {
-  inline-size: 14px;
-  block-size: 9px;
-  display: block;
-  color: var(--architecture-accent);
-}
-
-.architecture-editor__wire-toolbar button[data-wire-style="straight"] span {
-  block-size: 0;
-  border-block-start: 2px solid currentColor;
-}
-
-.architecture-editor__wire-toolbar button[data-wire-style="curved"] span {
-  border-block-start: 2px solid currentColor;
-  border-radius: 50%;
-  transform: rotate(-18deg);
-}
-
-.architecture-editor__wire-toolbar button[data-wire-style="rectangular"] span {
-  border-block: 2px solid currentColor;
-  border-inline-end: 2px solid currentColor;
-}
-
 .architecture-editor__context-menu > button {
   inline-size: 100%;
   border-color: transparent;

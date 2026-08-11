@@ -73,7 +73,7 @@ export function architectureCreateConnectedNodeOperations(input: {
           target: input.fromNodeID,
           sourceHandle: oppositeConnectionSide(fromHandle),
           targetHandle: fromHandle,
-          style: "rectangular",
+          style: "curved",
         }
       : {
           id: edgeID(),
@@ -81,7 +81,7 @@ export function architectureCreateConnectedNodeOperations(input: {
           target: id,
           sourceHandle: fromHandle,
           targetHandle: oppositeConnectionSide(fromHandle),
-          style: "rectangular",
+          style: "curved",
         }
   return {
     id,
@@ -151,7 +151,7 @@ export function architectureEdgeCreateOperation(connection: ConnectionInput) {
     target: connection.target,
     sourceHandle: architectureConnectionSide(connection.sourceHandle, "right"),
     targetHandle: architectureConnectionSide(connection.targetHandle, "left"),
-    style: "rectangular",
+    style: "curved",
   }
   return { id: edge.id, operation: architectureEdgeCreateOperationForEdge(edge) }
 }
@@ -179,7 +179,7 @@ export function architectureEdgeStyleOperation(
   style: ArchitectureEdgeStyle,
 ) {
   const edge = resource.edges.find((candidate) => candidate.id === edgeID)
-  if (!edge || (edge.style ?? "rectangular") === style) return
+  if (!edge || (edge.style ?? "curved") === style) return
   return architectureEdgeUpdateOperation({ ...edge, style })
 }
 

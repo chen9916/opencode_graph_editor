@@ -632,7 +632,7 @@ const layer = Layer.effectDiscard(
                 target: input.target,
                 sourceHandle: input.sourceHandle ?? "right",
                 targetHandle: input.targetHandle ?? "left",
-                style: input.style ?? "rectangular",
+                style: input.style ?? "curved",
               }
               const saved = yield* graph.patchInstance(input.resourceID, {
                 revision: current.snapshot.resource.revision,
@@ -668,7 +668,7 @@ const layer = Layer.effectDiscard(
           toModelOutput: ({ output }) => [
             {
               type: "text",
-              text: `Updated graph connection ${output.edge.id} (${output.edge.sourceHandle} to ${output.edge.targetHandle}; ${output.edge.style ?? "rectangular"})`,
+              text: `Updated graph connection ${output.edge.id} (${output.edge.sourceHandle} to ${output.edge.targetHandle}; ${output.edge.style ?? "curved"})`,
             },
           ],
           execute: (input, context) =>
@@ -683,7 +683,7 @@ const layer = Layer.effectDiscard(
                 target: input.target ?? edge.target,
                 sourceHandle: input.sourceHandle ?? edge.sourceHandle ?? "right",
                 targetHandle: input.targetHandle ?? edge.targetHandle ?? "left",
-                style: input.style ?? edge.style ?? "rectangular",
+                style: input.style ?? edge.style ?? "curved",
               }
               const saved = yield* graph.patchInstance(input.resourceID, {
                 revision: current.snapshot.resource.revision,
@@ -768,7 +768,7 @@ const layer = Layer.effectDiscard(
                     ...edge,
                     sourceHandle: item.sourceHandle ?? edge.sourceHandle ?? "right",
                     targetHandle: item.targetHandle ?? edge.targetHandle ?? "left",
-                    style: item.style ?? edge.style ?? "rectangular",
+                    style: item.style ?? edge.style ?? "curved",
                   },
                 })
               }

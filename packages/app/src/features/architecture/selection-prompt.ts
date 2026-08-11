@@ -8,7 +8,7 @@ export function architectureSelectionText(input: ArchitectureSelectionPrompt) {
     return `- ${node.id}: ${node.text}${tags} (position: ${node.position.x}, ${node.position.y})`
   })
   const edgeLines = input.edges.slice(0, edgeLimit).map((edge) => {
-    return `- ${edge.id}: ${edge.source}.${edge.sourceHandle ?? "right"} -> ${edge.target}.${edge.targetHandle ?? "left"} (style: ${edge.style ?? "rectangular"})`
+    return `- ${edge.id}: ${edge.source}.${edge.sourceHandle ?? "right"} -> ${edge.target}.${edge.targetHandle ?? "left"} (style: ${edge.style ?? "curved"})`
   })
   return [
     `Graph selection in resource ${input.resourceName} (${input.resourceID}).`,

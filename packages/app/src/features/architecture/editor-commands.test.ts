@@ -31,7 +31,7 @@ describe("architecture editor command builders", () => {
 
     expect(created?.operation).toMatchObject({
       type: "edge.create",
-      edge: { source: "a", target: "b", sourceHandle: "right", targetHandle: "top", style: "rectangular" },
+      edge: { source: "a", target: "b", sourceHandle: "right", targetHandle: "top", style: "curved" },
     })
     expect(architectureConnectionSide("left", "right")).toBe("left")
     expect(architectureConnectionSide(architectureRenderEdgeHandleID("ab", "source", "bottom"), "right")).toBe("bottom")
@@ -57,7 +57,7 @@ describe("architecture editor command builders", () => {
           target: created.id,
           sourceHandle: "right",
           targetHandle: "left",
-          style: "rectangular",
+          style: "curved",
         },
       },
     ])

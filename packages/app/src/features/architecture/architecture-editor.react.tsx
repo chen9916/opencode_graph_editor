@@ -278,15 +278,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     if (operation) commit([operation])
   }
 
-  const projected = toReactFlow(editor.resource, updateNodeText, {
-    label: props.labels.connectionStyle,
-    styles: {
-      rectangular: props.labels.rectangular,
-      curved: props.labels.curved,
-      straight: props.labels.straight,
-    },
-    onChange: (edgeID, style) => changeEdgeStyle(edgeID, style),
-  })
+  const projected = toReactFlow(editor.resource, updateNodeText)
   const [nodes, setNodes, onNodesChange] = useNodesState(projected.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(projected.edges)
   const flowNodes = connectionPreview ? [...nodes, connectionPreviewNode(connectionPreview, props.labels.defaultNodeText)] : nodes
@@ -304,15 +296,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   const replaceFlowElements = (resource: ArchitectureResource) => {
-    const next = toReactFlow(resource, updateNodeText, {
-      label: props.labels.connectionStyle,
-      styles: {
-        rectangular: props.labels.rectangular,
-        curved: props.labels.curved,
-        straight: props.labels.straight,
-      },
-      onChange: (edgeID, style) => changeEdgeStyle(edgeID, style),
-    })
+    const next = toReactFlow(resource, updateNodeText)
     const visible = new Set(resource.nodes.filter((node) => nodeMatchesFilter(node, filter)).map((node) => node.id))
     const editedHints = new Set(editedHintNodeIDs)
     const selected = selectionInResource(pendingSelection.current ?? selectionRef.current, resource)
@@ -393,7 +377,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       if (
         event.target instanceof Element &&
         event.target.closest(
-          ".architecture-editor__context-menu, .architecture-editor__ask-popover, .architecture-editor__wire-toolbar",
+          ".architecture-editor__context-menu, .architecture-editor__ask-popover",
         )
       )
         return
@@ -1117,7 +1101,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
                   <EdgeStyleControls
                     labels={props.labels}
                     style={
-                      editor.resource.edges.find((edge) => edge.id === contextMenu.id)?.style ?? "rectangular"
+                      editor.resource.edges.find((edge) => edge.id === contextMenu.id)?.style ?? "curved"
                     }
                     onChange={(style) => changeEdgeStyle(contextMenu.id, style)}
                   />
@@ -1424,7 +1408,7 @@ function Inspector(props: {
         </div>
         <EdgeStyleControls
           labels={props.labels}
-          style={edge.style ?? "rectangular"}
+          style={edge.style ?? "curved"}
           onChange={(style) => props.onEdgeStyle(edge.id, style)}
         />
       </div>
@@ -1887,7 +1871,7 @@ function isViewportPanStartEvent(event: MouseEvent | TouchEvent | null) {
   if (!isViewportMotionEvent(event)) return false
   if (!(event.target instanceof Element)) return true
   return !event.target.closest(
-    ".react-flow__node, .react-flow__edge, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .architecture-editor__side-toggle, .architecture-editor__context-menu, .architecture-editor__ask-popover, .architecture-editor__wire-toolbar",
+    ".react-flow__node, .react-flow__edge, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .architecture-editor__side-toggle, .architecture-editor__context-menu, .architecture-editor__ask-popover",
   )
 }
 
@@ -1948,7 +1932,7 @@ function connectionDropTargetIsEmpty(event: MouseEvent | TouchEvent | null) {
   const node = target.closest(".react-flow__node")
   if (node?.querySelector('.architecture-node[data-preview="true"]')) return true
   return !target.closest(
-    ".react-flow__node, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .architecture-editor__side-toggle, .architecture-editor__context-menu, .architecture-editor__ask-popover, .architecture-editor__wire-toolbar",
+    ".react-flow__node, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .architecture-editor__side-toggle, .architecture-editor__context-menu, .architecture-editor__ask-popover",
   )
 }
 
