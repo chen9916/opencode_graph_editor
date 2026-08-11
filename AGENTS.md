@@ -6,9 +6,36 @@
 
 ## Repository Focus
 
-- This working repository is primarily for implementing and validating the interactive Graph approach.
+- This working repository is primarily for developing, restructuring, debugging, and validating the OpenCode Graph editor.
+- When a request is ambiguous, assume Graph editor work is the main product goal unless the user clearly points to another area of OpenCode.
 - The graph is a shared communication surface where people describe intended software designs, AI explains the current implementation, and both can compare, refine, and cross-reference designs across multiple graph resources.
 - Treat this interaction model as the main product goal of the work in this repository. Do not turn it back into a hard-coded dependency scanner, a fixed taxonomy, or an automatically generated representation of the codebase.
+
+## Graph Editor Implementation Map
+
+- Product surface: the Graph editor is an OpenCode feature for human-authored design intent, AI implementation explanations, and comparisons between graph resources. It is not an automatic code dependency graph.
+- App editor implementation lives in `packages/app/src/features/architecture/`.
+- The Solid shell is `packages/app/src/features/architecture/architecture-panel.tsx`. It owns server queries, resource switching, create/delete/duplicate, save/reload, persisted selected resource, persisted pending overlays, persisted viewport, server event handling, labels, dialogs, toasts, and command routing.
+- The React Flow bridge is `packages/app/src/features/architecture/architecture-island.tsx`. It lazy-loads React, React DOM, and the editor so the Graph editor stays out of the initial Solid bundle.
+- The main React canvas is `packages/app/src/features/architecture/architecture-editor.react.tsx`. It owns React Flow wiring, node/edge gestures, selection, context menus, ask-selection popover, inspector panels, outline/filter UI, undo/redo, node position commits, viewport persistence, and viewport inertia. This is the largest app-side file and the main candidate for future restructuring.
+- Custom React Flow elements are `architecture-node.react.tsx` and `architecture-edge.react.tsx`. Nodes render text, tags, inline editing, and four-sided handles. Edges render rectangular, curved, and straight wires plus selected-wire style controls.
+- Shared app contracts and pure helpers are in `contract.ts`, `model.ts`, `journal.ts`, `editor-state.ts`, `live-instance.ts`, `resource-state.ts`, `event.ts`, `commands.ts`, `selection-state.ts`, `selection-prompt.ts`, `mention.ts`, `mentions.ts`, `edit-hint.ts`, `cache-order.ts`, and `export.ts`.
+- Session integration is in `packages/app/src/pages/session/session-side-panel.tsx`, `packages/app/src/components/session/session-header.tsx`, `packages/app/src/pages/session/use-session-commands.tsx`, and `packages/app/src/pages/session/helpers.ts`. The tab constant is `SESSION_ARCHITECTURE_TAB`.
+- Prompt mention integration is in `packages/app/src/components/prompt-input.tsx`, `packages/app/src/components/prompt-input-v2.tsx`, and `packages/app/src/features/architecture/mention.ts`. Graph resource mentions should remain visible to users while managed graph JSON is filtered out of provider file/media payloads.
+- Graph capability detection is in `packages/app/src/utils/server-protocol.ts` and the shared server SDK context. Do not gate Graph visibility on a downloaded external V2 CLI.
+- Backend schema is `packages/schema/src/architecture.ts`. The core resource service, storage, patching, locking, conflict behavior, AI tools, and dynamic System Context live under `packages/core/src/architecture/`.
+- Public HTTP API definitions are in `packages/protocol/src/groups/architecture.ts`; server handlers are in `packages/server/src/handlers/architecture.ts`. After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`.
+- Generated clients live under `packages/client/src/generated` and `packages/client/src/generated-effect`; never edit generated files directly.
+- Desktop packaging needs React island dependencies resolvable from `packages/desktop/package.json`; keep `react`, `react-dom`, and `@xyflow/react` there unless the bundling approach changes.
+
+## Graph Editor Data Model
+
+- Saved resources are stored per project under `.opencode/architecture/resources/<resource-id>.json`. The legacy `.opencode/architecture/graph.json` is exposed as `overview` and migrates on first edit.
+- A resource contains `version`, `revision`, `id`, `name`, optional `tagColors`, `nodes`, and `edges`.
+- Nodes contain `id`, `text`, free-form `tags`, and `layout.position`.
+- Edges contain `id`, `source`, `target`, optional `sourceHandle`, optional `targetHandle`, and optional `style`. Handles are explicit sides: `top`, `right`, `bottom`, or `left`; styles are `rectangular`, `curved`, or `straight`.
+- App-side editing distinguishes saved snapshots, server live instances, and editor-local pending overlays. Pending overlays bridge unacknowledged local UI edits, journal recovery, undo/redo, and conflict-aware rebase.
+- Graph changes should flow through typed operations such as `resource.update`, `tag.color`, `node.create`, `node.update`, `node.position`, `node.remove`, `edge.create`, `edge.update`, and `edge.remove`. Do not mutate graph JSON directly from app code.
 
 ## Graph Workspace Progress
 
