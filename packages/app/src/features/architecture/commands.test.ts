@@ -81,6 +81,24 @@ describe("architecture commands", () => {
     expect(received).toEqual([pane])
   })
 
+  test("routes graph shortcuts from the document body to a visible panel", () => {
+    const panel = document.createElement("div")
+    const received: Array<EventTarget | null | undefined> = []
+    const listener = (event: Event) =>
+      received.push((event as CustomEvent<{ target?: EventTarget | null }>).detail.target)
+
+    panel.setAttribute("data-architecture-panel", "")
+    document.body.append(panel)
+    document.addEventListener(ARCHITECTURE_COMMAND_EVENT, listener)
+
+    expect(architecturePanelCommandTarget(key("r", { target: document.body }))).toBe(true)
+    dispatchArchitectureCommand("reload")
+
+    document.removeEventListener(ARCHITECTURE_COMMAND_EVENT, listener)
+    panel.remove()
+    expect(received).toEqual([panel])
+  })
+
   test("uses standard editor keybinds for graph save, reload, undo, and redo", () => {
     expect(matchKeybind(parseKeybind(architectureCommandKeybinds.save), key("s", { ctrlKey: true }))).toBe(true)
     expect(matchKeybind(parseKeybind(architectureCommandKeybinds.reload), key("r", { ctrlKey: true }))).toBe(true)

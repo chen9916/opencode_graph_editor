@@ -56,9 +56,15 @@ export function architecturePanelCommandTarget(event: KeyboardEvent) {
       : typeof document !== "undefined" && document.activeElement instanceof Element
         ? document.activeElement
         : undefined
-  if (!target?.closest(ARCHITECTURE_PANEL_TARGET)) return false
-  if (target instanceof HTMLElement && target.isContentEditable) return false
-  if (target.closest("input, textarea, select, [contenteditable='true']")) return false
+  if (target && architectureTextEntryTarget(target)) return false
+  const panel = target ? architectureCommandPanel(target) : undefined
+  if (!panel) {
+    if (target && !architecturePanelFallbackTarget(target)) return false
+    const fallback = architectureCommandTarget()
+    if (!fallback) return false
+    lastArchitectureCommandTarget = fallback
+    return true
+  }
   lastArchitectureCommandTarget = target
   return true
 }
@@ -104,6 +110,15 @@ function architectureCommandPanel(target: Element) {
   const panel = target.closest<HTMLElement>(ARCHITECTURE_PANEL_TARGET)
   if (!panel || !architecturePanelVisible(panel)) return
   return panel
+}
+
+function architectureTextEntryTarget(target: Element) {
+  if (target instanceof HTMLElement && target.isContentEditable) return true
+  return !!target.closest("input, textarea, select, [contenteditable='true']")
+}
+
+function architecturePanelFallbackTarget(target: Element) {
+  return target === document.body || target === document.documentElement
 }
 
 function architecturePanelVisible(panel: HTMLElement) {
