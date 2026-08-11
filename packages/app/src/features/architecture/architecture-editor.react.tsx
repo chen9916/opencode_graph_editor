@@ -36,6 +36,7 @@ import type {
 import { architectureCommandMatches } from "./commands"
 import {
   architectureConnectionSide,
+  architectureCreateConnectedNodeOperations,
   architectureCreateNodeOperation,
   architectureDuplicateNodeOperation,
   architectureEdgeCreateOperation,
@@ -84,6 +85,7 @@ import {
 const nodeTypes = { architecture: ArchitectureNodeView }
 const edgeTypes = { architecture: ArchitectureEdgeView }
 const connectionSides = ["top", "right", "bottom", "left"] as const satisfies ReadonlyArray<ArchitectureConnectionSide>
+const connectionPreviewID = "__architecture_connection_preview__"
 
 type SingleSelection = { readonly type: "node" | "edge"; readonly id: string }
 type ContextMenu =
@@ -101,6 +103,13 @@ type AskPopover = {
   readonly selection: Selection
   readonly text: string
 }
+type ConnectionHandleType = "source" | "target"
+type ConnectionStart = {
+  readonly fromNodeID: string
+  readonly fromHandle?: ArchitectureConnectionSide
+  readonly fromHandleType: ConnectionHandleType
+}
+type ConnectionPreview = ConnectionStart & { readonly position: XYPosition }
 type ViewportMotion = {
   readonly active: boolean
   readonly last?: { readonly viewport: ArchitectureViewport; readonly time: number }
@@ -117,6 +126,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const historySource = props.pending?.journalBase ?? base.resource
   const liveInstanceKey = architectureEditorLiveInstanceKey({ base, liveInstanceVersion: props.liveInstanceVersion })
   const loadedResourceID = useRef(base.resource.id)
+  const loadedLiveInstanceVersion = useRef(props.liveInstanceVersion)
   const canvas = useRef<HTMLDivElement>(null)
   const visibleViewport = useRef<ArchitectureViewport | undefined>(props.viewport)
   const viewportMotion = useRef<ViewportMotion>({ active: false, velocity: { x: 0, y: 0 } })
@@ -130,6 +140,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const handledAction = useRef<number>()
   const suppressEmptySelectionUntil = useRef(0)
   const connecting = useRef(false)
+  const connectionStart = useRef<ConnectionStart>()
   const outlineID = useId()
   const inspectorID = useId()
   const [editor, setEditor] = useState(() => createArchitectureEditorHistory(historySource, initial))
@@ -140,6 +151,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenu>()
   const [askPopover, setAskPopover] = useState<AskPopover>()
+  const [connectionPreview, setConnectionPreview] = useState<ConnectionPreview>()
   const [editedHintNodeIDs, setEditedHintNodeIDs] = useState<ReadonlyArray<string>>([])
   const operations = architectureEditorPendingOperations(editor)
   latestChange.current = architectureInstanceChange(
@@ -162,14 +174,23 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const nodeInternalsKey = editor.resource.nodes
     .map((node) => [node.id, node.layout.position.x, node.layout.position.y, node.text, ...node.tags].join("\u001f"))
     .join("\u001e")
+  const edgeInternalsKey = editor.resource.edges
+    .map((edge) =>
+      [edge.id, edge.source, edge.target, edge.sourceHandle ?? "right", edge.targetHandle ?? "left"].join("\u001f"),
+    )
+    .join("\u001e")
   const resourceTagColorsKey = tagColorsKey(editor.resource.tagColors)
   const editedHintNodeIDsKey = editedHintNodeIDs.join(",")
 
   useLayoutEffect(() => {
     const resourceChanged = loadedResourceID.current !== base.resource.id
+    const resetEditedHints = resourceChanged || loadedLiveInstanceVersion.current !== props.liveInstanceVersion
     loadedResourceID.current = base.resource.id
-    locallyAuthoredResourceKeys.current.clear()
+    loadedLiveInstanceVersion.current = props.liveInstanceVersion
     const next = syncArchitectureEditorHistorySource(editor, historySource, initial)
+    const nextResourceKey = architectureResourceHintKey(next.resource)
+    const locallyAuthored = locallyAuthoredResourceKeys.current.has(nextResourceKey)
+    if (locallyAuthored) locallyAuthoredResourceKeys.current.delete(nextResourceKey)
     setEditor(next)
     latestChange.current = architectureInstanceChange(
       next.resource,
@@ -180,7 +201,17 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       props.server,
       props.directory,
     )
-    setEditedHintNodeIDs([])
+    setEditedHintNodeIDs((current) =>
+      resetEditedHints
+        ? []
+        : architectureEditedNodeHintsForResourceSync({
+            current,
+            previous: editor.resource,
+            next: next.resource,
+            external: !locallyAuthored,
+          }),
+    )
+    if (resetEditedHints) locallyAuthoredResourceKeys.current.clear()
     resetTransientLoadState({ closePanels: resourceChanged })
   }, [liveInstanceKey])
 
@@ -213,9 +244,11 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     additiveSelectionModifier.current = false
     suppressEmptySelectionUntil.current = 0
     connecting.current = false
+    connectionStart.current = undefined
     applySelection(emptySelection)
     setContextMenu(undefined)
     setAskPopover(undefined)
+    setConnectionPreview(undefined)
     if (!input.closePanels) return
     setOutlineOpen(false)
     setInspectorOpen(false)
@@ -255,6 +288,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   })
   const [nodes, setNodes, onNodesChange] = useNodesState(projected.nodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(projected.edges)
+  const flowNodes = connectionPreview ? [...nodes, connectionPreviewNode(connectionPreview, props.labels.defaultNodeText)] : nodes
 
   const changeEdgeStyle = (edgeID: string, style: ArchitectureEdgeStyle) => {
     const operation = architectureEdgeStyleOperation(editor.resource, edgeID, style)
@@ -322,6 +356,19 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
 
   const clearSelectionGestureAfterReactFlow = () => queueMicrotask(clearSelectionGesture)
 
+  const clearConnectionDrag = () => {
+    connecting.current = false
+    connectionStart.current = undefined
+    setConnectionPreview(undefined)
+  }
+
+  const updateConnectionDragPreview = (event: MouseEvent | TouchEvent) => {
+    const start = connectionStart.current
+    const position = flowPositionFromEvent(flow, event)
+    if (!start || !position) return
+    setConnectionPreview(connectionDropTargetIsEmpty(event) ? { ...start, position } : undefined)
+  }
+
   useEffect(() => {
     const pointer = (event: PointerEvent) => {
       if (
@@ -338,6 +385,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       if (event.key !== "Escape") return
       setContextMenu(undefined)
       setAskPopover(undefined)
+      clearConnectionDrag()
     }
     document.addEventListener("pointerdown", pointer)
     document.addEventListener("keydown", keyboard)
@@ -346,6 +394,23 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       document.removeEventListener("keydown", keyboard)
     }
   }, [])
+
+  useEffect(() => {
+    const pointerMove = (event: PointerEvent) => {
+      if (connecting.current) updateConnectionDragPreview(event)
+    }
+    const pointerCancel = () => {
+      clearConnectionDrag()
+    }
+    window.addEventListener("pointermove", pointerMove)
+    window.addEventListener("pointercancel", pointerCancel)
+    window.addEventListener("blur", pointerCancel)
+    return () => {
+      window.removeEventListener("pointermove", pointerMove)
+      window.removeEventListener("pointercancel", pointerCancel)
+      window.removeEventListener("blur", pointerCancel)
+    }
+  }, [flow])
 
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
@@ -518,6 +583,23 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     if (!created) return
     commit([created.operation])
     select({ type: "edge", id: created.id })
+  }
+
+  const createConnectedNodeOnEmptyDrop = (event: MouseEvent | TouchEvent, connection: FinalConnectionState | null) => {
+    const start = connectionStart.current
+    const position = flowPositionFromEvent(flow, event) ?? connectionPreview?.position
+    clearConnectionDrag()
+    if (!start || !position || !connectionEndedDisconnected(connection) || connectionEndWasCancelled(event)) return
+    if (!connectionDropTargetIsEmpty(event)) return
+    const created = architectureCreateConnectedNodeOperations({
+      text: props.labels.defaultNodeText,
+      position,
+      fromNodeID: start.fromNodeID,
+      fromHandle: start.fromHandle,
+      fromHandleType: start.fromHandleType,
+    })
+    commit(created.operations)
+    select({ type: "node", id: created.id })
   }
 
   const menuPosition = (x: number, y: number) => ({
@@ -802,7 +884,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
           }}
         >
           <ReactFlow<ArchitectureFlowNode, ArchitectureFlowEdge>
-            nodes={nodes}
+            nodes={flowNodes}
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -814,13 +896,21 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               selectionGesture.current = additiveSelectionModifier.current ? { base: selectionRef.current } : undefined
             }}
             onSelectionEnd={clearSelectionGestureAfterReactFlow}
-            onConnectStart={() => {
+            onConnectStart={(event, connection) => {
               connecting.current = true
               suppressEmptySelectionUntil.current = performanceNow() + 220
+              connectionStart.current = connection.nodeId
+                ? {
+                    fromNodeID: connection.nodeId,
+                    fromHandle: architectureConnectionSide(connection.handleId, "right"),
+                    fromHandleType: connectionHandleType(connection.handleType),
+                  }
+                : undefined
+              updateConnectionDragPreview(event)
             }}
-            onConnectEnd={() => {
-              connecting.current = false
+            onConnectEnd={(event, connection) => {
               suppressEmptySelectionUntil.current = performanceNow() + 120
+              createConnectedNodeOnEmptyDrop(event, connection)
             }}
             onConnect={onConnect}
             onPaneClick={() => {
@@ -914,7 +1004,10 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
             proOptions={{ hideAttribution: true }}
           >
             <SelectionLassoCleanup />
-            <NodeInternalsRefresh nodeIDs={nodeIDsKey} refreshKey={`${nodeInternalsKey}\u001e${resourceTagColorsKey}`} />
+            <NodeInternalsRefresh
+              nodeIDs={nodeIDsKey}
+              refreshKey={`${nodeInternalsKey}\u001e${edgeInternalsKey}\u001e${resourceTagColorsKey}`}
+            />
             <Background />
             <Controls position={controlsPosition} />
             {!props.mobile && <MiniMap position={minimapPosition} pannable zoomable />}
@@ -1773,6 +1866,72 @@ function cancelViewportInertia(motion: ViewportMotion) {
 
 function performanceNow() {
   return typeof performance === "undefined" ? Date.now() : performance.now()
+}
+
+function connectionPreviewNode(preview: ConnectionPreview, text: string): ArchitectureFlowNode {
+  const id = `${connectionPreviewID}:${preview.fromNodeID}`
+  return {
+    id,
+    type: "architecture",
+    position: preview.position,
+    data: {
+      node: {
+        id,
+        text,
+        tags: [],
+        layout: { position: preview.position },
+      },
+      tagColorsKey: "",
+      preview: true,
+      onTextChange: () => {},
+    },
+    connectable: false,
+    deletable: false,
+    draggable: false,
+    focusable: false,
+    selectable: false,
+    style: { pointerEvents: "none" },
+    zIndex: 10,
+  }
+}
+
+function flowPositionFromEvent(
+  flow: ReactFlowInstance<ArchitectureFlowNode, ArchitectureFlowEdge> | undefined,
+  event: MouseEvent | TouchEvent | null,
+) {
+  const point = clientPoint(event)
+  if (!flow || !point) return
+  return flow.screenToFlowPosition(point)
+}
+
+function connectionDropTargetIsEmpty(event: MouseEvent | TouchEvent | null) {
+  const point = clientPoint(event)
+  if (!point || typeof document === "undefined") return false
+  const target = document.elementFromPoint(point.x, point.y)
+  if (!(target instanceof Element)) return true
+  const node = target.closest(".react-flow__node")
+  if (node?.querySelector('.architecture-node[data-preview="true"]')) return true
+  return !target.closest(
+    ".react-flow__node, .react-flow__handle, .react-flow__controls, .react-flow__minimap, .architecture-editor__side-toggle, .architecture-editor__context-menu, .architecture-editor__ask-popover, .architecture-editor__wire-toolbar",
+  )
+}
+
+function clientPoint(event: MouseEvent | TouchEvent | null) {
+  if (!event) return
+  if ("changedTouches" in event) {
+    const touch = event.changedTouches[0] ?? event.touches[0]
+    if (!touch) return
+    return { x: touch.clientX, y: touch.clientY }
+  }
+  return { x: event.clientX, y: event.clientY }
+}
+
+function connectionHandleType(value: string | null | undefined): ConnectionHandleType {
+  return value === "target" ? "target" : "source"
+}
+
+function connectionEndWasCancelled(event: MouseEvent | TouchEvent) {
+  return event.type === "pointercancel" || event.type === "touchcancel" || event.type === "cancel"
 }
 
 function connectionEndedDisconnected(connection: FinalConnectionState | null | undefined) {

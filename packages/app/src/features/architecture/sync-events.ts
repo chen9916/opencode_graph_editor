@@ -25,7 +25,7 @@ export function architectureLiveInstanceEventPlan(input: {
 export function architectureResourceEventRefreshPlan(input: {
   readonly eventType: string
   readonly currentResourceID: string | undefined
-  readonly dirty: boolean
+  readonly localDirty: boolean
   readonly resources: ArchitectureListResourcesOutput["data"] | undefined
   readonly snapshot: ArchitectureSnapshot | undefined
   readonly event: ArchitectureResourceEventInfo
@@ -34,16 +34,25 @@ export function architectureResourceEventRefreshPlan(input: {
   readonly updateResources: boolean
   readonly updateResource: boolean
   readonly clearLocalState: boolean
+  readonly clearLiveInstance: boolean
 } {
   if (input.eventType === "architecture.resource.removed")
-    return { removed: true, updateResources: true, updateResource: false, clearLocalState: true }
-  if (input.event.resourceID === input.currentResourceID && input.dirty)
-    return { removed: false, updateResources: false, updateResource: false, clearLocalState: false }
+    return { removed: true, updateResources: true, updateResource: false, clearLocalState: true, clearLiveInstance: true }
+  if (input.event.resourceID === input.currentResourceID && input.localDirty)
+    return {
+      removed: false,
+      updateResources: false,
+      updateResource: false,
+      clearLocalState: false,
+      clearLiveInstance: false,
+    }
+  const updateResource =
+    input.event.resourceID === input.currentResourceID && !architectureSnapshotMatchesEvent(input.snapshot, input.event)
   return {
     removed: false,
     updateResources: !architectureSummaryMatchesEvent(input.resources, input.event),
-    updateResource:
-      input.event.resourceID === input.currentResourceID && !architectureSnapshotMatchesEvent(input.snapshot, input.event),
+    updateResource,
     clearLocalState: false,
+    clearLiveInstance: updateResource,
   }
 }

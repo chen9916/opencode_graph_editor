@@ -1,0 +1,1480 @@
+{
+  "version": 2,
+  "revision": 12,
+  "id": "design_ff267215400111kwcNtFTPmvkY",
+  "name": "Graph Editor UI System",
+  "tagColors": {
+    "acceptance": "#ca8a04",
+    "bridge": "#8b5cf6",
+    "bugfix": "#f43f5e",
+    "candidate": "#0891b2",
+    "canvas": "#06b6d4",
+    "change-target": "#22c55e",
+    "contract": "#f59e0b",
+    "data": "#10b981",
+    "element": "#ec4899",
+    "entrypoint": "#3b82f6",
+    "example": "#64748b",
+    "frontend-only": "#059669",
+    "guide": "#0ea5e9",
+    "i18n": "#a855f7",
+    "implemented": "#16a34a",
+    "improvement": "#2563eb",
+    "inspector": "#84cc16",
+    "integration": "#14b8a6",
+    "interaction": "#f97316",
+    "operation": "#ef4444",
+    "plan": "#7c3aed",
+    "risk": "#fb7185",
+    "shell": "#6366f1",
+    "styling": "#64748b",
+    "test": "#f97316",
+    "ux": "#db2777",
+    "verify": "#eab308"
+  },
+  "nodes": [
+    {
+      "id": "api_layer",
+      "text": "App API adapter\napi.ts wraps architecture HTTP calls for list, create, duplicate, load, live instance, patch, commit, discard, reload, and remove.",
+      "tags": [
+        "data",
+        "operation"
+      ],
+      "layout": {
+        "position": {
+          "x": 2030,
+          "y": 570
+        }
+      }
+    },
+    {
+      "id": "ask_popover",
+      "text": "Ask-selection popover\nSelected nodes and edges can be sent as model context via selectionPrompt and architectureSelectionText. Session follow-up drafts receive graph-selection metadata.",
+      "tags": [
+        "integration",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 1210,
+          "y": 1140
+        }
+      }
+    },
+    {
+      "id": "canvas_surface",
+      "text": "React Flow surface\nRenders custom node and edge types, Background, Controls, desktop MiniMap, loose connections, draggable nodes, reconnectable edges, and dirty/selection status chips.",
+      "tags": [
+        "canvas",
+        "element"
+      ],
+      "layout": {
+        "position": {
+          "x": 800,
+          "y": 1520
+        }
+      }
+    },
+    {
+      "id": "command_router",
+      "text": "Editor command router\ncommands.ts scopes custom opencode:architecture-command events to the active panel; ArchitectureEditor handles save, reload, fit, add, undo, redo, delete, export, and duplicate.",
+      "tags": [
+        "canvas",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 800,
+          "y": 760
+        }
+      }
+    },
+    {
+      "id": "context_menu",
+      "text": "Context menu\nPane menu adds nodes or fits view. Node and edge menus expose ask-selection, properties, duplicate/delete, and edge style controls.",
+      "tags": [
+        "element",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 1210,
+          "y": 950
+        }
+      }
+    },
+    {
+      "id": "contract_props",
+      "text": "ArchitecturePanelProps contract\ncontract.ts passes snapshot, runtimeView, pending, viewport, busy, action, localized labels, and callbacks for journal, viewport, save, duplicate, ask-selection, reload, export, and confirm.",
+      "tags": [
+        "contract"
+      ],
+      "layout": {
+        "position": {
+          "x": 800,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "custom_edges",
+      "text": "ArchitectureEdgeView\narchitecture-edge.react.tsx renders selected or dimmed wires with straight, curved, or rectangular paths using React Flow path helpers.",
+      "tags": [
+        "element"
+      ],
+      "layout": {
+        "position": {
+          "x": 1210,
+          "y": 570
+        }
+      }
+    },
+    {
+      "id": "custom_nodes",
+      "text": "ArchitectureNodeView\narchitecture-node.react.tsx renders node text, colored free-form tags, selected/dimmed/edited-hint states, double-click inline editing, and hover-revealed active sockets.",
+      "tags": [
+        "element"
+      ],
+      "layout": {
+        "position": {
+          "x": 1210,
+          "y": 190
+        }
+      }
+    },
+    {
+      "id": "edge_detail",
+      "text": "Edge detail form\nSingle selected edge exposes source side, target side, and style controls through edge.update operations.",
+      "tags": [
+        "inspector",
+        "operation"
+      ],
+      "layout": {
+        "position": {
+          "x": 1620,
+          "y": 950
+        }
+      }
+    },
+    {
+      "id": "edge_toolbar",
+      "text": "Selected-wire route toolbar\nEdgeToolbar appears only on selected edges and writes rectangular, curved, or straight style changes through the edge controls.",
+      "tags": [
+        "element",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 1210,
+          "y": 760
+        }
+      }
+    },
+    {
+      "id": "editor_history",
+      "text": "Local editor history\neditor-state.ts tracks undo/redo over operation batches. commit() updates the resource, records edited-node hints, and calls onJournal.",
+      "tags": [
+        "canvas",
+        "operation"
+      ],
+      "layout": {
+        "position": {
+          "x": 800,
+          "y": 380
+        }
+      }
+    },
+    {
+      "id": "entry_commands",
+      "text": "Command palette and keybinds\npages/session/use-session-commands.tsx registers Graph editor commands, keybinds, and dispatches opencode:architecture-command events.",
+      "tags": [
+        "entrypoint",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": -82.80671268770514,
+          "y": 376.6877314924918
+        }
+      }
+    },
+    {
+      "id": "entry_prompt_mentions",
+      "text": "Prompt @graph mentions\nprompt-input.tsx and prompt-input-v2.tsx list managed graph resources and the graph skill. mention.ts builds visible @resource file parts.",
+      "tags": [
+        "entrypoint",
+        "integration"
+      ],
+      "layout": {
+        "position": {
+          "x": -46.50721484031217,
+          "y": 713.2976983183236
+        }
+      }
+    },
+    {
+      "id": "entry_session_header",
+      "text": "Session header Graph button\ncomponents/session/session-header.tsx shows the branch icon when architecture capability is available; it opens the review side panel and Graph tab.",
+      "tags": [
+        "entrypoint",
+        "integration"
+      ],
+      "layout": {
+        "position": {
+          "x": -92.90816857553031,
+          "y": -146.10167504158738
+        }
+      }
+    },
+    {
+      "id": "entry_side_panel",
+      "text": "Session side-panel tab\npages/session/session-side-panel.tsx lazy-loads ArchitecturePanel in SESSION_ARCHITECTURE_TAB and force-mounts it after first open so editor state survives tab switches.",
+      "tags": [
+        "entrypoint",
+        "integration"
+      ],
+      "layout": {
+        "position": {
+          "x": -38.99999953963518,
+          "y": 125.00000076727474
+        }
+      }
+    },
+    {
+      "id": "filter_outline",
+      "text": "Outline and filters\nLeft outline panel starts closed. Search and tag filters dim unmatched canvas items, list visible nodes, and center a clicked node.",
+      "tags": [
+        "canvas",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 800,
+          "y": 1330
+        }
+      }
+    },
+    {
+      "id": "fix_agent_edits_refresh_immediately",
+      "text": "Implemented fix: agent graph edits refresh immediately\nAgent/server graph edits no longer require manual Reload to appear. Resource event refresh planning now distinguishes local unsaved UI edits from external live-instance dirty state, and clears stale live-instance cache when an authoritative saved resource update should take over.",
+      "tags": [
+        "bugfix",
+        "data",
+        "implemented",
+        "shell"
+      ],
+      "layout": {
+        "position": {
+          "x": 2488,
+          "y": 1350
+        }
+      }
+    },
+    {
+      "id": "fix_agent_edits_refresh_scope",
+      "text": "Scope: selected-resource refresh guard\nTouched architecture-panel.tsx and sync-events.ts. The panel now passes localDirty() instead of dirty(), so local pending UI work is still protected while external/agent updates can refetch immediately.",
+      "tags": [
+        "change-target",
+        "data",
+        "implemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 2898,
+          "y": 1350
+        }
+      }
+    },
+    {
+      "id": "fix_agent_edits_refresh_verify",
+      "text": "Verification: agent-edit refresh bug\nFocused sync/runtime/live-instance tests passed, packages/app typecheck passed, and diff whitespace check passed for architecture-panel.tsx, sync-events.ts, and sync-events.test.ts.",
+      "tags": [
+        "implemented",
+        "verify"
+      ],
+      "layout": {
+        "position": {
+          "x": 3318,
+          "y": 1350
+        }
+      }
+    },
+    {
+      "id": "i18n_rtl",
+      "text": "Labels, i18n, RTL, mobile\nArchitecturePanel builds labels with language.t. ArchitectureEditor receives dir, flips controls/minimap for RTL, uses bdi/dir=auto where needed, and hides MiniMap on mobile.",
+      "tags": [
+        "i18n",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 2030,
+          "y": 760
+        }
+      }
+    },
+    {
+      "id": "inspector",
+      "text": "Properties inspector\nRight panel starts closed and opens from the toggle or Properties menu. It shows resource hub, single node/edge details, multi-selection hint, conflicts, and runtime debug.",
+      "tags": [
+        "inspector",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 1620,
+          "y": 190
+        }
+      }
+    },
+    {
+      "id": "model_adapter",
+      "text": "React Flow model adapter\nmodel.ts maps managed nodes/edges into ArchitectureFlowNode and ArchitectureFlowEdge, applies default right-to-left handles and rectangular style, and passes tag colors plus edge controls.",
+      "tags": [
+        "canvas",
+        "data"
+      ],
+      "layout": {
+        "position": {
+          "x": 800,
+          "y": 570
+        }
+      }
+    },
+    {
+      "id": "node_ff2aa1fc20014bJ51NKMOpUZWC",
+      "text": "Example test node\nTemporary node for testing graph refresh, selection, hover hints, drag, and edit behavior. Safe to delete after testing.",
+      "tags": [
+        "example",
+        "test"
+      ],
+      "layout": {
+        "position": {
+          "x": 2488,
+          "y": 1580
+        }
+      }
+    },
+    {
+      "id": "node_form",
+      "text": "Node form\nNodeForm edits selected node text and comma/newline tags on blur or submit via node.update.",
+      "tags": [
+        "inspector",
+        "operation"
+      ],
+      "layout": {
+        "position": {
+          "x": 1620,
+          "y": 760
+        }
+      }
+    },
+    {
+      "id": "node_handles",
+      "text": "Four-sided node handles\nEach node exposes source and target handles on top, right, bottom, and left. Pointer position picks the nearest side to highlight the active socket.",
+      "tags": [
+        "element",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 1210,
+          "y": 380
+        }
+      }
+    },
+    {
+      "id": "operation_builders",
+      "text": "Typed operation builders\neditor-commands.ts creates resource.update, tag.color, node.create/update/position/remove, and edge.create/update/remove operations. UI code should not mutate graph JSON directly.",
+      "tags": [
+        "contract",
+        "operation"
+      ],
+      "layout": {
+        "position": {
+          "x": 2030,
+          "y": 380
+        }
+      }
+    },
+    {
+      "id": "plan_agent_edited_node_hints",
+      "text": "Improvement 1: transient agent-edited node highlights\nWhen an agent/sync update changes nodes, temporarily highlight those nodes in the canvas until the user hovers over each highlighted node. This is only an editor-local hint and should not write any backend state.",
+      "tags": [
+        "frontend-only",
+        "implemented",
+        "improvement",
+        "plan",
+        "ux"
+      ],
+      "layout": {
+        "position": {
+          "x": 2480,
+          "y": 250
+        }
+      }
+    },
+    {
+      "id": "plan_agent_hint_acceptance",
+      "text": "Acceptance: edited-node hints\n- Agent-edited nodes visibly pulse/glow or otherwise stand out.\n- Highlight survives until that node is hovered.\n- No new resource schema/backend operation.\n- User edits do not create false agent-edited hints.\n- Resource switching/reload clears stale hints safely.",
+      "tags": [
+        "acceptance",
+        "plan"
+      ],
+      "layout": {
+        "position": {
+          "x": 3318.9711227953367,
+          "y": 195.29720865227745
+        }
+      }
+    },
+    {
+      "id": "plan_agent_hint_scope",
+      "text": "Scope for edited-node hints\nUse editor-local state such as editedHintNodeIDs and node data flags. Clear a node hint on pointer hover via ArchitectureNodeView onEditedHintSeen. Detect external/agent node changes during resource sync rather than adding a saved graph field.",
+      "tags": [
+        "candidate",
+        "frontend-only",
+        "plan"
+      ],
+      "layout": {
+        "position": {
+          "x": 2898,
+          "y": 266
+        }
+      }
+    },
+    {
+      "id": "plan_drop_connection_acceptance",
+      "text": "Acceptance: drop-to-create-node\n- Preview appears only for a dangling connection over empty canvas.\n- Dropping on an existing compatible handle keeps normal connect behavior.\n- Dropping empty creates a default node and one edge.\n- Escape/cancel/pointer cancel removes preview.\n- Undo removes both created node and edge together.",
+      "tags": [
+        "acceptance",
+        "plan"
+      ],
+      "layout": {
+        "position": {
+          "x": 3317.75210915141,
+          "y": 553.5415321131238
+        }
+      }
+    },
+    {
+      "id": "plan_drop_connection_create_node",
+      "text": "Improvement 2: drop dangling connection to create node\nWhen the user drags a connection from a node and releases on empty canvas, show a hollow preview hint that dropping now will create a new node already connected to the source node.",
+      "tags": [
+        "implemented",
+        "improvement",
+        "plan",
+        "ux"
+      ],
+      "layout": {
+        "position": {
+          "x": 2483.0779878805542,
+          "y": 542.0947555426015
+        }
+      }
+    },
+    {
+      "id": "plan_drop_connection_scope",
+      "text": "Scope for drop-to-create-node\nUse React Flow connection start/end state in ArchitectureEditor. While dragging over empty pane, render a hollow node/card preview at the prospective drop position. On drop, create node.create plus edge.create operations in one commit batch.",
+      "tags": [
+        "candidate",
+        "plan"
+      ],
+      "layout": {
+        "position": {
+          "x": 2898,
+          "y": 506
+        }
+      }
+    },
+    {
+      "id": "plan_improvements_overview",
+      "text": "Plan: Graph editor interaction improvements\nThree frontend UX improvements: transient hints for agent-edited nodes, drop-to-create-node from a dangling connection, and separated connection anchor points for crowded rectangular wires.",
+      "tags": [
+        "improvement",
+        "plan",
+        "ux"
+      ],
+      "layout": {
+        "position": {
+          "x": 2238.9395577242603,
+          "y": -58.25975433341344
+        }
+      }
+    },
+    {
+      "id": "plan_separated_connection_points",
+      "text": "Improvement 3: separate crowded connection points\nWhen multiple lines connect to one node, offset each exact edge endpoint along the selected side according to source/target ordering so rectangular wires are easier to distinguish and drag off individually.",
+      "tags": [
+        "implemented",
+        "improvement",
+        "plan",
+        "ux"
+      ],
+      "layout": {
+        "position": {
+          "x": 2487.9999999999995,
+          "y": 803.4234747268662
+        }
+      }
+    },
+    {
+      "id": "plan_separated_points_acceptance",
+      "text": "Acceptance: separated endpoints\n- Multiple edges on the same node side no longer overlap at one point.\n- Existing edges remain reconnectable/disconnectable by dragging their visible endpoint.\n- New incoming connections still target the normal side handles.\n- Rectangular wires become easier to trace.\n- No saved schema changes unless a later design explicitly requires persisted anchor offsets.",
+      "tags": [
+        "acceptance",
+        "plan"
+      ],
+      "layout": {
+        "position": {
+          "x": 3305.5619727121475,
+          "y": 910.5668419300439
+        }
+      }
+    },
+    {
+      "id": "plan_separated_points_scope",
+      "text": "Scope for separated endpoints\nKeep user-visible connection handles conceptually on the four node sides for new drag targets, but render existing edge endpoints with per-edge offsets near the side. This is a rendering/interaction aid, not a graph data-model change.",
+      "tags": [
+        "candidate",
+        "frontend-only",
+        "plan"
+      ],
+      "layout": {
+        "position": {
+          "x": 2898,
+          "y": 787.0167676620473
+        }
+      }
+    },
+    {
+      "id": "plan_shared_constraints",
+      "text": "Shared constraints for all three improvements\nPrefer local UI state and typed operation batches. Do not add backend fields for visual hints. Keep changes in architecture-editor.react.tsx, architecture-node.react.tsx, architecture-edge.react.tsx, model.ts, editor-commands.ts, and CSS unless deeper runtime state is truly needed.",
+      "tags": [
+        "frontend-only",
+        "guide",
+        "plan"
+      ],
+      "layout": {
+        "position": {
+          "x": 2484.718658587036,
+          "y": 1076.236888856504
+        }
+      }
+    },
+    {
+      "id": "plan_verification_improvements",
+      "text": "Verification plan for improvements\nAdd or update focused tests around editor-commands operation batches, selection/connection state, edit-hint behavior, model mapping, and style snapshots where practical. Run packages/app focused tests and bun typecheck for touched contracts.",
+      "tags": [
+        "acceptance",
+        "plan",
+        "verify"
+      ],
+      "layout": {
+        "position": {
+          "x": 2883.371836272885,
+          "y": 1154.2238828618226
+        }
+      }
+    },
+    {
+      "id": "react_editor",
+      "text": "ArchitectureEditor React canvas\narchitecture-editor.react.tsx owns React Flow wiring, local history, selection, filtering, context menus, inspector toggles, undo/redo, viewport persistence, and journal callbacks.",
+      "tags": [
+        "canvas",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 800,
+          "y": 190
+        }
+      }
+    },
+    {
+      "id": "resource_hub",
+      "text": "Resource details tab\nResourceHub details tab renames the graph through a resource.update operation.",
+      "tags": [
+        "inspector",
+        "operation"
+      ],
+      "layout": {
+        "position": {
+          "x": 1620,
+          "y": 380
+        }
+      }
+    },
+    {
+      "id": "runtime_debug",
+      "text": "Collapsed sync debug\nRuntimeDebugView shows resource ID, dirty reasons, sync status, pending operation count, conflicts, live-instance flag, saved/visible revisions and digests, and recent activity.",
+      "tags": [
+        "data",
+        "inspector"
+      ],
+      "layout": {
+        "position": {
+          "x": 1620,
+          "y": 1140
+        }
+      }
+    },
+    {
+      "id": "selection_gestures",
+      "text": "Selection and gestures\nSelection refs plus selection-state helpers preserve single, multi, context, and lasso selection; Shift/Ctrl/Meta additive behavior; delete confirmations; and edge reconnect handling.",
+      "tags": [
+        "canvas",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 800,
+          "y": 950
+        }
+      }
+    },
+    {
+      "id": "shell_header",
+      "text": "Panel header and file menu\nResource select, dirty Save button, Reload, and File menu actions for New, Duplicate, and Delete live in the Solid shell.",
+      "tags": [
+        "interaction",
+        "shell"
+      ],
+      "layout": {
+        "position": {
+          "x": 390,
+          "y": 380
+        }
+      }
+    },
+    {
+      "id": "shell_island",
+      "text": "ArchitectureIsland lazy bridge\narchitecture-island.tsx dynamically imports React, React DOM, and architecture-editor.react, mounts a React root, and re-renders from Solid props.",
+      "tags": [
+        "bridge",
+        "shell"
+      ],
+      "layout": {
+        "position": {
+          "x": 378.0000001416506,
+          "y": 1422.999998902207
+        }
+      }
+    },
+    {
+      "id": "shell_journal_save",
+      "text": "Journal, save, reload lifecycle\nonJournal records pending overlays and starts live-instance sync. Save synchronizes authoritative snapshot then commits; Reload discards pending work after confirmation.",
+      "tags": [
+        "operation",
+        "shell"
+      ],
+      "layout": {
+        "position": {
+          "x": 385.0000003423225,
+          "y": 1175.999999575048
+        }
+      }
+    },
+    {
+      "id": "shell_panel",
+      "text": "ArchitecturePanel Solid shell\nfeatures/architecture/architecture-panel.tsx orchestrates resource selection, loading/error/empty states, dialogs, toasts, create/delete/duplicate, save/reload, export, and React island props.",
+      "tags": [
+        "shell"
+      ],
+      "layout": {
+        "position": {
+          "x": 390,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "shell_persisted",
+      "text": "Persisted editor state\nPersist key architecture-editor.v2 stores selected resource ID, pending overlays, and per-resource viewports for this server/workspace.",
+      "tags": [
+        "data",
+        "shell"
+      ],
+      "layout": {
+        "position": {
+          "x": 390,
+          "y": 570
+        }
+      }
+    },
+    {
+      "id": "shell_queries",
+      "text": "Capability and resource queries\nUses useServerArchitectureAvailable plus resource/get/live-instance queries. Polling pauses while busy or locally dirty.",
+      "tags": [
+        "data",
+        "shell"
+      ],
+      "layout": {
+        "position": {
+          "x": 390,
+          "y": 190
+        }
+      }
+    },
+    {
+      "id": "shell_runtime",
+      "text": "Runtime controller and view\nruntime-controller.ts and runtime-view.ts compose saved snapshot, live instance, pending overlay, dirty reasons, sync status, conflict explanations, and debug events.",
+      "tags": [
+        "data",
+        "shell"
+      ],
+      "layout": {
+        "position": {
+          "x": 390,
+          "y": 760
+        }
+      }
+    },
+    {
+      "id": "shell_sync",
+      "text": "Resource and instance event sync\narchitecture-panel.tsx subscribes to resource/instance events, reconciles query cache, removes deleted resources, and keeps live-instance cache aligned.",
+      "tags": [
+        "data",
+        "shell"
+      ],
+      "layout": {
+        "position": {
+          "x": 390,
+          "y": 950
+        }
+      }
+    },
+    {
+      "id": "styling",
+      "text": "Graph editor styling\narchitecture.css and architecture-panel.css define shell layout, side toggles, canvas status, node cards, sockets, wire toolbar, outline, inspector, and responsive behavior.",
+      "tags": [
+        "element",
+        "styling"
+      ],
+      "layout": {
+        "position": {
+          "x": 2030,
+          "y": 950
+        }
+      }
+    },
+    {
+      "id": "tag_hub",
+      "text": "Tag hub tab\nTagHub summarizes free-form tags, renames tags across nodes, edits tag colors, and clears colors.",
+      "tags": [
+        "inspector",
+        "operation"
+      ],
+      "layout": {
+        "position": {
+          "x": 1620,
+          "y": 570
+        }
+      }
+    },
+    {
+      "id": "viewport_motion",
+      "text": "Viewport persistence and inertia\nReact Flow move callbacks persist viewport through onViewport. glideViewport adds panning momentum and respects saved viewport on load.",
+      "tags": [
+        "canvas",
+        "interaction"
+      ],
+      "layout": {
+        "position": {
+          "x": 800,
+          "y": 1140
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_api_queries",
+      "source": "api_layer",
+      "target": "shell_queries",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_ask_shell",
+      "source": "ask_popover",
+      "target": "shell_panel",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_canvas_edges",
+      "source": "canvas_surface",
+      "target": "custom_edges",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_canvas_nodes",
+      "source": "canvas_surface",
+      "target": "custom_nodes",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_commands_router",
+      "source": "entry_commands",
+      "target": "command_router",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_context_ask",
+      "source": "context_menu",
+      "target": "ask_popover",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_context_ops",
+      "source": "context_menu",
+      "target": "operation_builders",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_contract_editor",
+      "source": "contract_props",
+      "target": "react_editor",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_edge_ops",
+      "source": "edge_detail",
+      "target": "operation_builders",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_edges_toolbar",
+      "source": "custom_edges",
+      "target": "edge_toolbar",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_editor_canvas",
+      "source": "react_editor",
+      "target": "canvas_surface",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_editor_history",
+      "source": "react_editor",
+      "target": "editor_history",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_editor_inspector",
+      "source": "react_editor",
+      "target": "inspector",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_editor_model",
+      "source": "react_editor",
+      "target": "model_adapter",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_editor_outline",
+      "source": "react_editor",
+      "target": "filter_outline",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_editor_router",
+      "source": "react_editor",
+      "target": "command_router",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_editor_selection",
+      "source": "react_editor",
+      "target": "selection_gestures",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_editor_viewport",
+      "source": "react_editor",
+      "target": "viewport_motion",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_fix_agent_refresh_scope_to_verify",
+      "source": "fix_agent_edits_refresh_scope",
+      "target": "fix_agent_edits_refresh_verify",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_fix_agent_refresh_to_queries",
+      "source": "fix_agent_edits_refresh_scope",
+      "target": "shell_queries",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_fix_agent_refresh_to_runtime",
+      "source": "fix_agent_edits_refresh_immediately",
+      "target": "shell_runtime",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_fix_agent_refresh_to_scope",
+      "source": "fix_agent_edits_refresh_immediately",
+      "target": "fix_agent_edits_refresh_scope",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_fix_agent_refresh_to_sync",
+      "source": "fix_agent_edits_refresh_immediately",
+      "target": "shell_sync",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_fix_agent_refresh_verify_to_plan_verify",
+      "source": "fix_agent_edits_refresh_verify",
+      "target": "plan_verification_improvements",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_header_api",
+      "source": "shell_header",
+      "target": "api_layer",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_header_journal",
+      "source": "shell_header",
+      "target": "shell_journal_save",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_header_side_panel",
+      "source": "entry_session_header",
+      "target": "entry_side_panel",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_history_journal",
+      "source": "editor_history",
+      "target": "shell_journal_save",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_i18n_editor",
+      "source": "i18n_rtl",
+      "target": "react_editor",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_i18n_shell",
+      "source": "i18n_rtl",
+      "target": "shell_panel",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_inline_node_ops",
+      "source": "custom_nodes",
+      "target": "operation_builders",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_inspector_debug",
+      "source": "inspector",
+      "target": "runtime_debug",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_inspector_edge",
+      "source": "inspector",
+      "target": "edge_detail",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_inspector_node",
+      "source": "inspector",
+      "target": "node_form",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_inspector_resource",
+      "source": "inspector",
+      "target": "resource_hub",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_inspector_tag",
+      "source": "inspector",
+      "target": "tag_hub",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_island_contract",
+      "source": "shell_island",
+      "target": "contract_props",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_journal_api",
+      "source": "shell_journal_save",
+      "target": "api_layer",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_journal_runtime",
+      "source": "shell_journal_save",
+      "target": "shell_runtime",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_model_edges",
+      "source": "model_adapter",
+      "target": "custom_edges",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_model_nodes",
+      "source": "model_adapter",
+      "target": "custom_nodes",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_node_ops",
+      "source": "node_form",
+      "target": "operation_builders",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_nodes_handles",
+      "source": "custom_nodes",
+      "target": "node_handles",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_ops_history",
+      "source": "operation_builders",
+      "target": "editor_history",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_persisted_runtime",
+      "source": "shell_persisted",
+      "target": "shell_runtime",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_plan_constraints_to_verify",
+      "source": "plan_shared_constraints",
+      "target": "plan_verification_improvements",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_plan_drop_scope_to_acceptance",
+      "source": "plan_drop_connection_scope",
+      "target": "plan_drop_connection_acceptance",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_plan_drop_to_canvas",
+      "source": "plan_drop_connection_create_node",
+      "target": "canvas_surface",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_plan_drop_to_ops",
+      "source": "plan_drop_connection_scope",
+      "target": "operation_builders",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_plan_drop_to_scope",
+      "source": "plan_drop_connection_create_node",
+      "target": "plan_drop_connection_scope",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_plan_drop_to_selection",
+      "source": "plan_drop_connection_scope",
+      "target": "selection_gestures",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_plan_hint_scope_to_acceptance",
+      "source": "plan_agent_hint_scope",
+      "target": "plan_agent_hint_acceptance",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_plan_hint_to_custom_nodes",
+      "source": "plan_agent_hint_scope",
+      "target": "custom_nodes",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_plan_hint_to_react_editor",
+      "source": "plan_agent_edited_node_hints",
+      "target": "react_editor",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_plan_hint_to_scope",
+      "source": "plan_agent_edited_node_hints",
+      "target": "plan_agent_hint_scope",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_plan_hint_to_sync",
+      "source": "plan_agent_hint_scope",
+      "target": "shell_sync",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_plan_overview_to_constraints",
+      "source": "plan_improvements_overview",
+      "target": "plan_shared_constraints",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_plan_overview_to_drop",
+      "source": "plan_improvements_overview",
+      "target": "plan_drop_connection_create_node",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_plan_overview_to_hint",
+      "source": "plan_improvements_overview",
+      "target": "plan_agent_edited_node_hints",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_plan_overview_to_separated",
+      "source": "plan_improvements_overview",
+      "target": "plan_separated_connection_points",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_plan_sep_scope_to_acceptance",
+      "source": "plan_separated_points_scope",
+      "target": "plan_separated_points_acceptance",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_plan_sep_to_edges",
+      "source": "plan_separated_connection_points",
+      "target": "custom_edges",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_plan_sep_to_handles",
+      "source": "plan_separated_points_scope",
+      "target": "node_handles",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_plan_sep_to_model",
+      "source": "plan_separated_points_scope",
+      "target": "model_adapter",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_plan_sep_to_scope",
+      "source": "plan_separated_connection_points",
+      "target": "plan_separated_points_scope",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_prompt_ask",
+      "source": "entry_prompt_mentions",
+      "target": "ask_popover",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_queries_runtime",
+      "source": "shell_queries",
+      "target": "shell_runtime",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_resource_ops",
+      "source": "resource_hub",
+      "target": "operation_builders",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_router_ops",
+      "source": "command_router",
+      "target": "operation_builders",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_runtime_debug_data",
+      "source": "shell_runtime",
+      "target": "runtime_debug",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_runtime_island",
+      "source": "shell_runtime",
+      "target": "shell_island",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_selection_context",
+      "source": "selection_gestures",
+      "target": "context_menu",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_shell_header",
+      "source": "shell_panel",
+      "target": "shell_header",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_shell_island",
+      "source": "shell_panel",
+      "target": "shell_island",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_shell_journal",
+      "source": "shell_panel",
+      "target": "shell_journal_save",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_shell_persisted",
+      "source": "shell_panel",
+      "target": "shell_persisted",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_shell_queries",
+      "source": "shell_panel",
+      "target": "shell_queries",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_shell_runtime",
+      "source": "shell_panel",
+      "target": "shell_runtime",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_shell_sync",
+      "source": "shell_panel",
+      "target": "shell_sync",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_side_panel_shell",
+      "source": "entry_side_panel",
+      "target": "shell_panel",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_style_canvas",
+      "source": "styling",
+      "target": "canvas_surface",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_style_elements",
+      "source": "styling",
+      "target": "custom_nodes",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_style_inspector",
+      "source": "styling",
+      "target": "inspector",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "e_sync_runtime",
+      "source": "shell_sync",
+      "target": "shell_runtime",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_tag_ops",
+      "source": "tag_hub",
+      "target": "operation_builders",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_toolbar_ops",
+      "source": "edge_toolbar",
+      "target": "operation_builders",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    }
+  ]
+}

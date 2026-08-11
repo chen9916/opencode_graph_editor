@@ -516,7 +516,7 @@ function ArchitecturePanelWorkspace() {
       const plan = architectureResourceEventRefreshPlan({
         eventType: type,
         currentResourceID: resourceID(),
-        dirty: dirty(),
+        localDirty: localDirty(),
         resources: queryClient.getQueryData(resourcesKey),
         snapshot: queryClient.getQueryData(architectureResourceQueryKey(current.url, current.directory, eventInfo.resourceID)),
         event: eventInfo,
@@ -544,6 +544,11 @@ function ArchitecturePanelWorkspace() {
 
       if (!plan.updateResource) return
       const resourceKey = architectureResourceQueryKey(current.url, current.directory, eventInfo.resourceID)
+      if (plan.clearLiveInstance)
+        setArchitectureQueryData<ArchitectureLiveInstanceCache>(
+          architectureResourceInstanceQueryKey(current.url, current.directory, eventInfo.resourceID),
+          null,
+        )
       void queryClient.refetchQueries({
         queryKey: resourceKey,
         exact: true,

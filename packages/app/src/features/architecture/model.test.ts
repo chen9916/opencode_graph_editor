@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import type { ArchitectureResource } from "./contract"
-import { tagColorsKey, toReactFlow } from "./model"
+import {
+  architectureRenderEdgeHandleID,
+  architectureRenderEdgeHandleSide,
+  tagColorsKey,
+  toReactFlow,
+} from "./model"
 
 const resource: ArchitectureResource = {
   version: 2,
@@ -22,8 +27,12 @@ describe("architecture flow model", () => {
   test("preserves explicitly authored connection sides regardless of layout", () => {
     const edges = toReactFlow(resource, () => {}).edges
 
-    expect(edges[0]).toMatchObject({ sourceHandle: "top", targetHandle: "bottom" })
-    expect(edges[1]).toMatchObject({ sourceHandle: "left", targetHandle: "right" })
+    expect(edges[0]).toMatchObject({
+      sourceHandle: architectureRenderEdgeHandleID("vertical", "source", "top"),
+      targetHandle: architectureRenderEdgeHandleID("vertical", "target", "bottom"),
+    })
+    expect(architectureRenderEdgeHandleSide(edges[1]?.sourceHandle)).toBe("left")
+    expect(architectureRenderEdgeHandleSide(edges[1]?.targetHandle)).toBe("right")
   })
 
   test("uses a stable right-to-left fallback for older connections", () => {
@@ -32,7 +41,45 @@ describe("architecture flow model", () => {
       () => {},
     ).edges
 
-    expect(edges[0]).toMatchObject({ sourceHandle: "right", targetHandle: "left" })
+    expect(edges[0]).toMatchObject({
+      sourceHandle: architectureRenderEdgeHandleID("legacy", "source", "right"),
+      targetHandle: architectureRenderEdgeHandleID("legacy", "target", "left"),
+    })
+  })
+
+  test("separates render-only endpoint handles sharing the same node side", () => {
+    const shared: ArchitectureResource = {
+      ...resource,
+      nodes: [
+        { id: "hub", text: "Hub", tags: [], layout: { position: { x: 0, y: 0 } } },
+        { id: "left", text: "Left", tags: [], layout: { position: { x: -220, y: 0 } } },
+        { id: "right", text: "Right", tags: [], layout: { position: { x: 220, y: 0 } } },
+      ],
+      edges: [
+        { id: "z-edge", source: "hub", target: "right", sourceHandle: "right", targetHandle: "left" },
+        { id: "a-edge", source: "left", target: "hub", sourceHandle: "right", targetHandle: "right" },
+      ],
+    }
+    const handles = toReactFlow(shared, () => {}).nodes.find((node) => node.id === "hub")?.data.edgeHandles ?? []
+    const reorderedHandles = toReactFlow({ ...shared, edges: [...shared.edges].reverse() }, () => {}).nodes.find(
+      (node) => node.id === "hub",
+    )?.data.edgeHandles ?? []
+    const incoming = handles.find((handle) => handle.id === architectureRenderEdgeHandleID("a-edge", "target", "right"))
+    const outgoing = handles.find((handle) => handle.id === architectureRenderEdgeHandleID("z-edge", "source", "right"))
+
+    expect(incoming).toMatchObject({
+      id: architectureRenderEdgeHandleID("a-edge", "target", "right"),
+      side: "right",
+      type: "target",
+    })
+    expect(incoming?.offset).toBeCloseTo(100 / 3)
+    expect(outgoing).toMatchObject({
+      id: architectureRenderEdgeHandleID("z-edge", "source", "right"),
+      side: "right",
+      type: "source",
+    })
+    expect(outgoing?.offset).toBeCloseTo(200 / 3)
+    expect(endpointOffsets(reorderedHandles)).toEqual(endpointOffsets(handles))
   })
 
   test("uses durable graph edge styles", () => {
@@ -71,3 +118,9 @@ describe("architecture flow model", () => {
     )
   })
 })
+
+function endpointOffsets(
+  handles: NonNullable<ReturnType<typeof toReactFlow>["nodes"][number]["data"]["edgeHandles"]>,
+) {
+  return Object.fromEntries(handles.map((handle) => [handle.id, handle.offset]))
+}

@@ -12,8 +12,29 @@
   min-block-size: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
+  position: relative;
+  overflow: hidden;
+  outline: none;
   background: var(--color-v2-background-bg-base, var(--color-background-base));
   color: var(--color-v2-text-primary, var(--color-text-base));
+  isolation: isolate;
+}
+
+.architecture-editor:focus,
+.architecture-editor:focus-visible {
+  outline: none;
+}
+
+.architecture-editor:focus-within::after {
+  content: "";
+  z-index: 40;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--architecture-accent) 68%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--architecture-accent) 16%, transparent);
+  pointer-events: none;
 }
 
 [data-color-scheme="dark"] .architecture-editor {
@@ -75,6 +96,7 @@
   min-block-size: 0;
   min-inline-size: 0;
   position: relative;
+  overflow: hidden;
 }
 
 .architecture-editor__side-toggle {
@@ -694,6 +716,21 @@
     0 10px 28px rgb(0 0 0 / 18%);
 }
 
+.architecture-node[data-preview="true"] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--architecture-accent) 76%, transparent);
+  background: color-mix(in srgb, var(--architecture-accent) 7%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--architecture-accent) 18%, transparent),
+    0 10px 28px rgb(0 0 0 / 12%);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.architecture-node[data-preview="true"] .architecture-node__text {
+  color: color-mix(in srgb, var(--color-v2-text-primary, var(--color-text-base)) 72%, transparent);
+}
+
 .architecture-editor .react-flow__node.selected .architecture-node[data-edited-hint="true"],
 .architecture-node[data-selected="true"][data-edited-hint="true"] {
   box-shadow:
@@ -777,6 +814,26 @@
 .architecture-editor .react-flow__handle.connectingfrom,
 .architecture-node:hover .react-flow__handle {
   pointer-events: auto;
+}
+
+.architecture-node .react-flow__handle.architecture-node__edge-anchor {
+  z-index: 2;
+  inline-size: 9px;
+  block-size: 9px;
+  min-inline-size: 9px;
+  min-block-size: 9px;
+  border: 2px solid var(--color-v2-background-bg-raised, var(--color-background-stronger));
+  border-radius: 999px;
+  background: var(--architecture-node-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--architecture-node-accent) 42%, transparent);
+  opacity: 0.86;
+  pointer-events: none;
+}
+
+.architecture-node:hover .react-flow__handle.architecture-node__edge-anchor,
+.architecture-editor .react-flow__handle.architecture-node__edge-anchor.connectionindicator,
+.architecture-editor .react-flow__handle.architecture-node__edge-anchor.connectingfrom {
+  pointer-events: none;
 }
 
 .architecture-node:hover .architecture-node__socket--source span {

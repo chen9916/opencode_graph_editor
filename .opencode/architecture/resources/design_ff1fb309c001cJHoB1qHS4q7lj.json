@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "revision": 2,
+  "revision": 3,
   "id": "design_ff1fb309c001cJHoB1qHS4q7lj",
   "name": "Graph current vs target operation flow",
   "tagColors": {
@@ -69,8 +69,8 @@
       ],
       "layout": {
         "position": {
-          "x": 773.7656833155248,
-          "y": 173.5029768130242
+          "x": 785.9558197547874,
+          "y": 150.3417175784254
         }
       }
     },

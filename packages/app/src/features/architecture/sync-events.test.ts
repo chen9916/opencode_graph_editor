@@ -33,22 +33,35 @@ describe("architecture sync event helpers", () => {
       architectureResourceEventRefreshPlan({
         eventType: "architecture.resource.updated",
         currentResourceID: "design",
-        dirty: true,
+        localDirty: true,
         resources: [],
         snapshot: undefined,
         event: { resourceID: "design", revision: 2, digest: "next" },
       }),
-    ).toMatchObject({ updateResources: false, updateResource: false })
+    ).toMatchObject({ updateResources: false, updateResource: false, clearLiveInstance: false })
     expect(
       architectureResourceEventRefreshPlan({
         eventType: "architecture.resource.removed",
         currentResourceID: "design",
-        dirty: false,
+        localDirty: false,
         resources: [],
         snapshot: undefined,
         event: { resourceID: "design" },
       }),
     ).toMatchObject({ removed: true, clearLocalState: true })
+  })
+
+  test("allows selected resource refetches when only external live state is dirty", () => {
+    expect(
+      architectureResourceEventRefreshPlan({
+        eventType: "architecture.resource.updated",
+        currentResourceID: "design",
+        localDirty: false,
+        resources: [],
+        snapshot: snapshot(2, "previous"),
+        event: { resourceID: "design", revision: 3, digest: "next" },
+      }),
+    ).toMatchObject({ updateResources: true, updateResource: true, clearLiveInstance: true })
   })
 
   test("builds bounded debug event history with operation type summaries", () => {

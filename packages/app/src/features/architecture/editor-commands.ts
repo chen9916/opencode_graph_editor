@@ -7,6 +7,7 @@ import type {
   ArchitectureResource,
 } from "./contract"
 import { operationID } from "./journal"
+import { architectureRenderEdgeHandleSide } from "./model"
 
 type Position = { readonly x: number; readonly y: number }
 type ConnectionInput = {
@@ -15,6 +16,7 @@ type ConnectionInput = {
   readonly sourceHandle?: string | null
   readonly targetHandle?: string | null
 }
+type ConnectionHandleType = "source" | "target"
 type SelectionInput = {
   readonly nodeIDs: ReadonlyArray<string>
   readonly edgeIDs: ReadonlyArray<string>
@@ -53,6 +55,49 @@ export function architectureDuplicateNodeOperation(resource: ArchitectureResourc
   }
 }
 
+export function architectureCreateConnectedNodeOperations(input: {
+  readonly text: string
+  readonly position: Position
+  readonly fromNodeID: string
+  readonly fromHandle?: string | null
+  readonly fromHandleType?: ConnectionHandleType | null
+}) {
+  const id = `node_${Date.now().toString(36)}`
+  const fromHandleType = input.fromHandleType ?? "source"
+  const fromHandle = architectureConnectionSide(input.fromHandle, fromHandleType === "target" ? "left" : "right")
+  const edge: ArchitectureEdge =
+    fromHandleType === "target"
+      ? {
+          id: edgeID(),
+          source: id,
+          target: input.fromNodeID,
+          sourceHandle: oppositeConnectionSide(fromHandle),
+          targetHandle: fromHandle,
+          style: "rectangular",
+        }
+      : {
+          id: edgeID(),
+          source: input.fromNodeID,
+          target: id,
+          sourceHandle: fromHandle,
+          targetHandle: oppositeConnectionSide(fromHandle),
+          style: "rectangular",
+        }
+  return {
+    id,
+    edgeID: edge.id,
+    operations: [
+      architectureNodeCreateOperation({
+        id,
+        text: input.text,
+        tags: [],
+        position: input.position,
+      }),
+      architectureEdgeCreateOperationForEdge(edge),
+    ],
+  }
+}
+
 export function architectureNodeTextOperation(node: ArchitectureNode, text: string) {
   if (text === node.text) return
   return architectureNodeUpdateOperation({ ...node, text })
@@ -82,7 +127,7 @@ export function architectureNodeRemoveOperation(nodeID: string): ArchitectureOpe
 export function architectureEdgeCreateOperation(connection: ConnectionInput) {
   if (!connection.source || !connection.target) return
   const edge: ArchitectureEdge = {
-    id: `edge_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    id: edgeID(),
     source: connection.source,
     target: connection.target,
     sourceHandle: architectureConnectionSide(connection.sourceHandle, "right"),
@@ -172,7 +217,11 @@ export function architectureSelectionDeleteOperations(resource: ArchitectureReso
 }
 
 export function architectureConnectionSide(value: string | null | undefined, fallback: ArchitectureConnectionSide) {
-  return (["top", "right", "bottom", "left"] as const).find((side) => side === value) ?? fallback
+  return (
+    architectureRenderEdgeHandleSide(value) ??
+    (["top", "right", "bottom", "left"] as const).find((side) => side === value) ??
+    fallback
+  )
 }
 
 function architectureNodeCreateOperation(input: {
@@ -199,6 +248,17 @@ function architectureEdgeCreateOperationForEdge(edge: ArchitectureEdge): Archite
 
 function samePosition(left: Position, right: Position) {
   return left.x === right.x && left.y === right.y
+}
+
+function edgeID() {
+  return `edge_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function oppositeConnectionSide(side: ArchitectureConnectionSide): ArchitectureConnectionSide {
+  if (side === "top") return "bottom"
+  if (side === "bottom") return "top"
+  if (side === "left") return "right"
+  return "left"
 }
 
 function unique(values: ReadonlyArray<string>) {

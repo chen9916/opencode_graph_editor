@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import type { ArchitectureResource } from "./contract"
 import {
   architectureConnectionSide,
+  architectureCreateConnectedNodeOperations,
   architectureEdgeCreateOperation,
   architectureEdgeReconnectOperation,
   architectureEdgeStyleOperation,
@@ -9,6 +10,7 @@ import {
   architectureRenameTagOperations,
   architectureSelectionDeleteOperations,
 } from "./editor-commands"
+import { architectureRenderEdgeHandleID } from "./model"
 
 const resource = (): ArchitectureResource => ({
   version: 2,
@@ -32,7 +34,33 @@ describe("architecture editor command builders", () => {
       edge: { source: "a", target: "b", sourceHandle: "right", targetHandle: "top", style: "rectangular" },
     })
     expect(architectureConnectionSide("left", "right")).toBe("left")
+    expect(architectureConnectionSide(architectureRenderEdgeHandleID("ab", "source", "bottom"), "right")).toBe("bottom")
     expect(architectureConnectionSide("bad", "right")).toBe("right")
+  })
+
+  test("creates a new node and edge as one connected operation batch", () => {
+    const created = architectureCreateConnectedNodeOperations({
+      text: "New node",
+      position: { x: 320, y: 80 },
+      fromNodeID: "a",
+      fromHandle: "right",
+      fromHandleType: "source",
+    })
+
+    expect(created.operations).toMatchObject([
+      { type: "node.create", node: { id: created.id, text: "New node", layout: { position: { x: 320, y: 80 } } } },
+      {
+        type: "edge.create",
+        edge: {
+          id: created.edgeID,
+          source: "a",
+          target: created.id,
+          sourceHandle: "right",
+          targetHandle: "left",
+          style: "rectangular",
+        },
+      },
+    ])
   })
 
   test("updates edge style and reconnects without changing unchanged styles", () => {

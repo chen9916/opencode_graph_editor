@@ -4,7 +4,11 @@ import type { NodeProps } from "@xyflow/react"
 import { Handle, Position } from "@xyflow/react"
 import { useRef, useState, type CSSProperties, type PointerEvent } from "react"
 import type { ArchitectureConnectionSide } from "./contract"
-import { architectureNodeClass, type ArchitectureFlowNode } from "./model"
+import {
+  architectureNodeClass,
+  type ArchitectureFlowEndpointHandle,
+  type ArchitectureFlowNode,
+} from "./model"
 
 const connectionSides = ["top", "right", "bottom", "left"] as const satisfies ReadonlyArray<ArchitectureConnectionSide>
 const positions = {
@@ -20,8 +24,9 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
   const [text, setText] = useState(node.text)
   const [activeSocket, setActiveSocket] = useState<ArchitectureConnectionSide>()
   const cancelled = useRef(false)
+  const markEditedHintSeen = () => props.data.onEditedHintSeen?.(node.id)
   const revealSocket = (event: PointerEvent<HTMLDivElement>) => {
-    props.data.onEditedHintSeen?.(node.id)
+    markEditedHintSeen()
     const rect = event.currentTarget.getBoundingClientRect()
     const x = event.clientX - rect.left
     const y = event.clientY - rect.top
@@ -51,7 +56,9 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
       data-active-socket={activeSocket}
       data-dimmed={props.data.dimmed || undefined}
       data-edited-hint={props.data.editedHint || undefined}
+      data-preview={props.data.preview || undefined}
       data-selected={props.selected || undefined}
+      onPointerEnter={markEditedHintSeen}
       onPointerMove={revealSocket}
       onPointerLeave={() => setActiveSocket(undefined)}
       onDoubleClick={() => {
@@ -80,6 +87,19 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
           <span aria-hidden="true" />
         </Handle>,
       ])}
+      {props.data.edgeHandles?.map((handle) => (
+        <Handle
+          key={handle.id}
+          id={handle.id}
+          className={`architecture-node__edge-anchor architecture-node__edge-anchor--${handle.type}`}
+          data-side={handle.side}
+          data-edge-anchor="true"
+          type={handle.type}
+          position={positions[handle.side]}
+          style={edgeAnchorStyle(handle)}
+          aria-hidden="true"
+        />
+      ))}
       {editing ? (
         <textarea
           className="architecture-node__text-input nodrag nowheel"
@@ -123,4 +143,10 @@ export function ArchitectureNodeView(props: NodeProps<ArchitectureFlowNode>) {
 function tagStyle(color: string | undefined) {
   if (!color) return undefined
   return { "--architecture-tag-color": color } as CSSProperties
+}
+
+function edgeAnchorStyle(handle: ArchitectureFlowEndpointHandle) {
+  const offset = `${handle.offset}%`
+  if (handle.side === "top" || handle.side === "bottom") return { left: offset } as CSSProperties
+  return { top: offset } as CSSProperties
 }

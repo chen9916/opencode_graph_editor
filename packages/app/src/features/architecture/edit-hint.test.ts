@@ -3,6 +3,7 @@ import type { ArchitectureOperation } from "./contract"
 import {
   architectureEditedNodeHintsForResourceSync,
   architectureExternallyChangedNodeIDs,
+  architectureResourceHintKey,
   architectureTouchedNodeIDs,
   clearArchitectureEditedNodeHint,
   filterArchitectureEditedNodeHints,
@@ -61,6 +62,23 @@ describe("architecture edited node hints", () => {
         external: false,
       }),
     ).toEqual(["existing"])
+  })
+
+  test("adds externally changed nodes to the current hint set", () => {
+    expect(
+      architectureEditedNodeHintsForResourceSync({
+        current: ["existing"],
+        previous: resource([node("existing"), node("updated")]),
+        next: resource([node("existing"), { ...node("updated"), text: "updated remotely" }, node("created")]),
+        external: true,
+      }),
+    ).toEqual(["created", "existing", "updated"])
+  })
+
+  test("matches locally authored resources independently from storage revision", () => {
+    expect(architectureResourceHintKey(resource([node("local")]))).toBe(
+      architectureResourceHintKey({ ...resource([node("local")]), revision: 12 }),
+    )
   })
 
   test("keeps hint state transient and only for nodes still in the current resource", () => {
