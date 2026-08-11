@@ -43,14 +43,14 @@ describe("public event manifest", () => {
     expect(Architecture.Event.Definitions).toEqual([
       Architecture.Event.ResourceUpdated,
       Architecture.Event.ResourceRemoved,
-      Architecture.Event.ResourceDraftUpdated,
-      Architecture.Event.ResourceDraftDiscarded,
+      Architecture.Event.ResourceInstanceUpdated,
+      Architecture.Event.ResourceInstanceDiscarded,
     ])
     expect(EventManifest.Latest.get("architecture.resource.updated")).toBe(Architecture.Event.ResourceUpdated)
     expect(EventManifest.Latest.get("architecture.resource.removed")).toBe(Architecture.Event.ResourceRemoved)
-    expect(EventManifest.Latest.get("architecture.resource.draft.updated")).toBe(Architecture.Event.ResourceDraftUpdated)
-    expect(EventManifest.Latest.get("architecture.resource.draft.discarded")).toBe(
-      Architecture.Event.ResourceDraftDiscarded,
+    expect(EventManifest.Latest.get("architecture.resource.instance.updated")).toBe(Architecture.Event.ResourceInstanceUpdated)
+    expect(EventManifest.Latest.get("architecture.resource.instance.discarded")).toBe(
+      Architecture.Event.ResourceInstanceDiscarded,
     )
     expect(EventManifest.Latest.has("ide.installed")).toBe(false)
     expect(IdeEvent.Definitions).toEqual([IdeEvent.Installed])

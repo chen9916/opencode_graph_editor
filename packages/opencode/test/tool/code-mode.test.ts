@@ -101,23 +101,21 @@ function serverNames(mcpTools: Record<string, MCP.McpTool>, servers?: string[]) 
 function graphMock(input: Partial<ArchitectureGraph.Interface> = {}): ArchitectureGraph.Interface {
   return {
     list: () => Effect.succeed([]),
-    listLive: () => Effect.succeed({ resources: [], source: "saved" }),
+    listInstances: () => Effect.succeed({ resources: [], source: "saved" }),
     create: () => Effect.die("unexpected graph create in CodeMode test"),
     duplicate: () => Effect.die("unexpected graph duplicate in CodeMode test"),
     load: () => Effect.die("unexpected graph load in CodeMode test"),
-    loadLive: () => Effect.die("unexpected graph live load in CodeMode test"),
-    loadDraft: () => Effect.die("unexpected graph draft load in CodeMode test"),
-    patchLive: () => Effect.die("unexpected graph live patch in CodeMode test"),
-    patchDraft: () => Effect.die("unexpected graph draft patch in CodeMode test"),
-    commitDraft: () => Effect.die("unexpected graph draft commit in CodeMode test"),
-    discardDraft: () => Effect.die("unexpected graph draft discard in CodeMode test"),
-    reloadSaved: () => Effect.die("unexpected graph saved reload in CodeMode test"),
+    loadInstance: () => Effect.die("unexpected graph instance load in CodeMode test"),
+    patchInstance: () => Effect.die("unexpected graph instance patch in CodeMode test"),
+    commitInstance: () => Effect.die("unexpected graph instance commit in CodeMode test"),
+    discardInstance: () => Effect.die("unexpected graph instance discard in CodeMode test"),
+    reloadInstance: () => Effect.die("unexpected graph saved reload in CodeMode test"),
     remove: () => Effect.die("unexpected graph remove in CodeMode test"),
     reset: () => Effect.die("unexpected graph reset in CodeMode test"),
     query: () => Effect.die("unexpected graph query in CodeMode test"),
-    queryLive: () => Effect.die("unexpected graph live query in CodeMode test"),
+    queryInstances: () => Effect.die("unexpected graph live query in CodeMode test"),
     context: () => Effect.die("unexpected graph context in CodeMode test"),
-    contextLive: () => Effect.die("unexpected graph live context in CodeMode test"),
+    contextInstances: () => Effect.die("unexpected graph live context in CodeMode test"),
     ...input,
   }
 }
@@ -402,7 +400,7 @@ describe("code mode execute", () => {
       undefined,
       undefined,
       {
-        listLive: () => Effect.succeed({ resources: [{ ...summary, source: "live" as const }], source: "live" as const }),
+        listInstances: () => Effect.succeed({ resources: [{ ...summary, source: "live" as const }], source: "live" as const }),
       },
     )
     const output = await Effect.runPromise(
@@ -459,8 +457,8 @@ describe("code mode execute", () => {
       undefined,
       undefined,
       {
-        listLive: () => Effect.succeed({ resources: [{ ...summary(saved), source: "live" as const }], source: "live" as const }),
-        reloadSaved: () => Effect.succeed({ snapshot: saved, source: "saved" as const }),
+        listInstances: () => Effect.succeed({ resources: [{ ...summary(saved), source: "live" as const }], source: "live" as const }),
+        reloadInstance: () => Effect.succeed({ snapshot: saved, source: "saved" as const }),
       },
     )
     const output = await Effect.runPromise(
@@ -479,7 +477,7 @@ describe("code mode execute", () => {
     expect(JSON.parse(output.output)).toEqual({ listedSource: "live", reloadSource: "saved", name: "Saved graph" })
   })
 
-  test("native graph save commits live drafts through CodeMode", async () => {
+  test("native graph save commits live instances through CodeMode", async () => {
     const asked: string[] = []
     const resourceID = Architecture.ResourceID.make("design_test")
     const current = snapshot({
@@ -498,12 +496,12 @@ describe("code mode execute", () => {
       undefined,
       undefined,
       {
-        loadDraft: () => Effect.sync(() => {
-          calls.push("loadDraft")
+        loadInstance: () => Effect.sync(() => {
+          calls.push("loadInstance")
           return { snapshot: current, source: "live" as const }
         }),
-        commitDraft: (_id, input) => Effect.sync(() => {
-          calls.push(`commitDraft:${input.revision}:${input.digest}`)
+        commitInstance: (_id, input) => Effect.sync(() => {
+          calls.push(`commitInstance:${input.revision}:${input.digest}`)
           return saved
         }),
       },
@@ -523,7 +521,7 @@ describe("code mode execute", () => {
     )
 
     expect(asked).toEqual(["edit"])
-    expect(calls).toEqual(["loadDraft", "commitDraft:4:live-digest"])
+    expect(calls).toEqual(["loadInstance", "commitInstance:4:live-digest"])
     expect(JSON.parse(output.output)).toMatchObject({
       resource: { id: "design_test", revision: 5 },
       digest: "saved-digest",
@@ -539,7 +537,7 @@ describe("code mode execute", () => {
     ])
   })
 
-  test("native graph edits patch live drafts by default", async () => {
+  test("native graph edits patch live instances by default", async () => {
     const resourceID = Architecture.ResourceID.make("design_test")
     const current = snapshot({
       version: 2,
@@ -555,7 +553,7 @@ describe("code mode execute", () => {
       nodes: [
         {
           id: Architecture.NodeID.make("node_test"),
-          text: "Draft node",
+          text: "Instance node",
           tags: [],
           layout: { position: { x: 1, y: 2 } },
         },
@@ -568,12 +566,12 @@ describe("code mode execute", () => {
       undefined,
       undefined,
       {
-        loadLive: () => Effect.sync(() => {
-          calls.push("loadLive")
+        loadInstance: () => Effect.sync(() => {
+          calls.push("loadInstance")
           return { snapshot: current, source: "live" as const }
         }),
-        patchLive: (_id, input) => Effect.sync(() => {
-          calls.push(`patchLive:${input.revision}:${input.digest}`)
+        patchInstance: (_id, input) => Effect.sync(() => {
+          calls.push(`patchInstance:${input.revision}:${input.digest}`)
           return { snapshot: patched, source: "live" as const }
         }),
       },
@@ -585,7 +583,7 @@ describe("code mode execute", () => {
             return await tools.graph.create_node({
               resourceID: "design_test",
               id: "node_test",
-              text: "Draft node",
+              text: "Instance node",
               position: { x: 1, y: 2 }
             })
           `,
@@ -594,7 +592,7 @@ describe("code mode execute", () => {
       ),
     )
 
-    expect(calls).toEqual(["loadLive", "patchLive:4:live-digest"])
+    expect(calls).toEqual(["loadInstance", "patchInstance:4:live-digest"])
     expect(JSON.parse(output.output)).toMatchObject({ revision: 5, digest: "patched-digest", source: "live" })
   })
 

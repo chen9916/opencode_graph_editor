@@ -26,23 +26,21 @@ const ctx: Tool.Context = {
 function graphMock(input: Partial<ArchitectureGraph.Interface> = {}): ArchitectureGraph.Interface {
   return {
     list: () => Effect.die("unexpected graph list in legacy GraphTools test"),
-    listLive: () => Effect.succeed({ resources: [], source: "saved" }),
+    listInstances: () => Effect.succeed({ resources: [], source: "saved" }),
     create: () => Effect.die("unexpected graph create in legacy GraphTools test"),
     duplicate: () => Effect.die("unexpected graph duplicate in legacy GraphTools test"),
     load: () => Effect.die("unexpected graph load in legacy GraphTools test"),
-    loadLive: () => Effect.die("unexpected graph live load in legacy GraphTools test"),
-    loadDraft: () => Effect.die("unexpected graph draft load in legacy GraphTools test"),
-    patchLive: () => Effect.die("unexpected graph live patch in legacy GraphTools test"),
-    patchDraft: () => Effect.die("unexpected graph draft patch in legacy GraphTools test"),
-    commitDraft: () => Effect.die("unexpected graph draft commit in legacy GraphTools test"),
-    discardDraft: () => Effect.die("unexpected graph draft discard in legacy GraphTools test"),
-    reloadSaved: () => Effect.die("unexpected graph saved reload in legacy GraphTools test"),
+    loadInstance: () => Effect.die("unexpected graph instance load in legacy GraphTools test"),
+    patchInstance: () => Effect.die("unexpected graph instance patch in legacy GraphTools test"),
+    commitInstance: () => Effect.die("unexpected graph instance commit in legacy GraphTools test"),
+    discardInstance: () => Effect.die("unexpected graph instance discard in legacy GraphTools test"),
+    reloadInstance: () => Effect.die("unexpected graph saved reload in legacy GraphTools test"),
     remove: () => Effect.die("unexpected graph remove in legacy GraphTools test"),
     reset: () => Effect.die("unexpected graph reset in legacy GraphTools test"),
     query: () => Effect.die("unexpected graph query in legacy GraphTools test"),
-    queryLive: () => Effect.die("unexpected graph live query in legacy GraphTools test"),
+    queryInstances: () => Effect.die("unexpected graph live query in legacy GraphTools test"),
     context: () => Effect.die("unexpected graph context in legacy GraphTools test"),
-    contextLive: () => Effect.die("unexpected graph live context in legacy GraphTools test"),
+    contextInstances: () => Effect.die("unexpected graph live context in legacy GraphTools test"),
     ...input,
   }
 }
@@ -107,7 +105,7 @@ describe("legacy graph tools", () => {
     })
     const output = await Effect.runPromise(
       runTool(ArchitectureTools.names.listResources, {}, {
-        listLive: () => Effect.succeed({ resources: [{ ...summary(saved), source: "live" as const }], source: "live" as const }),
+        listInstances: () => Effect.succeed({ resources: [{ ...summary(saved), source: "live" as const }], source: "live" as const }),
       }),
     )
 
@@ -126,7 +124,7 @@ describe("legacy graph tools", () => {
     })
     const output = await Effect.runPromise(
       runTool(ArchitectureTools.names.reloadResource, { resourceID: "design_test" }, {
-        reloadSaved: () => Effect.succeed({ snapshot: saved, source: "saved" as const }),
+        reloadInstance: () => Effect.succeed({ snapshot: saved, source: "saved" as const }),
       }),
     )
 
@@ -134,7 +132,7 @@ describe("legacy graph tools", () => {
     expect(output.metadata).toMatchObject({ resourceID: "design_test", revision: 2, digest: "digest", source: "saved" })
   })
 
-  test("save commits live drafts using the current draft revision and digest", async () => {
+  test("save commits live instances using the current instance revision and digest", async () => {
     const resourceID = Architecture.ResourceID.make("design_test")
     const current = snapshot({ version: 2, id: resourceID, name: "Live graph", revision: 4, nodes: [], edges: [] }, "live-digest")
     const saved = snapshot({ ...current.resource, revision: 5 }, "saved-digest")
@@ -144,18 +142,18 @@ describe("legacy graph tools", () => {
         resourceID: "design_test",
         expectedDigest: "live-digest",
       }, {
-        loadDraft: () => Effect.sync(() => {
-          calls.push("loadDraft")
+        loadInstance: () => Effect.sync(() => {
+          calls.push("loadInstance")
           return { snapshot: current, source: "live" as const }
         }),
-        commitDraft: (_id, input) => Effect.sync(() => {
-          calls.push(`commitDraft:${input.revision}:${input.digest}`)
+        commitInstance: (_id, input) => Effect.sync(() => {
+          calls.push(`commitInstance:${input.revision}:${input.digest}`)
           return saved
         }),
       }),
     )
 
-    expect(calls).toEqual(["loadDraft", "commitDraft:4:live-digest"])
+    expect(calls).toEqual(["loadInstance", "commitInstance:4:live-digest"])
     expect(JSON.parse(output.output)).toMatchObject({
       resource: { id: "design_test", revision: 5 },
       digest: "saved-digest",
@@ -171,20 +169,20 @@ describe("legacy graph tools", () => {
     })
   })
 
-  test("save no-ops when no live draft exists", async () => {
+  test("save no-ops when no live instance exists", async () => {
     const resourceID = Architecture.ResourceID.make("design_test")
     const current = snapshot({ version: 2, id: resourceID, name: "Saved graph", revision: 2, nodes: [], edges: [] }, "saved-digest")
     const calls: string[] = []
     const output = await Effect.runPromise(
       runTool(ArchitectureTools.names.saveResource, { resourceID: "design_test" }, {
-        loadDraft: () => Effect.sync(() => {
-          calls.push("loadDraft")
+        loadInstance: () => Effect.sync(() => {
+          calls.push("loadInstance")
           return { snapshot: current, source: "saved" as const }
         }),
       }),
     )
 
-    expect(calls).toEqual(["loadDraft"])
+    expect(calls).toEqual(["loadInstance"])
     expect(JSON.parse(output.output)).toMatchObject({
       resource: { id: "design_test", revision: 2 },
       digest: "saved-digest",
@@ -209,14 +207,14 @@ describe("legacy graph tools", () => {
         resourceID: "design_test",
         expectedDigest: "stale-digest",
       }, {
-        loadDraft: () => Effect.sync(() => {
-          calls.push("loadDraft")
+        loadInstance: () => Effect.sync(() => {
+          calls.push("loadInstance")
           return { snapshot: current, source: "live" as const }
         }),
       }),
     ) as Error & { conflict?: { error?: string; operation?: string; expectedDigest?: string; currentDigest?: string } }
 
-    expect(calls).toEqual(["loadDraft"])
+    expect(calls).toEqual(["loadInstance"])
     expect(error.message).toContain("operation=graph_save_resource")
     expect(error.conflict).toMatchObject({
       error: "GraphConflictError",
@@ -226,7 +224,7 @@ describe("legacy graph tools", () => {
     })
   })
 
-  test("edits load and patch the live draft by default", async () => {
+  test("edits load and patch the live instance by default", async () => {
     const resourceID = Architecture.ResourceID.make("design_test")
     const current = snapshot({ version: 2, id: resourceID, name: "Live graph", revision: 4, nodes: [], edges: [] }, "live-digest")
     const patched = snapshot({
@@ -235,7 +233,7 @@ describe("legacy graph tools", () => {
       nodes: [
         {
           id: Architecture.NodeID.make("node_test"),
-          text: "Draft node",
+          text: "Instance node",
           tags: [],
           layout: { position: { x: 1, y: 2 } },
         },
@@ -246,21 +244,21 @@ describe("legacy graph tools", () => {
       runTool(ArchitectureTools.names.createNode, {
         resourceID: "design_test",
         id: "node_test",
-        text: "Draft node",
+        text: "Instance node",
         position: { x: 1, y: 2 },
       }, {
-        loadLive: () => Effect.sync(() => {
-          calls.push("loadLive")
+        loadInstance: () => Effect.sync(() => {
+          calls.push("loadInstance")
           return { snapshot: current, source: "live" as const }
         }),
-        patchLive: (_id, input) => Effect.sync(() => {
-          calls.push(`patchLive:${input.revision}:${input.digest}`)
+        patchInstance: (_id, input) => Effect.sync(() => {
+          calls.push(`patchInstance:${input.revision}:${input.digest}`)
           return { snapshot: patched, source: "live" as const }
         }),
       }),
     )
 
-    expect(calls).toEqual(["loadLive", "patchLive:4:live-digest"])
+    expect(calls).toEqual(["loadInstance", "patchInstance:4:live-digest"])
     expect(JSON.parse(output.output)).toMatchObject({ revision: 5, digest: "patched-digest", source: "live" })
     expect(output.metadata).toMatchObject({ resourceID: "design_test", revision: 5, digest: "patched-digest", source: "live" })
   })

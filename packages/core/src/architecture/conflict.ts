@@ -10,7 +10,7 @@ export const RetryHint = "Reload the graph resource and retry the edit against t
 export const SafeToRetry = Schema.Union([Schema.Boolean, Schema.Literals(["unknown", "partial"])])
 export type SafeToRetry = typeof SafeToRetry.Type
 
-export const Kind = Schema.Literals(["draft_changed", "draft_missing"])
+export const Kind = Schema.Literals(["instance_changed", "instance_missing"])
 export type Kind = typeof Kind.Type
 
 export const Expected = Schema.Struct({

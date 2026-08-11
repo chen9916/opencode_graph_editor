@@ -127,7 +127,7 @@ export const apply = Effect.fn("ArchitecturePatch.apply")(function* (
   resource: Architecture.Resource,
   operations: ReadonlyArray<Architecture.Operation>,
 ) {
-  const draft = {
+  const next = {
     name: resource.name,
     tagColors: resource.tagColors,
     nodes: [...resource.nodes],
@@ -135,80 +135,80 @@ export const apply = Effect.fn("ArchitecturePatch.apply")(function* (
   }
   for (const operation of operations) {
     if (operation.type === "resource.update") {
-      draft.name = operation.name
+      next.name = operation.name
       continue
     }
     if (operation.type === "tag.color") {
-      const tagColors = { ...(draft.tagColors ?? {}) }
+      const tagColors = { ...(next.tagColors ?? {}) }
       if (operation.color) tagColors[operation.tag] = operation.color
       else delete tagColors[operation.tag]
-      draft.tagColors = Object.keys(tagColors).length ? tagColors : undefined
+      next.tagColors = Object.keys(tagColors).length ? tagColors : undefined
       continue
     }
     if (operation.type === "node.create") {
-      if (draft.nodes.some((node) => node.id === operation.node.id))
+      if (next.nodes.some((node) => node.id === operation.node.id))
         return yield* conflict(operation, `Node already exists: ${operation.node.id}`)
-      draft.nodes.push(operation.node)
+      next.nodes.push(operation.node)
       continue
     }
     if (operation.type === "node.update") {
-      const index = draft.nodes.findIndex((node) => node.id === operation.node.id)
-      const current = draft.nodes[index]
+      const index = next.nodes.findIndex((node) => node.id === operation.node.id)
+      const current = next.nodes[index]
       if (!current) return yield* new NotFoundError({ entity: "node", id: operation.node.id })
       yield* checkExpected(operation, current)
-      draft.nodes[index] = operation.node
+      next.nodes[index] = operation.node
       continue
     }
     if (operation.type === "node.position") {
-      const index = draft.nodes.findIndex((node) => node.id === operation.nodeID)
-      const current = draft.nodes[index]
+      const index = next.nodes.findIndex((node) => node.id === operation.nodeID)
+      const current = next.nodes[index]
       if (!current) return yield* new NotFoundError({ entity: "node", id: operation.nodeID })
       yield* checkExpected(operation, current)
-      draft.nodes[index] = { ...current, layout: { position: operation.position } }
+      next.nodes[index] = { ...current, layout: { position: operation.position } }
       continue
     }
     if (operation.type === "node.remove") {
-      const index = draft.nodes.findIndex((node) => node.id === operation.nodeID)
-      const current = draft.nodes[index]
+      const index = next.nodes.findIndex((node) => node.id === operation.nodeID)
+      const current = next.nodes[index]
       if (!current) return yield* new NotFoundError({ entity: "node", id: operation.nodeID })
       yield* checkExpected(operation, current)
-      const connected = draft.edges.some((edge) => edge.source === operation.nodeID || edge.target === operation.nodeID)
+      const connected = next.edges.some((edge) => edge.source === operation.nodeID || edge.target === operation.nodeID)
       if (connected && !operation.cascade)
         return yield* conflict(operation, `Node ${operation.nodeID} has connected relationships`)
-      draft.nodes.splice(index, 1)
+      next.nodes.splice(index, 1)
       if (operation.cascade)
-        draft.edges = draft.edges.filter((edge) => edge.source !== operation.nodeID && edge.target !== operation.nodeID)
+        next.edges = next.edges.filter((edge) => edge.source !== operation.nodeID && edge.target !== operation.nodeID)
       continue
     }
     if (operation.type === "edge.create") {
-      if (draft.edges.some((edge) => edge.id === operation.edge.id))
+      if (next.edges.some((edge) => edge.id === operation.edge.id))
         return yield* conflict(operation, `Edge already exists: ${operation.edge.id}`)
-      draft.edges.push(operation.edge)
+      next.edges.push(operation.edge)
       continue
     }
     if (operation.type === "edge.update") {
-      const index = draft.edges.findIndex((edge) => edge.id === operation.edge.id)
-      const current = draft.edges[index]
+      const index = next.edges.findIndex((edge) => edge.id === operation.edge.id)
+      const current = next.edges[index]
       if (!current) return yield* new NotFoundError({ entity: "edge", id: operation.edge.id })
       yield* checkExpected(operation, current)
-      draft.edges[index] = operation.edge
+      next.edges[index] = operation.edge
       continue
     }
-    const index = draft.edges.findIndex((edge) => edge.id === operation.edgeID)
-    const current = draft.edges[index]
+    const index = next.edges.findIndex((edge) => edge.id === operation.edgeID)
+    const current = next.edges[index]
     if (!current) return yield* new NotFoundError({ entity: "edge", id: operation.edgeID })
     yield* checkExpected(operation, current)
-    draft.edges.splice(index, 1)
+    next.edges.splice(index, 1)
   }
   return yield* validate(
     normalize({
       version: 2,
       revision: resource.revision + 1,
       id: resource.id,
-      name: draft.name,
-      tagColors: draft.tagColors,
-      nodes: draft.nodes,
-      edges: draft.edges,
+      name: next.name,
+      tagColors: next.tagColors,
+      nodes: next.nodes,
+      edges: next.edges,
     }),
   )
 })

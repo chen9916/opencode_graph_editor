@@ -1,18 +1,18 @@
 import { describe, expect, test } from "bun:test"
-import type { ArchitectureLiveDraft } from "./contract"
+import type { ArchitectureLiveInstance } from "./contract"
 import {
-  architectureDraftEventIsStale,
+  architectureInstanceEventIsStale,
   architectureResourceEventInfo,
-  architectureResourceDraftEventCache,
-  architectureResourceDraftEventInfo,
+  architectureResourceInstanceEventCache,
+  architectureResourceInstanceEventInfo,
   architectureSnapshotCoversEvent,
   architectureSnapshotMatchesEvent,
   architectureSummaryMatchesEvent,
-  beginArchitectureLocalDraftOperation,
+  beginArchitectureLocalInstanceOperation,
   beginArchitectureLocalSave,
-  captureArchitectureLocalDraftOperationEvent,
+  captureArchitectureLocalInstanceOperationEvent,
   isArchitectureLocalSaveEvent,
-  rememberArchitectureLocalDraftOperationEvent,
+  rememberArchitectureLocalInstanceOperationEvent,
 } from "./event"
 
 describe("architecture resource events", () => {
@@ -32,10 +32,10 @@ describe("architecture resource events", () => {
     ).toEqual({ resourceID: "design", revision: 3, digest: "def" })
   })
 
-  test("keeps live draft events out of saved resource reconciliation", () => {
+  test("keeps live instance events out of saved resource reconciliation", () => {
     expect(
       architectureResourceEventInfo({
-        type: "architecture.resource.draft.updated",
+        type: "architecture.resource.instance.updated",
         properties: { resourceID: "design", revision: 2, digest: "live" },
       }),
     ).toBeUndefined()
@@ -111,8 +111,8 @@ describe("architecture resource events", () => {
     ).toBe(false)
   })
 
-  test("captures draft events during a local save or reload without exposing them to the live synchronizer", () => {
-    const finish = beginArchitectureLocalDraftOperation({
+  test("captures instance events during a local save or reload without exposing them to the live synchronizer", () => {
+    const finish = beginArchitectureLocalInstanceOperation({
       server: "http://127.0.0.1:4096",
       directory: "C:/repo",
       resourceID: "design",
@@ -121,7 +121,7 @@ describe("architecture resource events", () => {
     const event = { resourceID: "design", action: "discarded" as const, revision: 2, digest: "saved" }
 
     expect(
-      captureArchitectureLocalDraftOperationEvent({
+      captureArchitectureLocalInstanceOperationEvent({
         server: "http://127.0.0.1:4096",
         directory: "C:/repo",
         event,
@@ -131,7 +131,7 @@ describe("architecture resource events", () => {
     expect(finish()).toEqual(event)
     expect(finish()).toBeUndefined()
     expect(
-      captureArchitectureLocalDraftOperationEvent({
+      captureArchitectureLocalInstanceOperationEvent({
         server: "http://127.0.0.1:4096",
         directory: "C:/repo",
         event,
@@ -139,23 +139,23 @@ describe("architecture resource events", () => {
     ).toBe(false)
   })
 
-  test("suppresses late draft echo events after the local patch response settles", () => {
-    const event = { resourceID: "design", action: "updated" as const, revision: 4, digest: "draft" }
-    rememberArchitectureLocalDraftOperationEvent({
+  test("suppresses late instance echo events after the local patch response settles", () => {
+    const event = { resourceID: "design", action: "updated" as const, revision: 4, digest: "instance" }
+    rememberArchitectureLocalInstanceOperationEvent({
       server: "http://127.0.0.1:4096",
       directory: "C:/repo",
       event,
     })
 
     expect(
-      captureArchitectureLocalDraftOperationEvent({
+      captureArchitectureLocalInstanceOperationEvent({
         server: "http://127.0.0.1:4096",
         directory: "C:/repo",
         event,
       }),
     ).toBe(true)
     expect(
-      captureArchitectureLocalDraftOperationEvent({
+      captureArchitectureLocalInstanceOperationEvent({
         server: "http://127.0.0.1:4096",
         directory: "C:/repo",
         event: { ...event, digest: "external" },
@@ -163,35 +163,35 @@ describe("architecture resource events", () => {
     ).toBe(false)
   })
 
-  test("reads live draft update events with inline or nested draft payloads", () => {
-    const draft: ArchitectureLiveDraft = {
+  test("reads live instance update events with inline or nested instance payloads", () => {
+    const instance: ArchitectureLiveInstance = {
       source: "live",
       snapshot: {
         digest: "live",
         storage: { root: "/repo/.opencode/architecture", path: ".opencode/architecture/resources/design.json" },
-        resource: { version: 2, revision: 4, id: "design", name: "Design draft", nodes: [], edges: [] },
+          resource: { version: 2, revision: 4, id: "design", name: "Design instance", nodes: [], edges: [] },
       },
     }
 
     expect(
-      architectureResourceDraftEventInfo({
-        type: "architecture.resource.draft.updated",
-        data: { resourceID: "design", ...draft },
+      architectureResourceInstanceEventInfo({
+        type: "architecture.resource.instance.updated",
+        data: { resourceID: "design", ...instance },
       }),
-    ).toEqual({ resourceID: "design", action: "updated", draft })
+    ).toEqual({ resourceID: "design", action: "updated", instance })
 
     expect(
-      architectureResourceDraftEventInfo({
-        type: "architecture.resource.draft.discarded",
-        properties: { resourceID: "design", draft },
+      architectureResourceInstanceEventInfo({
+        type: "architecture.resource.instance.discarded",
+        properties: { resourceID: "design", instance },
       }),
-    ).toEqual({ resourceID: "design", action: "discarded", draft })
+    ).toEqual({ resourceID: "design", action: "discarded", instance })
   })
 
   test("uses data payload fields when a legacy properties object is also present", () => {
     expect(
-      architectureResourceDraftEventInfo({
-        type: "architecture.resource.draft.updated",
+      architectureResourceInstanceEventInfo({
+        type: "architecture.resource.instance.updated",
         properties: {},
         data: {
           resourceID: "design",
@@ -208,14 +208,14 @@ describe("architecture resource events", () => {
       digest: "data-digest",
       baseRevision: 4,
       baseDigest: "base-digest",
-      draft: undefined,
+      instance: undefined,
     })
   })
 
-  test("reads metadata-only draft events without pretending they include a draft", () => {
+  test("reads metadata-only instance events without pretending they include an instance", () => {
     expect(
-      architectureResourceDraftEventInfo({
-        type: "architecture.resource.draft.updated",
+      architectureResourceInstanceEventInfo({
+        type: "architecture.resource.instance.updated",
         data: {
           resourceID: "design",
           revision: 4,
@@ -231,11 +231,11 @@ describe("architecture resource events", () => {
       digest: "live",
       baseRevision: 2,
       baseDigest: "saved",
-      draft: undefined,
+      instance: undefined,
     })
   })
 
-  test("detects stale draft events after a newer saved snapshot", () => {
+  test("detects stale instance events after a newer saved snapshot", () => {
     const saved = {
       resource: { version: 2 as const, id: "design", name: "Design", revision: 3, nodes: [], edges: [] },
       digest: "saved",
@@ -243,7 +243,7 @@ describe("architecture resource events", () => {
     }
 
     expect(
-      architectureDraftEventIsStale(saved, {
+      architectureInstanceEventIsStale(saved, {
         resourceID: "design",
         action: "updated",
         revision: 2,
@@ -253,7 +253,7 @@ describe("architecture resource events", () => {
       }),
     ).toBe(true)
     expect(
-      architectureDraftEventIsStale(saved, {
+      architectureInstanceEventIsStale(saved, {
         resourceID: "design",
         action: "discarded",
         revision: 2,
@@ -261,7 +261,7 @@ describe("architecture resource events", () => {
       }),
     ).toBe(true)
     expect(
-      architectureDraftEventIsStale(saved, {
+      architectureInstanceEventIsStale(saved, {
         resourceID: "design",
         action: "updated",
         revision: 3,
@@ -272,7 +272,7 @@ describe("architecture resource events", () => {
     ).toBe(false)
   })
 
-  test("maps discard events to an explicit empty draft cache value", () => {
-    expect(architectureResourceDraftEventCache({ resourceID: "design", action: "discarded" })).toBeNull()
+  test("maps discard events to an explicit empty instance cache value", () => {
+    expect(architectureResourceInstanceEventCache({ resourceID: "design", action: "discarded" })).toBeNull()
   })
 })

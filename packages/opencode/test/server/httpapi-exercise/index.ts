@@ -758,14 +758,14 @@ const scenarios: Scenario[] = [
       }),
     ),
   http.protected
-    .get("/api/architecture/resource/{resourceID}/draft", "v2.architecture.resource.draft.get")
+    .get("/api/architecture/resource/{resourceID}/instance", "v2.architecture.resource.instance.get")
     .inProject({ git: false })
     .seeded((ctx) => {
-      const resource = ArchitecturePatch.empty({ id: Architecture.ResourceID.make("draft-get"), name: "Draft get" })
-      return ctx.file(".opencode/architecture/resources/draft-get.json", JSON.stringify(resource, null, 2) + "\n")
+      const resource = ArchitecturePatch.empty({ id: Architecture.ResourceID.make("instance-get"), name: "Instance get" })
+      return ctx.file(".opencode/architecture/resources/instance-get.json", JSON.stringify(resource, null, 2) + "\n")
     })
     .at((ctx) => ({
-      path: route("/api/architecture/resource/{resourceID}/draft", { resourceID: "draft-get" }),
+      path: route("/api/architecture/resource/{resourceID}/instance", { resourceID: "instance-get" }),
       headers: ctx.headers(),
     }))
     .json(
@@ -774,46 +774,46 @@ const scenarios: Scenario[] = [
         object(value)
         object(value.snapshot)
         object(value.snapshot.resource)
-        check(value.source === "saved", "architecture draft get should fall back to saved state")
-        check(value.snapshot.resource.id === "draft-get", "architecture draft get should return requested resource")
+        check(value.source === "saved", "architecture instance get should fall back to saved state")
+        check(value.snapshot.resource.id === "instance-get", "architecture instance get should return requested resource")
       }),
     ),
   http.protected
-    .post("/api/architecture/resource/{resourceID}/draft/commit", "v2.architecture.resource.draft.commit")
+    .post("/api/architecture/resource/{resourceID}/instance/commit", "v2.architecture.resource.instance.commit")
     .inProject({ git: false })
     .mutating()
     .seeded((ctx) => {
       const resource = ArchitecturePatch.empty({
-        id: Architecture.ResourceID.make("draft-commit"),
-        name: "Draft commit",
+        id: Architecture.ResourceID.make("instance-commit"),
+        name: "Instance commit",
       })
       return ctx
-        .file(".opencode/architecture/resources/draft-commit.json", JSON.stringify(resource, null, 2) + "\n")
+        .file(".opencode/architecture/resources/instance-commit.json", JSON.stringify(resource, null, 2) + "\n")
         .pipe(Effect.as({ resource, digest: ArchitecturePatch.digest(resource) }))
     })
     .at((ctx) => ({
-      path: route("/api/architecture/resource/{resourceID}/draft/commit", { resourceID: "draft-commit" }),
+      path: route("/api/architecture/resource/{resourceID}/instance/commit", { resourceID: "instance-commit" }),
       headers: ctx.headers(),
       body: { revision: ctx.state.resource.revision, digest: ctx.state.digest },
     }))
     .json(409, (value) => {
       object(value)
-      check(value.error === "GraphConflictError", "architecture draft commit should return a typed conflict")
-      check(value.conflictKind === "draft_missing", "architecture draft commit should reject a missing live draft")
+      check(value.error === "GraphConflictError", "architecture instance commit should return a typed conflict")
+      check(value.conflictKind === "instance_missing", "architecture instance commit should reject a missing live instance")
     }),
   http.protected
-    .post("/api/architecture/resource/{resourceID}/draft/discard", "v2.architecture.resource.draft.discard")
+    .post("/api/architecture/resource/{resourceID}/instance/discard", "v2.architecture.resource.instance.discard")
     .inProject({ git: false })
     .mutating()
     .seeded((ctx) => {
       const resource = ArchitecturePatch.empty({
-        id: Architecture.ResourceID.make("draft-discard"),
-        name: "Draft discard",
+        id: Architecture.ResourceID.make("instance-discard"),
+        name: "Instance discard",
       })
-      return ctx.file(".opencode/architecture/resources/draft-discard.json", JSON.stringify(resource, null, 2) + "\n")
+      return ctx.file(".opencode/architecture/resources/instance-discard.json", JSON.stringify(resource, null, 2) + "\n")
     })
     .at((ctx) => ({
-      path: route("/api/architecture/resource/{resourceID}/draft/discard", { resourceID: "draft-discard" }),
+      path: route("/api/architecture/resource/{resourceID}/instance/discard", { resourceID: "instance-discard" }),
       headers: ctx.headers(),
     }))
     .json(
@@ -821,22 +821,22 @@ const scenarios: Scenario[] = [
       locationData((value) => {
         object(value)
         object(value.snapshot)
-        check(value.source === "saved", "architecture draft discard should return saved source")
+        check(value.source === "saved", "architecture instance discard should return saved source")
       }),
     ),
   http.protected
-    .post("/api/architecture/resource/{resourceID}/draft/reload", "v2.architecture.resource.draft.reload")
+    .post("/api/architecture/resource/{resourceID}/instance/reload", "v2.architecture.resource.instance.reload")
     .inProject({ git: false })
     .mutating()
     .seeded((ctx) => {
       const resource = ArchitecturePatch.empty({
-        id: Architecture.ResourceID.make("draft-reload"),
-        name: "Draft reload",
+        id: Architecture.ResourceID.make("instance-reload"),
+        name: "Instance reload",
       })
-      return ctx.file(".opencode/architecture/resources/draft-reload.json", JSON.stringify(resource, null, 2) + "\n")
+      return ctx.file(".opencode/architecture/resources/instance-reload.json", JSON.stringify(resource, null, 2) + "\n")
     })
     .at((ctx) => ({
-      path: route("/api/architecture/resource/{resourceID}/draft/reload", { resourceID: "draft-reload" }),
+      path: route("/api/architecture/resource/{resourceID}/instance/reload", { resourceID: "instance-reload" }),
       headers: ctx.headers(),
     }))
     .json(
@@ -844,7 +844,7 @@ const scenarios: Scenario[] = [
       locationData((value) => {
         object(value)
         object(value.snapshot)
-        check(value.source === "saved", "architecture draft reload should return saved source")
+        check(value.source === "saved", "architecture instance reload should return saved source")
       }),
     ),
   http.protected

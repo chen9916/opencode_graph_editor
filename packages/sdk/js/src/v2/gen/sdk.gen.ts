@@ -10,7 +10,7 @@ import type {
   AppLogResponses,
   AppSkillsErrors,
   AppSkillsResponses,
-  ArchitectureDraftCommitInput,
+  ArchitectureLiveInstanceCommitInput,
   ArchitecturePatchInput,
   ArchitectureResourceCreateInput,
   ArchitectureResourceDuplicateInput,
@@ -272,20 +272,20 @@ import type {
   V2AgentListResponses,
   V2ArchitectureResourceCreateErrors,
   V2ArchitectureResourceCreateResponses,
-  V2ArchitectureResourceDraftCommitErrors,
-  V2ArchitectureResourceDraftCommitResponses,
-  V2ArchitectureResourceDraftDiscardErrors,
-  V2ArchitectureResourceDraftDiscardResponses,
-  V2ArchitectureResourceDraftGetErrors,
-  V2ArchitectureResourceDraftGetResponses,
-  V2ArchitectureResourceDraftPatchErrors,
-  V2ArchitectureResourceDraftPatchResponses,
-  V2ArchitectureResourceDraftReloadErrors,
-  V2ArchitectureResourceDraftReloadResponses,
   V2ArchitectureResourceDuplicateErrors,
   V2ArchitectureResourceDuplicateResponses,
   V2ArchitectureResourceGetErrors,
   V2ArchitectureResourceGetResponses,
+  V2ArchitectureResourceInstanceCommitErrors,
+  V2ArchitectureResourceInstanceCommitResponses,
+  V2ArchitectureResourceInstanceDiscardErrors,
+  V2ArchitectureResourceInstanceDiscardResponses,
+  V2ArchitectureResourceInstanceGetErrors,
+  V2ArchitectureResourceInstanceGetResponses,
+  V2ArchitectureResourceInstancePatchErrors,
+  V2ArchitectureResourceInstancePatchResponses,
+  V2ArchitectureResourceInstanceReloadErrors,
+  V2ArchitectureResourceInstanceReloadResponses,
   V2ArchitectureResourceListErrors,
   V2ArchitectureResourceListResponses,
   V2ArchitectureResourceRemoveErrors,
@@ -5110,11 +5110,11 @@ export class Agent extends HeyApiClient {
   }
 }
 
-export class Draft extends HeyApiClient {
+export class Instance2 extends HeyApiClient {
   /**
-   * Get graph draft
+   * Get live graph instance
    *
-   * Load the live draft snapshot for one graph resource, falling back to the saved resource.
+   * Load the live graph instance for one graph resource, falling back to the saved resource.
    */
   public get<ThrowOnError extends boolean = false>(
     parameters: {
@@ -5138,20 +5138,20 @@ export class Draft extends HeyApiClient {
       ],
     )
     return (options?.client ?? this.client).get<
-      V2ArchitectureResourceDraftGetResponses,
-      V2ArchitectureResourceDraftGetErrors,
+      V2ArchitectureResourceInstanceGetResponses,
+      V2ArchitectureResourceInstanceGetErrors,
       ThrowOnError
     >({
-      url: "/api/architecture/resource/{resourceID}/draft",
+      url: "/api/architecture/resource/{resourceID}/instance",
       ...options,
       ...params,
     })
   }
 
   /**
-   * Update graph draft
+   * Update live graph instance
    *
-   * Apply graph edits to the live draft without writing the saved graph resource file.
+   * Apply graph edits to the live graph instance without writing the saved graph resource file.
    */
   public patch<ThrowOnError extends boolean = false>(
     parameters: {
@@ -5177,11 +5177,11 @@ export class Draft extends HeyApiClient {
       ],
     )
     return (options?.client ?? this.client).patch<
-      V2ArchitectureResourceDraftPatchResponses,
-      V2ArchitectureResourceDraftPatchErrors,
+      V2ArchitectureResourceInstancePatchResponses,
+      V2ArchitectureResourceInstancePatchErrors,
       ThrowOnError
     >({
-      url: "/api/architecture/resource/{resourceID}/draft",
+      url: "/api/architecture/resource/{resourceID}/instance",
       ...options,
       ...params,
       headers: {
@@ -5193,9 +5193,9 @@ export class Draft extends HeyApiClient {
   }
 
   /**
-   * Commit graph draft
+   * Save live graph instance
    *
-   * Write the expected live graph draft to the saved graph resource file.
+   * Write the expected live graph instance to the saved graph resource file.
    */
   public commit<ThrowOnError extends boolean = false>(
     parameters: {
@@ -5204,7 +5204,7 @@ export class Draft extends HeyApiClient {
         directory?: string
         workspace?: string
       }
-      architectureDraftCommitInput: ArchitectureDraftCommitInput
+      architectureLiveInstanceCommitInput: ArchitectureLiveInstanceCommitInput
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -5215,17 +5215,17 @@ export class Draft extends HeyApiClient {
           args: [
             { in: "path", key: "resourceID" },
             { in: "query", key: "location" },
-            { key: "architectureDraftCommitInput", map: "body" },
+            { key: "architectureLiveInstanceCommitInput", map: "body" },
           ],
         },
       ],
     )
     return (options?.client ?? this.client).post<
-      V2ArchitectureResourceDraftCommitResponses,
-      V2ArchitectureResourceDraftCommitErrors,
+      V2ArchitectureResourceInstanceCommitResponses,
+      V2ArchitectureResourceInstanceCommitErrors,
       ThrowOnError
     >({
-      url: "/api/architecture/resource/{resourceID}/draft/commit",
+      url: "/api/architecture/resource/{resourceID}/instance/commit",
       ...options,
       ...params,
       headers: {
@@ -5237,9 +5237,9 @@ export class Draft extends HeyApiClient {
   }
 
   /**
-   * Discard graph draft
+   * Discard live graph instance changes
    *
-   * Discard the live graph draft and return the saved graph resource snapshot.
+   * Replace the live graph instance with the saved graph resource snapshot.
    */
   public discard<ThrowOnError extends boolean = false>(
     parameters: {
@@ -5263,11 +5263,11 @@ export class Draft extends HeyApiClient {
       ],
     )
     return (options?.client ?? this.client).post<
-      V2ArchitectureResourceDraftDiscardResponses,
-      V2ArchitectureResourceDraftDiscardErrors,
+      V2ArchitectureResourceInstanceDiscardResponses,
+      V2ArchitectureResourceInstanceDiscardErrors,
       ThrowOnError
     >({
-      url: "/api/architecture/resource/{resourceID}/draft/discard",
+      url: "/api/architecture/resource/{resourceID}/instance/discard",
       ...options,
       ...params,
     })
@@ -5276,7 +5276,7 @@ export class Draft extends HeyApiClient {
   /**
    * Reload saved graph
    *
-   * Drop the live graph draft and reload the saved graph resource snapshot from disk.
+   * Replace the live graph instance with the saved graph resource snapshot from disk.
    */
   public reload<ThrowOnError extends boolean = false>(
     parameters: {
@@ -5300,11 +5300,11 @@ export class Draft extends HeyApiClient {
       ],
     )
     return (options?.client ?? this.client).post<
-      V2ArchitectureResourceDraftReloadResponses,
-      V2ArchitectureResourceDraftReloadErrors,
+      V2ArchitectureResourceInstanceReloadResponses,
+      V2ArchitectureResourceInstanceReloadErrors,
       ThrowOnError
     >({
-      url: "/api/architecture/resource/{resourceID}/draft/reload",
+      url: "/api/architecture/resource/{resourceID}/instance/reload",
       ...options,
       ...params,
     })
@@ -5542,9 +5542,9 @@ export class Resource2 extends HeyApiClient {
     })
   }
 
-  private _draft?: Draft
-  get draft(): Draft {
-    return (this._draft ??= new Draft({ client: this.client }))
+  private _instance?: Instance2
+  get instance(): Instance2 {
+    return (this._instance ??= new Instance2({ client: this.client }))
   }
 }
 

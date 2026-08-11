@@ -20,13 +20,13 @@ const resource = {
 }
 
 describe("Architecture schema", () => {
-  test("decodes the exact draft identity required by commit", () => {
-    expect(Schema.decodeUnknownSync(Architecture.DraftCommitInput)({ revision: 3, digest: "draft-digest" })).toEqual({
+  test("decodes the exact live instance identity required by commit", () => {
+    expect(Schema.decodeUnknownSync(Architecture.LiveInstanceCommitInput)({ revision: 3, digest: "instance-digest" })).toEqual({
       revision: 3,
-      digest: "draft-digest",
+      digest: "instance-digest",
     })
     expect(() =>
-      Schema.decodeUnknownSync(Architecture.DraftCommitInput)({ revision: -1, digest: "draft-digest" }),
+      Schema.decodeUnknownSync(Architecture.LiveInstanceCommitInput)({ revision: -1, digest: "instance-digest" }),
     ).toThrow()
   })
 

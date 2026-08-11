@@ -1,5 +1,5 @@
 import type { ArchitectureListResourcesOutput } from "@opencode-ai/client/promise"
-import type { ArchitectureLiveDraft, ArchitectureResource, ArchitectureSnapshot } from "./contract"
+import type { ArchitectureLiveInstance, ArchitectureResource, ArchitectureSnapshot } from "./contract"
 
 export type ArchitectureResourceEvent = {
   readonly type: string
@@ -13,14 +13,14 @@ export type ArchitectureResourceEventInfo = {
   readonly digest?: string
 }
 
-export type ArchitectureResourceDraftEventInfo = {
+export type ArchitectureResourceInstanceEventInfo = {
   readonly resourceID: string
   readonly action: "updated" | "discarded"
   readonly revision?: number
   readonly digest?: string
   readonly baseRevision?: number
   readonly baseDigest?: string
-  readonly draft?: ArchitectureLiveDraft
+  readonly instance?: ArchitectureLiveInstance
 }
 
 type ArchitectureLocalSave = {
@@ -29,7 +29,7 @@ type ArchitectureLocalSave = {
   readonly resourceID: string
 }
 
-type ArchitectureLocalDraftOperation = ArchitectureLocalSave & {
+type ArchitectureLocalInstanceOperation = ArchitectureLocalSave & {
   readonly operation: "save" | "reload" | "patch"
 }
 
@@ -39,8 +39,8 @@ type ArchitectureLocalSaveState = {
 }
 
 const localSaves = new Map<string, ArchitectureLocalSaveState>()
-const localDraftOperations = new Map<string, ArchitectureLocalDraftOperationState>()
-const localDraftEchoes = new Map<string, ArchitectureLocalDraftEchoState>()
+const localInstanceOperations = new Map<string, ArchitectureLocalInstanceOperationState>()
+const localInstanceEchoes = new Map<string, ArchitectureLocalInstanceEchoState>()
 
 export function beginArchitectureLocalSave(input: ArchitectureLocalSave) {
   const key = localSaveKey(input)
@@ -72,10 +72,10 @@ export function isArchitectureLocalSaveEvent(input: {
   return true
 }
 
-export function beginArchitectureLocalDraftOperation(input: ArchitectureLocalDraftOperation) {
+export function beginArchitectureLocalInstanceOperation(input: ArchitectureLocalInstanceOperation) {
   const key = localSaveKey(input)
-  const current = localDraftOperations.get(key)
-  localDraftOperations.set(key, {
+  const current = localInstanceOperations.get(key)
+  localInstanceOperations.set(key, {
     count: (current?.count ?? 0) + 1,
     event: current?.event,
   })
@@ -83,52 +83,52 @@ export function beginArchitectureLocalDraftOperation(input: ArchitectureLocalDra
   return () => {
     if (finished) return
     finished = true
-    const state = localDraftOperations.get(key)
+    const state = localInstanceOperations.get(key)
     if (!state || state.count === 1) {
-      localDraftOperations.delete(key)
+      localInstanceOperations.delete(key)
       return state?.event
     }
-    localDraftOperations.set(key, { ...state, count: state.count - 1 })
+    localInstanceOperations.set(key, { ...state, count: state.count - 1 })
     return state.event
   }
 }
 
-export function captureArchitectureLocalDraftOperationEvent(input: {
+export function captureArchitectureLocalInstanceOperationEvent(input: {
   readonly server: string
   readonly directory: string
-  readonly event: ArchitectureResourceDraftEventInfo
+  readonly event: ArchitectureResourceInstanceEventInfo
 }) {
   const key = localSaveKey({ server: input.server, directory: input.directory, resourceID: input.event.resourceID })
-  const state = localDraftOperations.get(key)
+  const state = localInstanceOperations.get(key)
   if (state) {
-    localDraftOperations.set(key, { ...state, event: input.event })
+    localInstanceOperations.set(key, { ...state, event: input.event })
     return true
   }
-  return localDraftEchoes.get(key)?.events.some((event) => sameDraftEvent(event, input.event)) ?? false
+  return localInstanceEchoes.get(key)?.events.some((event) => sameInstanceEvent(event, input.event)) ?? false
 }
 
-export function getArchitectureLocalDraftOperationEvent(input: ArchitectureLocalSave) {
-  return localDraftOperations.get(localSaveKey(input))?.event
+export function getArchitectureLocalInstanceOperationEvent(input: ArchitectureLocalSave) {
+  return localInstanceOperations.get(localSaveKey(input))?.event
 }
 
-export function rememberArchitectureLocalDraftOperationEvent(input: {
+export function rememberArchitectureLocalInstanceOperationEvent(input: {
   readonly server: string
   readonly directory: string
-  readonly event: ArchitectureResourceDraftEventInfo
+  readonly event: ArchitectureResourceInstanceEventInfo
 }) {
   const key = localSaveKey({ server: input.server, directory: input.directory, resourceID: input.event.resourceID })
-  const current = localDraftEchoes.get(key)
+  const current = localInstanceEchoes.get(key)
   if (current) clearTimeout(current.timeout)
   const events = [input.event, ...(current?.events ?? [])].slice(0, 8)
-  const timeout = setTimeout(() => localDraftEchoes.delete(key), 5_000)
+  const timeout = setTimeout(() => localInstanceEchoes.delete(key), 5_000)
   unrefTimeout(timeout)
-  localDraftEchoes.set(key, { events, timeout })
+  localInstanceEchoes.set(key, { events, timeout })
 }
 
 export function architectureResourceEventInfo(
   event: ArchitectureResourceEvent,
 ): ArchitectureResourceEventInfo | undefined {
-  if (event.type.startsWith("architecture.resource.draft.")) return
+  if (event.type.startsWith("architecture.resource.instance.")) return
   if (!event.type.startsWith("architecture.resource.")) return
   const payload = architectureEventPayload(event)
   const resourceID = typeof payload?.resourceID === "string" ? payload.resourceID : undefined
@@ -138,11 +138,11 @@ export function architectureResourceEventInfo(
   return { resourceID, revision, digest }
 }
 
-export function architectureResourceDraftEventInfo(
+export function architectureResourceInstanceEventInfo(
   event: ArchitectureResourceEvent,
-): ArchitectureResourceDraftEventInfo | undefined {
-  if (!event.type.startsWith("architecture.resource.draft.")) return
-  const action = event.type.slice("architecture.resource.draft.".length)
+): ArchitectureResourceInstanceEventInfo | undefined {
+  if (!event.type.startsWith("architecture.resource.instance.")) return
+  const action = event.type.slice("architecture.resource.instance.".length)
   if (action !== "updated" && action !== "discarded") return
   const payload = architectureEventPayload(event)
   const resourceID = typeof payload?.resourceID === "string" ? payload.resourceID : undefined
@@ -151,7 +151,7 @@ export function architectureResourceDraftEventInfo(
   const digest = typeof payload?.digest === "string" ? payload.digest : undefined
   const baseRevision = typeof payload?.baseRevision === "number" ? payload.baseRevision : undefined
   const baseDigest = typeof payload?.baseDigest === "string" ? payload.baseDigest : undefined
-  const draft = architectureEventDraft(payload)
+  const instance = architectureEventInstance(payload)
   return {
     resourceID,
     action,
@@ -159,13 +159,13 @@ export function architectureResourceDraftEventInfo(
     ...(digest === undefined ? {} : { digest }),
     ...(baseRevision === undefined ? {} : { baseRevision }),
     ...(baseDigest === undefined ? {} : { baseDigest }),
-    draft,
+    instance,
   }
 }
 
-export function architectureResourceDraftEventCache(event: ArchitectureResourceDraftEventInfo) {
+export function architectureResourceInstanceEventCache(event: ArchitectureResourceInstanceEventInfo) {
   if (event.action === "discarded") return null
-  return event.draft
+  return event.instance
 }
 
 export function architectureSummaryMatchesEvent(
@@ -201,9 +201,9 @@ export function architectureSnapshotCoversEvent(
   return architectureSnapshotMatchesEvent(snapshot, event)
 }
 
-export function architectureDraftEventIsStale(
+export function architectureInstanceEventIsStale(
   snapshot: ArchitectureSnapshot | undefined,
-  event: ArchitectureResourceDraftEventInfo,
+  event: ArchitectureResourceInstanceEventInfo,
 ) {
   if (!snapshot || snapshot.resource.id !== event.resourceID) return false
   if (event.action === "updated") {
@@ -225,22 +225,22 @@ function architectureEventPayload(event: ArchitectureResourceEvent) {
   return { ...(data ?? {}), ...(properties ?? {}) }
 }
 
-function architectureEventDraft(payload: Record<string, unknown> | undefined): ArchitectureLiveDraft | undefined {
+function architectureEventInstance(payload: Record<string, unknown> | undefined): ArchitectureLiveInstance | undefined {
   if (!payload) return
-  const draft = isRecord(payload.draft) ? payload.draft : payload
-  if (draft.source !== "live") return
-  if (!isRecord(draft.snapshot)) return
-  if (typeof draft.snapshot.digest !== "string") return
-  if (!isRecord(draft.snapshot.storage)) return
-  if (typeof draft.snapshot.storage.root !== "string") return
-  if (typeof draft.snapshot.storage.path !== "string") return
-  if (!isArchitectureResource(draft.snapshot.resource)) return
+  const instance = isRecord(payload.instance) ? payload.instance : payload
+  if (instance.source !== "live") return
+  if (!isRecord(instance.snapshot)) return
+  if (typeof instance.snapshot.digest !== "string") return
+  if (!isRecord(instance.snapshot.storage)) return
+  if (typeof instance.snapshot.storage.root !== "string") return
+  if (typeof instance.snapshot.storage.path !== "string") return
+  if (!isArchitectureResource(instance.snapshot.resource)) return
   return {
     source: "live",
     snapshot: {
-      digest: draft.snapshot.digest,
-      storage: { root: draft.snapshot.storage.root, path: draft.snapshot.storage.path },
-      resource: draft.snapshot.resource,
+      digest: instance.snapshot.digest,
+      storage: { root: instance.snapshot.storage.root, path: instance.snapshot.storage.path },
+      resource: instance.snapshot.resource,
     },
   }
 }
@@ -263,13 +263,13 @@ function localSaveKey(input: ArchitectureLocalSave) {
   return `${input.server}\0${input.directory}\0${input.resourceID}`
 }
 
-type ArchitectureLocalDraftOperationState = {
+type ArchitectureLocalInstanceOperationState = {
   count: number
-  event?: ArchitectureResourceDraftEventInfo
+  event?: ArchitectureResourceInstanceEventInfo
 }
 
-type ArchitectureLocalDraftEchoState = {
-  readonly events: ReadonlyArray<ArchitectureResourceDraftEventInfo>
+type ArchitectureLocalInstanceEchoState = {
+  readonly events: ReadonlyArray<ArchitectureResourceInstanceEventInfo>
   readonly timeout: ReturnType<typeof setTimeout>
 }
 
@@ -281,7 +281,7 @@ function latestResourceEvent(
   return next
 }
 
-function sameDraftEvent(left: ArchitectureResourceDraftEventInfo, right: ArchitectureResourceDraftEventInfo) {
+function sameInstanceEvent(left: ArchitectureResourceInstanceEventInfo, right: ArchitectureResourceInstanceEventInfo) {
   if (left.resourceID !== right.resourceID || left.action !== right.action) return false
   if (left.revision === undefined || left.digest === undefined) return false
   return left.revision === right.revision && left.digest === right.digest

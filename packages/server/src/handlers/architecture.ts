@@ -30,24 +30,24 @@ export const ArchitectureHandler = HttpApiBuilder.group(Api, "server.architectur
           ArchitectureGraph.Service.use((graph) => mapError(graph.duplicate(ctx.params.resourceID, ctx.payload))),
         ),
       )
-      .handle("architecture.resource.draft.get", (ctx) =>
-        response(ArchitectureGraph.Service.use((graph) => mapError(graph.loadDraft(ctx.params.resourceID)))),
+      .handle("architecture.resource.instance.get", (ctx) =>
+        response(ArchitectureGraph.Service.use((graph) => mapError(graph.loadInstance(ctx.params.resourceID)))),
       )
-      .handle("architecture.resource.draft.patch", (ctx) =>
+      .handle("architecture.resource.instance.patch", (ctx) =>
         response(
-          ArchitectureGraph.Service.use((graph) => mapError(graph.patchDraft(ctx.params.resourceID, ctx.payload))),
+          ArchitectureGraph.Service.use((graph) => mapError(graph.patchInstance(ctx.params.resourceID, ctx.payload))),
         ),
       )
-      .handle("architecture.resource.draft.commit", (ctx) =>
+      .handle("architecture.resource.instance.commit", (ctx) =>
         response(
-          ArchitectureGraph.Service.use((graph) => mapError(graph.commitDraft(ctx.params.resourceID, ctx.payload))),
+          ArchitectureGraph.Service.use((graph) => mapError(graph.commitInstance(ctx.params.resourceID, ctx.payload))),
         ),
       )
-      .handle("architecture.resource.draft.discard", (ctx) =>
-        response(ArchitectureGraph.Service.use((graph) => mapError(graph.discardDraft(ctx.params.resourceID)))),
+      .handle("architecture.resource.instance.discard", (ctx) =>
+        response(ArchitectureGraph.Service.use((graph) => mapError(graph.discardInstance(ctx.params.resourceID)))),
       )
-      .handle("architecture.resource.draft.reload", (ctx) =>
-        response(ArchitectureGraph.Service.use((graph) => mapError(graph.reloadSaved(ctx.params.resourceID)))),
+      .handle("architecture.resource.instance.reload", (ctx) =>
+        response(ArchitectureGraph.Service.use((graph) => mapError(graph.reloadInstance(ctx.params.resourceID)))),
       )
       .handle("architecture.resource.remove", (ctx) =>
         response(ArchitectureGraph.Service.use((graph) => mapError(graph.remove(ctx.params.resourceID, ctx.payload)))),

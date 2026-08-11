@@ -1,15 +1,15 @@
 import { describe, expect, test } from "bun:test"
 import { createArchitectureCacheOrder, guardedArchitectureCacheResponse } from "./cache-order"
-import type { ArchitectureLiveDraft, ArchitectureSnapshot } from "./contract"
+import type { ArchitectureLiveInstance, ArchitectureSnapshot } from "./contract"
 
 describe("architecture cache order", () => {
   test("keeps the current cache when a late refetch resolves after save or reload", async () => {
     const cacheOrder = createArchitectureCacheOrder()
-    const key = ["architecture-resource-draft", "server", "/repo", "design"] as const
+    const key = ["architecture-resource-instance", "server", "/repo", "design"] as const
     const current = live("current")
-    const pending = deferred<ArchitectureLiveDraft>()
+    const pending = deferred<ArchitectureLiveInstance>()
 
-    const response = guardedArchitectureCacheResponse<ArchitectureLiveDraft>({
+    const response = guardedArchitectureCacheResponse<ArchitectureLiveInstance>({
       cacheOrder,
       key,
       current: () => current,
@@ -22,12 +22,12 @@ describe("architecture cache order", () => {
     await expect(response).resolves.toBe(current)
   })
 
-  test("keeps a cleared draft when a late saved response arrives after reload", async () => {
+  test("keeps a cleared instance when a late saved response arrives after reload", async () => {
     const cacheOrder = createArchitectureCacheOrder()
-    const key = ["architecture-resource-draft", "server", "/repo", "design"] as const
-    const pending = deferred<ArchitectureLiveDraft | null>()
+    const key = ["architecture-resource-instance", "server", "/repo", "design"] as const
+    const pending = deferred<ArchitectureLiveInstance | null>()
 
-    const response = guardedArchitectureCacheResponse<ArchitectureLiveDraft | null>({
+    const response = guardedArchitectureCacheResponse<ArchitectureLiveInstance | null>({
       cacheOrder,
       key,
       current: () => null,
@@ -41,7 +41,7 @@ describe("architecture cache order", () => {
   })
 })
 
-function live(text: string): ArchitectureLiveDraft {
+function live(text: string): ArchitectureLiveInstance {
   return {
     source: "live",
     snapshot: snapshot(text),

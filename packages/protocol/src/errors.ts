@@ -147,7 +147,7 @@ export class ArchitectureConflictError extends Schema.TaggedErrorClass<Architect
     currentRevision: Schema.optional(Schema.Int),
     currentDigest: Schema.optional(Schema.String),
     safeToRetry: Schema.optional(Schema.Union([Schema.Boolean, Schema.Literals(["unknown", "partial"])])),
-    conflictKind: Schema.optional(Schema.Literals(["draft_changed", "draft_missing"])),
+    conflictKind: Schema.optional(Schema.Literals(["instance_changed", "instance_missing"])),
     retryHint: Schema.optional(Schema.String),
   },
   { httpApiStatus: 409 },

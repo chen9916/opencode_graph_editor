@@ -1,7 +1,7 @@
 import type {
-  ArchitectureGetDraftOutput,
+  ArchitectureGetInstanceOutput,
   ArchitectureGetResourceOutput,
-  ArchitecturePatchDraftInput,
+  ArchitecturePatchInstanceInput,
 } from "@opencode-ai/client/promise"
 import type { Direction } from "@/context/language"
 import type { ArchitectureCommandAction } from "./commands"
@@ -12,24 +12,27 @@ export type ArchitectureResource = ArchitectureSnapshot["resource"]
 export type ArchitectureNode = ArchitectureResource["nodes"][number]
 export type ArchitectureEdge = ArchitectureResource["edges"][number]
 export type ArchitectureConnectionSide = NonNullable<ArchitectureEdge["sourceHandle"]>
-export type ArchitectureOperation = ArchitecturePatchDraftInput["operations"][number]
+export type ArchitectureOperation = ArchitecturePatchInstanceInput["operations"][number]
 export type ArchitectureViewport = { readonly x: number; readonly y: number; readonly zoom: number }
 export type ArchitectureEdgeStyle = "rectangular" | "curved" | "straight"
 
-export type ArchitectureDraftSnapshot = ArchitectureGetDraftOutput["data"]
-export type ArchitectureLiveDraft = Omit<ArchitectureDraftSnapshot, "source"> & { readonly source: "live" }
-export type ArchitectureLiveDraftCache = ArchitectureLiveDraft | null
+export type ArchitectureInstanceSnapshot = ArchitectureGetInstanceOutput["data"]
+export type ArchitectureLiveInstance = Omit<ArchitectureInstanceSnapshot, "source"> & { readonly source: "live" }
+export type ArchitectureLiveInstanceCache = ArchitectureLiveInstance | null
 
-export type ArchitectureDraft = {
+// Transient editor-local pending overlay. The backend live instance is the
+// normal graph instance; these operations only bridge unacknowledged local UI
+// edits plus crash/undo recovery.
+export type ArchitecturePendingOverlay = {
   readonly base: ArchitectureSnapshot
   readonly origin?: ArchitectureSnapshot
   readonly journalBase?: ArchitectureResource
   readonly operations: ReadonlyArray<ArchitectureOperation>
   readonly conflicts: ReadonlyArray<ArchitectureConflict>
-  readonly live?: ArchitectureLiveDraft
+  readonly instance?: ArchitectureLiveInstance
 }
 
-export type ArchitectureDraftChange = {
+export type ArchitectureInstanceChange = {
   readonly server: string
   readonly directory: string
   readonly base: ArchitectureSnapshot
@@ -132,15 +135,16 @@ export type ArchitecturePanelProps = {
   readonly direction: Direction
   readonly mobile: boolean
   readonly snapshot: ArchitectureSnapshot
-  readonly draft?: ArchitectureDraft
+  readonly liveInstanceVersion: number
+  readonly pending?: ArchitecturePendingOverlay
   readonly viewport?: ArchitectureViewport
   readonly busy: boolean
   readonly action?: ArchitectureCommandAction
   readonly labels: ArchitectureLabels
-  readonly onJournal: (change: ArchitectureDraftChange) => void
+  readonly onJournal: (change: ArchitectureInstanceChange) => void
   readonly onViewport: (change: ArchitectureViewportChange) => void
-  readonly onSave: (change: ArchitectureDraftChange) => void
-  readonly onDuplicate: (change: ArchitectureDraftChange) => void
+  readonly onSave: (change: ArchitectureInstanceChange) => void
+  readonly onDuplicate: (change: ArchitectureInstanceChange) => void
   readonly onAskSelection?: (input: ArchitectureSelectionPrompt) => void
   readonly onReload: () => void
   readonly onExport: (operations: ReadonlyArray<ArchitectureOperation>) => void

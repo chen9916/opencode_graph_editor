@@ -23,9 +23,9 @@ import {
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react"
 import type {
   ArchitectureConnectionSide,
-  ArchitectureDraftChange,
   ArchitectureEdge,
   ArchitectureEdgeStyle,
+  ArchitectureInstanceChange,
   ArchitectureNode,
   ArchitectureOperation,
   ArchitecturePanelProps,
@@ -41,12 +41,18 @@ import {
   filterArchitectureEditedNodeHints,
 } from "./edit-hint"
 import {
-  draftChange,
-  type ArchitectureEditorHistory,
+  architectureEditorPendingOperations,
+  architectureEditorLiveInstanceKey,
+  architectureInstanceChange,
+  commitArchitectureEditorHistory,
+  createArchitectureEditorHistory,
+  redoArchitectureEditorHistory,
+  syncArchitectureEditorHistorySource,
+  undoArchitectureEditorHistory,
 } from "./editor-state"
-import { applyOperations, flattenJournal, operationID } from "./journal"
+import { operationID } from "./journal"
 import { tagColorsKey, toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } from "./model"
-import { architectureDraftIsDirty } from "./resource-state"
+import { architectureInstanceIsDirty } from "./resource-state"
 import { ArchitectureEdgeView } from "./architecture-edge.react"
 import { ArchitectureNodeView } from "./architecture-node.react"
 import {
@@ -88,10 +94,11 @@ type ViewportMotion = {
 const emptySelection: Selection = { nodeIDs: [], edgeIDs: [] }
 
 export function ArchitectureEditor(props: ArchitecturePanelProps) {
-  const base = props.draft?.base ?? props.snapshot
-  const initial = props.draft?.operations ?? []
-  const historyOrigin = props.draft?.origin ?? base
-  const historyBase = props.draft?.journalBase ?? historyOrigin.resource
+  const base = props.pending?.base ?? props.snapshot
+  const initial = props.pending?.operations ?? []
+  const historyOrigin = props.pending?.origin ?? base
+  const historySource = props.pending?.journalBase ?? base.resource
+  const liveInstanceKey = architectureEditorLiveInstanceKey({ base, liveInstanceVersion: props.liveInstanceVersion })
   const loadedResourceID = useRef(base.resource.id)
   const canvas = useRef<HTMLDivElement>(null)
   const visibleViewport = useRef<ArchitectureViewport | undefined>(props.viewport)
@@ -100,7 +107,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const locallyAuthoredResourceKeys = useRef(new Set<string>())
   const selectionRef = useRef<Selection>(emptySelection)
   const pendingSelection = useRef<Selection>()
-  const latestChange = useRef<ArchitectureDraftChange>()
+  const latestChange = useRef<ArchitectureInstanceChange>()
   const selectionGesture = useRef<SelectionGesture>()
   const additiveSelectionModifier = useRef(false)
   const handledAction = useRef<number>()
@@ -108,11 +115,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const connecting = useRef(false)
   const outlineID = useId()
   const inspectorID = useId()
-  const [editor, setEditor] = useState<ArchitectureEditorHistory>(() => ({
-    resource: applyOperations(historyBase, initial),
-    past: initial.map((operation) => [operation]),
-    future: [],
-  }))
+  const [editor, setEditor] = useState(() => createArchitectureEditorHistory(historySource, initial))
   const [selection, setSelection] = useState<Selection>(emptySelection)
   const [flow, setFlow] = useState<ReactFlowInstance<ArchitectureFlowNode, ArchitectureFlowEdge>>()
   const [filter, setFilter] = useState({ text: "", tag: "" })
@@ -121,17 +124,17 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenu>()
   const [askPopover, setAskPopover] = useState<AskPopover>()
   const [editedHintNodeIDs, setEditedHintNodeIDs] = useState<ReadonlyArray<string>>([])
-  const operations = flattenJournal(editor.past)
-  latestChange.current = draftChange(
+  const operations = architectureEditorPendingOperations(editor)
+  latestChange.current = architectureInstanceChange(
     editor.resource,
     operations,
     base,
     historyOrigin,
-    props.draft?.conflicts ?? [],
+    props.pending?.conflicts ?? [],
     props.server,
     props.directory,
   )
-  const dirty = architectureDraftIsDirty({ draft: props.draft, operations })
+  const dirty = architectureInstanceIsDirty({ pending: props.pending, operations })
   const tags = unique(editor.resource.nodes.flatMap((node) => node.tags))
   const controlsPosition = props.direction === "rtl" ? "bottom-right" : "bottom-left"
   const minimapPosition = props.direction === "rtl" ? "top-left" : "top-right"
@@ -149,24 +152,20 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     const resourceChanged = loadedResourceID.current !== base.resource.id
     loadedResourceID.current = base.resource.id
     locallyAuthoredResourceKeys.current.clear()
-    const nextResource = applyOperations(historyBase, initial)
-    setEditor({
-      resource: nextResource,
-      past: initial.map((operation) => [operation]),
-      future: [],
-    })
-    latestChange.current = draftChange(
-      nextResource,
-      initial,
+    const next = syncArchitectureEditorHistorySource(editor, historySource, initial)
+    setEditor(next)
+    latestChange.current = architectureInstanceChange(
+      next.resource,
+      architectureEditorPendingOperations(next),
       base,
       historyOrigin,
-      props.draft?.conflicts ?? [],
+      props.pending?.conflicts ?? [],
       props.server,
       props.directory,
     )
     setEditedHintNodeIDs([])
     resetTransientLoadState({ closePanels: resourceChanged })
-  }, [base])
+  }, [liveInstanceKey])
 
   const keepExistingEditedNodeHints = (resource: ArchitectureResource) => {
     setEditedHintNodeIDs((current) =>
@@ -207,20 +206,16 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
 
   const commit = (batch: ReadonlyArray<ArchitectureOperation>) => {
     if (batch.length === 0) return
-    const next = {
-      resource: applyOperations(editor.resource, batch),
-      past: [...editor.past, batch],
-      future: [],
-    }
+    const next = commitArchitectureEditorHistory(editor, batch)
     rememberLocalResource(next.resource)
     setEditor(next)
     keepExistingEditedNodeHints(next.resource)
-    latestChange.current = draftChange(
+    latestChange.current = architectureInstanceChange(
       next.resource,
-      flattenJournal(next.past),
+      architectureEditorPendingOperations(next),
       base,
       historyOrigin,
-      props.draft?.conflicts ?? [],
+      props.pending?.conflicts ?? [],
       props.server,
       props.directory,
     )
@@ -361,40 +356,21 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   useEffect(() => () => cancelViewportInertia(viewportMotion.current), [])
 
   useLayoutEffect(() => {
-    const resourceChanged = loadedResourceID.current !== base.resource.id
-    loadedResourceID.current = base.resource.id
-    const nextResource = applyOperations(historyBase, initial)
-    setEditor({
-      resource: nextResource,
-      past: initial.map((operation) => [operation]),
-      future: [],
-    })
-    setEditedHintNodeIDs([])
-    resetTransientLoadState({ closePanels: resourceChanged })
-  }, [base])
-
-  useLayoutEffect(() => {
     replaceFlowElements(editor.resource)
   }, [editor.resource, filter.tag, filter.text, filterActive, resourceTagColorsKey, editedHintNodeIDsKey, setEdges, setNodes])
 
   const undo = () => {
-    const batch = editor.past.at(-1)
-    if (!batch) return
-    const past = editor.past.slice(0, -1)
-    const nextResource = applyOperations(historyBase, flattenJournal(past))
-    rememberLocalResource(nextResource)
-    setEditor({
-      resource: nextResource,
-      past,
-      future: [batch, ...editor.future],
-    })
-    keepExistingEditedNodeHints(nextResource)
-    latestChange.current = draftChange(
-      nextResource,
-      flattenJournal(past),
+    const next = undoArchitectureEditorHistory(editor)
+    if (next === editor) return
+    rememberLocalResource(next.resource)
+    setEditor(next)
+    keepExistingEditedNodeHints(next.resource)
+    latestChange.current = architectureInstanceChange(
+      next.resource,
+      architectureEditorPendingOperations(next),
       base,
       historyOrigin,
-      props.draft?.conflicts ?? [],
+      props.pending?.conflicts ?? [],
       props.server,
       props.directory,
     )
@@ -402,23 +378,17 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   }
 
   const redo = () => {
-    const batch = editor.future[0]
-    if (!batch) return
-    const past = [...editor.past, batch]
-    const nextResource = applyOperations(historyBase, flattenJournal(past))
-    rememberLocalResource(nextResource)
-    setEditor({
-      resource: nextResource,
-      past,
-      future: editor.future.slice(1),
-    })
-    keepExistingEditedNodeHints(nextResource)
-    latestChange.current = draftChange(
-      nextResource,
-      flattenJournal(past),
+    const next = redoArchitectureEditorHistory(editor)
+    if (next === editor) return
+    rememberLocalResource(next.resource)
+    setEditor(next)
+    keepExistingEditedNodeHints(next.resource)
+    latestChange.current = architectureInstanceChange(
+      next.resource,
+      architectureEditorPendingOperations(next),
       base,
       historyOrigin,
-      props.draft?.conflicts ?? [],
+      props.pending?.conflicts ?? [],
       props.server,
       props.directory,
     )
@@ -1141,11 +1111,11 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               onEdgeStyle={changeEdgeStyle}
               onCommit={commit}
             />
-            {(props.draft?.conflicts.length ?? 0) > 0 && (
+            {(props.pending?.conflicts.length ?? 0) > 0 && (
               <section className="architecture-editor__conflicts">
                 <h3>{props.labels.conflicts}</h3>
                 <ul>
-                  {props.draft?.conflicts.map((conflict) => (
+                  {props.pending?.conflicts.map((conflict) => (
                     <li key={conflict.operation.id}>
                       <bdi>{conflict.operation.id}</bdi>: {props.labels.conflictReasons[conflict.reason]}
                     </li>

@@ -138,7 +138,7 @@ export const GraphTools = Effect.gen(function* () {
       parameters: Schema.Struct({}),
       execute: (_input, ctx) =>
         authorize(ctx, "read").pipe(
-          Effect.andThen(withGraph((graph) => graph.listLive())),
+          Effect.andThen(withGraph((graph) => graph.listInstances())),
           Effect.map((output) => json("Graph resources", output.resources, { count: output.resources.length, source: output.source })),
         ),
     }),
@@ -158,7 +158,7 @@ export const GraphTools = Effect.gen(function* () {
       parameters: ReloadResourceInput,
       execute: (input, ctx) =>
         authorize(ctx, "read", input.resourceID).pipe(
-          Effect.andThen(withGraph((graph) => graph.reloadSaved(input.resourceID))),
+          Effect.andThen(withGraph((graph) => graph.reloadInstance(input.resourceID))),
           Effect.map((output) =>
             json(
               `Graph resource ${output.snapshot.resource.id}`,
@@ -170,14 +170,14 @@ export const GraphTools = Effect.gen(function* () {
     }),
     graphTool(ArchitectureTools.names.saveResource, {
       description:
-        "Commit one managed Graph editor resource's current live draft to saved storage. This is the explicit Save boundary; if no live draft exists, it returns the saved snapshot without writing.",
+        "Save one managed Graph editor resource's current live instance to saved storage. This is the explicit Save boundary; if no live instance exists, it returns the saved snapshot without writing.",
       parameters: SaveResourceInput,
       execute: (input, ctx) =>
         authorize(ctx, "edit", input.resourceID).pipe(
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadDraft(input.resourceID)
+                const current = yield* graph.loadInstance(input.resourceID)
                 if (current.source === "saved") return { snapshot: current.snapshot, source: current.source, saved: false }
                 if (input.expectedDigest !== undefined && current.snapshot.digest !== input.expectedDigest)
                   return yield* Effect.fail(
@@ -193,7 +193,7 @@ export const GraphTools = Effect.gen(function* () {
                     ),
                   )
                 return {
-                  snapshot: yield* graph.commitDraft(input.resourceID, {
+                  snapshot: yield* graph.commitInstance(input.resourceID, {
                     revision: current.snapshot.resource.revision,
                     digest: current.snapshot.digest,
                   }, conflict(ArchitectureTools.names.saveResource, "unknown")),
@@ -220,8 +220,8 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
-                return yield* graph.patchLive(input.resourceID, {
+                const current = yield* graph.loadInstance(input.resourceID)
+                return yield* graph.patchInstance(input.resourceID, {
                   revision: current.snapshot.resource.revision,
                   digest: current.snapshot.digest,
                   operations: [
@@ -281,7 +281,7 @@ export const GraphTools = Effect.gen(function* () {
       parameters: Architecture.QueryInput,
       execute: (input, ctx) =>
         authorize(ctx, "read").pipe(
-          Effect.andThen(withGraph((graph) => graph.queryLive(input))),
+          Effect.andThen(withGraph((graph) => graph.queryInstances(input))),
           Effect.map((output) =>
             json("Graph query", output, {
               count: output.nodes.length + output.edges.length,
@@ -301,10 +301,10 @@ export const GraphTools = Effect.gen(function* () {
               Effect.gen(function* () {
                 const selected = input.resourceIDs && input.resourceIDs.length > 0 ? Array.from(new Set(input.resourceIDs)) : undefined
                 const snapshots = selected
-                  ? yield* Effect.forEach(selected, (resourceID) => graph.loadLive(resourceID), { concurrency: 8 })
+                  ? yield* Effect.forEach(selected, (resourceID) => graph.loadInstance(resourceID), { concurrency: 8 })
                   : yield* Effect.forEach(
-                      (yield* graph.listLive()).resources,
-                      (resource) => graph.loadLive(resource.id),
+                      (yield* graph.listInstances()).resources,
+                      (resource) => graph.loadInstance(resource.id),
                       { concurrency: 8 },
                     )
                 return {
@@ -331,7 +331,7 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
+                const current = yield* graph.loadInstance(input.resourceID)
                 const referenced = new Set(ArchitectureLayout.referencedNodeIDs(input))
                 const missing = [...referenced].find((nodeID) => !current.snapshot.resource.nodes.some((node) => node.id === nodeID))
                 if (missing) return yield* new ArchitecturePatch.NotFoundError({ entity: "node", id: missing })
@@ -352,7 +352,7 @@ export const GraphTools = Effect.gen(function* () {
                 const saved =
                   input.dryRun || operations.length === 0
                     ? current
-                    : yield* graph.patchLive(
+                    : yield* graph.patchInstance(
                         input.resourceID,
                         {
                           revision: current.snapshot.resource.revision,
@@ -391,14 +391,14 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
+                const current = yield* graph.loadInstance(input.resourceID)
                 const node: Architecture.Node = {
                   id: input.id ?? Architecture.NodeID.create(),
                   text: input.text,
                   tags: input.tags ?? [],
                   layout: { position: input.position ?? { x: 0, y: 0 } },
                 }
-                const saved = yield* graph.patchLive(input.resourceID, {
+                const saved = yield* graph.patchInstance(input.resourceID, {
                   revision: current.snapshot.resource.revision,
                   digest: current.snapshot.digest,
                   operations: [{ id: Architecture.OperationID.create(), type: "node.create", node }],
@@ -421,12 +421,12 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
+                const current = yield* graph.loadInstance(input.resourceID)
                 const batch = ArchitectureBatch.prepare(input, current.snapshot.resource)
                 if (!batch.ok) return yield* batch.error
                 const saved =
                   batch.operations.length > 0
-                    ? yield* graph.patchLive(input.resourceID, {
+                    ? yield* graph.patchInstance(input.resourceID, {
                         revision: current.snapshot.resource.revision,
                         digest: current.snapshot.digest,
                         operations: batch.operations,
@@ -456,7 +456,7 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
+                const current = yield* graph.loadInstance(input.resourceID)
                 const node = current.snapshot.resource.nodes.find((candidate) => candidate.id === input.nodeID)
                 if (!node) return yield* new ArchitecturePatch.NotFoundError({ entity: "node", id: input.nodeID })
                 const updated: Architecture.Node = {
@@ -480,7 +480,7 @@ export const GraphTools = Effect.gen(function* () {
                         position: updated.layout.position,
                         expectedDigest: input.expectedDigest,
                       }
-                const saved = yield* graph.patchLive(input.resourceID, {
+                const saved = yield* graph.patchInstance(input.resourceID, {
                   revision: current.snapshot.resource.revision,
                   digest: current.snapshot.digest,
                   operations: [operation],
@@ -502,8 +502,8 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
-                const saved = yield* graph.patchLive(input.resourceID, {
+                const current = yield* graph.loadInstance(input.resourceID)
+                const saved = yield* graph.patchInstance(input.resourceID, {
                   revision: current.snapshot.resource.revision,
                   digest: current.snapshot.digest,
                   operations: [
@@ -536,11 +536,11 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
+                const current = yield* graph.loadInstance(input.resourceID)
                 const removedEdgeIDs = current.snapshot.resource.edges
                   .filter((edge) => edge.source === input.nodeID || edge.target === input.nodeID)
                   .map((edge) => edge.id)
-                const saved = yield* graph.patchLive(input.resourceID, {
+                const saved = yield* graph.patchInstance(input.resourceID, {
                   revision: current.snapshot.resource.revision,
                   digest: current.snapshot.digest,
                   operations: [
@@ -574,7 +574,7 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
+                const current = yield* graph.loadInstance(input.resourceID)
                 const edge: Architecture.Edge = {
                   id: input.id ?? Architecture.EdgeID.create(),
                   source: input.source,
@@ -583,7 +583,7 @@ export const GraphTools = Effect.gen(function* () {
                   targetHandle: input.targetHandle ?? "left",
                   style: input.style ?? "rectangular",
                 }
-                const saved = yield* graph.patchLive(input.resourceID, {
+                const saved = yield* graph.patchInstance(input.resourceID, {
                   revision: current.snapshot.resource.revision,
                   digest: current.snapshot.digest,
                   operations: [{ id: Architecture.OperationID.create(), type: "edge.create", edge }],
@@ -605,7 +605,7 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
+                const current = yield* graph.loadInstance(input.resourceID)
                 const edge = current.snapshot.resource.edges.find((candidate) => candidate.id === input.edgeID)
                 if (!edge) return yield* new ArchitecturePatch.NotFoundError({ entity: "edge", id: input.edgeID })
                 const updated: Architecture.Edge = {
@@ -616,7 +616,7 @@ export const GraphTools = Effect.gen(function* () {
                   targetHandle: input.targetHandle ?? edge.targetHandle ?? "left",
                   style: input.style ?? edge.style ?? "rectangular",
                 }
-                const saved = yield* graph.patchLive(input.resourceID, {
+                const saved = yield* graph.patchInstance(input.resourceID, {
                   revision: current.snapshot.resource.revision,
                   digest: current.snapshot.digest,
                   operations: [
@@ -645,7 +645,7 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
+                const current = yield* graph.loadInstance(input.resourceID)
                 const nodeOperations = (input.nodes ?? []).map((item): Architecture.Operation => {
                   const node = current.snapshot.resource.nodes.find((candidate) => candidate.id === item.nodeID)
                   if (!node) throw new Error(`node not found: ${item.nodeID}`)
@@ -673,7 +673,7 @@ export const GraphTools = Effect.gen(function* () {
                 const operations = [...nodeOperations, ...edgeOperations]
                 const saved =
                   operations.length > 0
-                    ? yield* graph.patchLive(input.resourceID, {
+                    ? yield* graph.patchInstance(input.resourceID, {
                         revision: current.snapshot.resource.revision,
                         digest: current.snapshot.digest,
                         operations,
@@ -704,8 +704,8 @@ export const GraphTools = Effect.gen(function* () {
           Effect.andThen(
             withGraph((graph) =>
               Effect.gen(function* () {
-                const current = yield* graph.loadLive(input.resourceID)
-                const saved = yield* graph.patchLive(input.resourceID, {
+                const current = yield* graph.loadInstance(input.resourceID)
+                const saved = yield* graph.patchInstance(input.resourceID, {
                   revision: current.snapshot.resource.revision,
                   digest: current.snapshot.digest,
                   operations: [
@@ -737,7 +737,7 @@ export const GraphTools = Effect.gen(function* () {
         authorize(ctx, "read").pipe(
           Effect.andThen(
             withGraph((graph) =>
-              Effect.all({ output: graph.contextLive(input.resourceIDs), source: liveSource(graph, input.resourceIDs) }),
+              Effect.all({ output: graph.contextInstances(input.resourceIDs), source: liveSource(graph, input.resourceIDs) }),
             ),
           ),
           Effect.map((result) => text("Graph context", { output: result.output, source: result.source })),
@@ -817,7 +817,7 @@ function text(
 }
 
 function liveSource(graph: ArchitectureGraph.Interface, ids?: ReadonlyArray<Architecture.ResourceID>) {
-  return graph.listLive().pipe(
+  return graph.listInstances().pipe(
     Effect.map((output) => {
       const selected = ids && ids.length > 0 ? output.resources.filter((resource) => ids.includes(resource.id)) : output.resources
       return mixedSource(selected.map((resource) => resource.source))

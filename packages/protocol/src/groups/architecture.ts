@@ -84,88 +84,88 @@ export const ArchitectureGroup = HttpApiGroup.make("server.architecture")
       ),
   )
   .add(
-    HttpApiEndpoint.get("architecture.resource.draft.get", "/api/architecture/resource/:resourceID/draft", {
+    HttpApiEndpoint.get("architecture.resource.instance.get", "/api/architecture/resource/:resourceID/instance", {
       params: { resourceID: Architecture.ResourceID },
       query: LocationQuery,
-      success: Location.response(Architecture.DraftSnapshot),
+      success: Location.response(Architecture.LiveInstanceSnapshot),
       error: errors,
     })
       .annotateMerge(locationQueryOpenApi)
       .annotateMerge(
         OpenApi.annotations({
-          identifier: "v2.architecture.resource.draft.get",
-          summary: "Get graph draft",
-          description: "Load the live draft snapshot for one graph resource, falling back to the saved resource.",
+          identifier: "v2.architecture.resource.instance.get",
+          summary: "Get live graph instance",
+          description: "Load the live graph instance for one graph resource, falling back to the saved resource.",
         }),
       ),
   )
   .add(
-    HttpApiEndpoint.patch("architecture.resource.draft.patch", "/api/architecture/resource/:resourceID/draft", {
+    HttpApiEndpoint.patch("architecture.resource.instance.patch", "/api/architecture/resource/:resourceID/instance", {
       params: { resourceID: Architecture.ResourceID },
       query: LocationQuery,
       payload: Architecture.PatchInput,
-      success: Location.response(Architecture.DraftSnapshot),
+      success: Location.response(Architecture.LiveInstanceSnapshot),
       error: errors,
     })
       .annotateMerge(locationQueryOpenApi)
       .annotateMerge(
         OpenApi.annotations({
-          identifier: "v2.architecture.resource.draft.patch",
-          summary: "Update graph draft",
-          description: "Apply graph edits to the live draft without writing the saved graph resource file.",
+          identifier: "v2.architecture.resource.instance.patch",
+          summary: "Update live graph instance",
+          description: "Apply graph edits to the live graph instance without writing the saved graph resource file.",
         }),
       ),
   )
   .add(
-    HttpApiEndpoint.post("architecture.resource.draft.commit", "/api/architecture/resource/:resourceID/draft/commit", {
+    HttpApiEndpoint.post("architecture.resource.instance.commit", "/api/architecture/resource/:resourceID/instance/commit", {
       params: { resourceID: Architecture.ResourceID },
       query: LocationQuery,
-      payload: Architecture.DraftCommitInput,
+      payload: Architecture.LiveInstanceCommitInput,
       success: Location.response(Architecture.ResourceSnapshot),
       error: errors,
     })
       .annotateMerge(locationQueryOpenApi)
       .annotateMerge(
         OpenApi.annotations({
-          identifier: "v2.architecture.resource.draft.commit",
-          summary: "Commit graph draft",
-          description: "Write the expected live graph draft to the saved graph resource file.",
+          identifier: "v2.architecture.resource.instance.commit",
+          summary: "Save live graph instance",
+          description: "Write the expected live graph instance to the saved graph resource file.",
         }),
       ),
   )
   .add(
     HttpApiEndpoint.post(
-      "architecture.resource.draft.discard",
-      "/api/architecture/resource/:resourceID/draft/discard",
+      "architecture.resource.instance.discard",
+      "/api/architecture/resource/:resourceID/instance/discard",
       {
         params: { resourceID: Architecture.ResourceID },
         query: LocationQuery,
-        success: Location.response(Architecture.DraftSnapshot),
+        success: Location.response(Architecture.LiveInstanceSnapshot),
         error: errors,
       },
     )
       .annotateMerge(locationQueryOpenApi)
       .annotateMerge(
         OpenApi.annotations({
-          identifier: "v2.architecture.resource.draft.discard",
-          summary: "Discard graph draft",
-          description: "Discard the live graph draft and return the saved graph resource snapshot.",
+          identifier: "v2.architecture.resource.instance.discard",
+          summary: "Discard live graph instance changes",
+          description: "Replace the live graph instance with the saved graph resource snapshot.",
         }),
       ),
   )
   .add(
-    HttpApiEndpoint.post("architecture.resource.draft.reload", "/api/architecture/resource/:resourceID/draft/reload", {
+    HttpApiEndpoint.post("architecture.resource.instance.reload", "/api/architecture/resource/:resourceID/instance/reload", {
       params: { resourceID: Architecture.ResourceID },
       query: LocationQuery,
-      success: Location.response(Architecture.DraftSnapshot),
+      success: Location.response(Architecture.LiveInstanceSnapshot),
       error: errors,
     })
       .annotateMerge(locationQueryOpenApi)
       .annotateMerge(
         OpenApi.annotations({
-          identifier: "v2.architecture.resource.draft.reload",
+          identifier: "v2.architecture.resource.instance.reload",
           summary: "Reload saved graph",
-          description: "Drop the live graph draft and reload the saved graph resource snapshot from disk.",
+          description: "Replace the live graph instance with the saved graph resource snapshot from disk.",
         }),
       ),
   )

@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import type { ArchitectureDraftChange, ArchitectureSnapshot } from "./contract"
+import type { ArchitectureInstanceChange, ArchitectureSnapshot } from "./contract"
 import {
-  architectureDraftCanSkipSave,
-  architectureDraftHasVisibleChanges,
-  architectureDraftIsDirty,
-  architectureDraftResourceID,
+  architectureInstanceCanSkipSave,
+  architectureInstanceHasVisibleChanges,
+  architectureInstanceIsDirty,
+  architectureInstanceResourceID,
+  architectureVisibleLiveInstance,
   architectureResourceSelectionOptions,
   architectureResourceSummary,
   latestArchitectureSnapshot,
@@ -22,7 +23,7 @@ const snapshot = (id: string, name: string, digest = `${id}-digest`): Architectu
   resource: { version: 2, revision: 0, id, name, nodes: [], edges: [] },
 })
 
-const change = (overrides: Partial<ArchitectureDraftChange> = {}): ArchitectureDraftChange => {
+const change = (overrides: Partial<ArchitectureInstanceChange> = {}): ArchitectureInstanceChange => {
   const saved = snapshot("design", "Design")
   return {
     server: "server",
@@ -96,16 +97,16 @@ describe("architecture resource state", () => {
   })
 
   test("dirty state is driven by local operations and conflicts", () => {
-    expect(architectureDraftHasVisibleChanges(change())).toBe(false)
+    expect(architectureInstanceHasVisibleChanges(change())).toBe(false)
     expect(
-      architectureDraftHasVisibleChanges(
+      architectureInstanceHasVisibleChanges(
         change({
           operations: [{ id: "move", type: "node.position", nodeID: "node", position: { x: 12, y: 8 } }],
         }),
       ),
     ).toBe(true)
     expect(
-      architectureDraftCanSkipSave(
+      architectureInstanceCanSkipSave(
         change({
           operations: [],
           conflicts: [
@@ -117,11 +118,11 @@ describe("architecture resource state", () => {
         }),
       ),
     ).toBe(false)
-    expect(architectureDraftIsDirty({ draft: change() })).toBe(false)
-    expect(architectureDraftIsDirty({ draft: { ...change(), live: { source: "live" } } })).toBe(true)
+    expect(architectureInstanceIsDirty({ pending: change() })).toBe(false)
+    expect(architectureInstanceIsDirty({ pending: { ...change(), instance: { source: "live" } } })).toBe(true)
     expect(
-      architectureDraftIsDirty({
-        draft: change({
+      architectureInstanceIsDirty({
+        pending: change({
           operations: [{ id: "move", type: "node.position", nodeID: "node", position: { x: 12, y: 8 } }],
         }),
       }),
@@ -146,7 +147,7 @@ describe("architecture resource state", () => {
       ],
     })
 
-    expect(architectureDraftResourceID(changeValue)).toBe("new_graph")
+    expect(architectureInstanceResourceID(changeValue)).toBe("new_graph")
   })
 
   test("selection and summary helpers keep the latest saved snapshot visible", async () => {
@@ -170,5 +171,85 @@ describe("architecture resource state", () => {
     })
 
     expect(reconciled).toEqual({ snapshot: newer, invalidate: false })
+  })
+
+  test("prefers the backend live instance over an acknowledged local pending overlay", () => {
+    const saved = snapshot("design", "Design")
+    const live = {
+      source: "live" as const,
+      snapshot: {
+        ...saved,
+        digest: "live",
+        resource: {
+          ...saved.resource,
+          nodes: [{ id: "node", text: "Live", tags: [], layout: { position: { x: 0, y: 0 } } }],
+        },
+      },
+    }
+    const visible = architectureVisibleLiveInstance({
+      saved,
+      live,
+      pending: {
+        base: saved,
+        origin: saved,
+        journalBase: saved.resource,
+        operations: [{ id: "add-node", type: "node.create", node: live.snapshot.resource.nodes[0]! }],
+        conflicts: [],
+      },
+    })
+
+    expect(visible.snapshot).toBe(live.snapshot)
+    expect(visible.pendingCovered).toBe(true)
+    expect(visible.pending?.operations).toEqual([])
+    expect(visible.pending?.instance).toBe(live)
+  })
+
+  test("prefers the backend live instance over the saved snapshot without a local pending overlay", () => {
+    const saved = snapshot("design", "Saved")
+    const live = {
+      source: "live" as const,
+      snapshot: {
+        ...saved,
+        digest: "ai-live",
+        resource: {
+          ...saved.resource,
+          nodes: [{ id: "ai", text: "AI update", tags: [], layout: { position: { x: 0, y: 0 } } }],
+        },
+      },
+    }
+
+    const visible = architectureVisibleLiveInstance({ saved, live, pending: undefined })
+
+    expect(visible.snapshot).toBe(live.snapshot)
+    expect(visible.pending?.base).toBe(live.snapshot)
+    expect(visible.pending?.operations).toEqual([])
+    expect(visible.pendingCovered).toBe(false)
+  })
+
+  test("treats unacknowledged local operations as a pending overlay on top of the live instance", () => {
+    const saved = snapshot("design", "Design")
+    const aiNode = { id: "ai", text: "AI", tags: [], layout: { position: { x: 240, y: 0 } } }
+    const localNode = { id: "local", text: "Local", tags: [], layout: { position: { x: 0, y: 120 } } }
+    const live = {
+      source: "live" as const,
+      snapshot: { ...saved, digest: "ai", resource: { ...saved.resource, nodes: [aiNode] } },
+    }
+    const visible = architectureVisibleLiveInstance({
+      saved,
+      live,
+      pending: {
+        base: saved,
+        origin: saved,
+        journalBase: saved.resource,
+        operations: [{ id: "add-local", type: "node.create", node: localNode }],
+        conflicts: [],
+      },
+    })
+
+    expect(visible.snapshot).toBe(live.snapshot)
+    expect(visible.pendingCovered).toBe(false)
+    expect(visible.pending?.journalBase).toBe(live.snapshot.resource)
+    expect(visible.pending?.operations.map((operation) => operation.type)).toEqual(["node.create"])
+    expect(visible.pending?.operations[0]).toMatchObject({ type: "node.create", node: localNode })
   })
 })

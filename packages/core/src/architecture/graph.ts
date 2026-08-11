@@ -11,7 +11,7 @@ import { Location } from "../location"
 import { NonNegativeInt, RelativePath, optional } from "../schema"
 import { EffectFlock } from "../util/effect-flock"
 import { ArchitectureConflict } from "./conflict"
-import { ArchitectureDraft } from "./draft"
+import { ArchitectureInstance } from "./instance"
 import { ArchitecturePatch } from "./patch"
 import { ArchitectureRoot } from "./root"
 
@@ -58,32 +58,26 @@ export type Error =
 
 export interface Interface {
   readonly list: () => Effect.Effect<ReadonlyArray<Architecture.ResourceSummary>, Error>
-  readonly listLive: () => Effect.Effect<SourcedSummaries, Error>
+  readonly listInstances: () => Effect.Effect<SourcedSummaries, Error>
   readonly create: (input: Architecture.ResourceCreateInput) => Effect.Effect<Architecture.ResourceSnapshot, Error>
   readonly duplicate: (
     id: Architecture.ResourceID,
     input: Architecture.ResourceDuplicateInput,
   ) => Effect.Effect<Architecture.ResourceSnapshot, Error>
   readonly load: (id: Architecture.ResourceID) => Effect.Effect<Architecture.ResourceSnapshot, Error>
-  readonly loadLive: (id: Architecture.ResourceID) => Effect.Effect<SourcedSnapshot, Error>
-  readonly loadDraft: (id: Architecture.ResourceID) => Effect.Effect<Architecture.DraftSnapshot, Error>
-  readonly patchLive: (
+  readonly loadInstance: (id: Architecture.ResourceID) => Effect.Effect<Architecture.LiveInstanceSnapshot, Error>
+  readonly patchInstance: (
     id: Architecture.ResourceID,
     input: Architecture.PatchInput,
     conflict?: ConflictContext,
-  ) => Effect.Effect<SourcedSnapshot, Error>
-  readonly patchDraft: (
+  ) => Effect.Effect<Architecture.LiveInstanceSnapshot, Error>
+  readonly commitInstance: (
     id: Architecture.ResourceID,
-    input: Architecture.PatchInput,
-    conflict?: ConflictContext,
-  ) => Effect.Effect<Architecture.DraftSnapshot, Error>
-  readonly commitDraft: (
-    id: Architecture.ResourceID,
-    input: Architecture.DraftCommitInput,
+    input: Architecture.LiveInstanceCommitInput,
     conflict?: ConflictContext,
   ) => Effect.Effect<Architecture.ResourceSnapshot, Error>
-  readonly discardDraft: (id: Architecture.ResourceID) => Effect.Effect<Architecture.DraftSnapshot, Error>
-  readonly reloadSaved: (id: Architecture.ResourceID) => Effect.Effect<Architecture.DraftSnapshot, Error>
+  readonly discardInstance: (id: Architecture.ResourceID) => Effect.Effect<Architecture.LiveInstanceSnapshot, Error>
+  readonly reloadInstance: (id: Architecture.ResourceID) => Effect.Effect<Architecture.LiveInstanceSnapshot, Error>
   readonly remove: (
     id: Architecture.ResourceID,
     input: Architecture.ResourceRemoveInput,
@@ -91,9 +85,9 @@ export interface Interface {
   ) => Effect.Effect<void, Error>
   readonly reset: (id: Architecture.ResourceID) => Effect.Effect<Architecture.ResourceSnapshot, Error>
   readonly query: (input: Architecture.QueryInput) => Effect.Effect<Architecture.QueryResult, Error>
-  readonly queryLive: (input: Architecture.QueryInput) => Effect.Effect<SourcedQueryResult, Error>
+  readonly queryInstances: (input: Architecture.QueryInput) => Effect.Effect<SourcedQueryResult, Error>
   readonly context: (ids?: ReadonlyArray<Architecture.ResourceID>) => Effect.Effect<string, Error>
-  readonly contextLive: (ids?: ReadonlyArray<Architecture.ResourceID>) => Effect.Effect<string, Error>
+  readonly contextInstances: (ids?: ReadonlyArray<Architecture.ResourceID>) => Effect.Effect<string, Error>
 }
 
 export type Source = "live" | "saved" | "mixed"
@@ -158,7 +152,7 @@ const layer = Layer.effect(
     const flock = yield* EffectFlock.Service
     const events = yield* EventV2.Service
     const location = yield* Location.Service
-    const drafts = yield* ArchitectureDraft.Service
+    const instances = yield* ArchitectureInstance.Service
     const locks = KeyedMutex.makeUnsafe<string>()
     const decodeJson = Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)
     const decodeLegacy = Schema.decodeUnknownEffect(LegacyGraph)
@@ -286,13 +280,13 @@ const layer = Layer.effect(
         )
         .pipe(Effect.asVoid)
 
-    const publishDraftUpdated = (
+    const publishInstanceUpdated = (
       value: Architecture.ResourceSnapshot,
       base: { readonly revision: number; readonly digest: string },
     ) =>
       events
         .publish(
-          Architecture.Event.ResourceDraftUpdated,
+          Architecture.Event.ResourceInstanceUpdated,
           {
             resourceID: value.resource.id,
             revision: value.resource.revision,
@@ -306,10 +300,10 @@ const layer = Layer.effect(
         )
         .pipe(Effect.asVoid)
 
-    const publishDraftDiscarded = (value: Architecture.ResourceSnapshot) =>
+    const publishInstanceDiscarded = (value: Architecture.ResourceSnapshot) =>
       events
         .publish(
-          Architecture.Event.ResourceDraftDiscarded,
+          Architecture.Event.ResourceInstanceDiscarded,
           {
             resourceID: value.resource.id,
             revision: value.resource.revision,
@@ -421,7 +415,7 @@ const layer = Layer.effect(
       saved: Architecture.Resource,
       source: Exclude<Source, "mixed"> = "saved",
     ) {
-      const entry = yield* drafts.get(saved.id)
+      const entry = yield* instances.get(saved.id)
       if (!entry) return { resource: saved, source }
       const savedDigest = ArchitecturePatch.digest(saved)
       if (entry.baseRevision === saved.revision && entry.baseDigest === savedDigest)
@@ -432,7 +426,7 @@ const layer = Layer.effect(
         { revision: entry.baseRevision, digest: entry.baseDigest },
         { revision: saved.revision, digest: savedDigest },
         undefined,
-        "graph_draft_load",
+        "graph_instance_load",
       )
     })
 
@@ -459,7 +453,7 @@ const layer = Layer.effect(
       return (yield* readAll(yield* roots.get)).map(summary).toSorted((a, b) => a.name.localeCompare(b.name))
     })
 
-    const listLive = Effect.fn("ArchitectureGraph.listLive")(function* () {
+    const listInstances = Effect.fn("ArchitectureGraph.listInstances")(function* () {
       const resources = (yield* readAllLive(yield* roots.get))
         .map((item) => sourcedSummary(item.resource, item.source))
         .toSorted((a, b) => a.name.localeCompare(b.name))
@@ -519,17 +513,13 @@ const layer = Layer.effect(
       return snapshot(storage, (yield* read(storage, id)).resource)
     })
 
-    const loadLive = Effect.fn("ArchitectureGraph.loadLive")(function* (id: Architecture.ResourceID) {
+    const loadInstance = Effect.fn("ArchitectureGraph.loadInstance")(function* (id: Architecture.ResourceID) {
       const storage = yield* roots.get
       const current = yield* readLive(storage, id)
       return { snapshot: snapshot(storage, current.resource), source: current.source }
     })
 
-    const loadDraft = Effect.fn("ArchitectureGraph.loadDraft")(function* (id: Architecture.ResourceID) {
-      return yield* loadLive(id)
-    })
-
-    const patchLive = Effect.fn("ArchitectureGraph.patchLive")(function* (
+    const patchInstance = Effect.fn("ArchitectureGraph.patchInstance")(function* (
       id: Architecture.ResourceID,
       input: Architecture.PatchInput,
       conflict?: ConflictContext,
@@ -540,7 +530,7 @@ const layer = Layer.effect(
         Effect.gen(function* () {
           const saved = (yield* read(storage, id)).resource
           const savedDigest = ArchitecturePatch.digest(saved)
-          const entry = yield* drafts.get(id)
+          const entry = yield* instances.get(id)
           if (entry && (entry.baseRevision !== saved.revision || entry.baseDigest !== savedDigest)) {
             return yield* graphConflict(
               id,
@@ -548,7 +538,7 @@ const layer = Layer.effect(
               { revision: entry.baseRevision, digest: entry.baseDigest },
               { revision: saved.revision, digest: savedDigest },
               conflict,
-              "graph_draft_patch",
+              "graph_instance_patch",
             )
           }
           const current = entry?.resource ?? saved
@@ -560,7 +550,7 @@ const layer = Layer.effect(
               { revision: input.revision, digest: input.digest },
               { revision: current.revision, digest: currentDigest },
               conflict,
-              "graph_draft_patch",
+              "graph_instance_patch",
             )
           const patched = yield* ArchitecturePatch.apply(current, input.operations).pipe(
             Effect.mapError((error) =>
@@ -571,19 +561,19 @@ const layer = Layer.effect(
                     { revision: input.revision, digest: input.digest },
                     { revision: current.revision, digest: currentDigest },
                     conflict,
-                    "graph_draft_patch",
+                    "graph_instance_patch",
                     error.operationIDs,
                   )
                 : error,
             ),
           )
-          yield* drafts.set(id, {
+          yield* instances.set(id, {
             baseRevision: entry?.baseRevision ?? saved.revision,
             baseDigest: entry?.baseDigest ?? savedDigest,
             resource: patched,
           })
           const result = snapshot(storage, patched)
-          yield* publishDraftUpdated(result, {
+          yield* publishInstanceUpdated(result, {
             revision: entry?.baseRevision ?? saved.revision,
             digest: entry?.baseDigest ?? savedDigest,
           })
@@ -592,17 +582,9 @@ const layer = Layer.effect(
       )
     })
 
-    const patchDraft = Effect.fn("ArchitectureGraph.patchDraft")(function* (
+    const commitInstance = Effect.fn("ArchitectureGraph.commitInstance")(function* (
       id: Architecture.ResourceID,
-      input: Architecture.PatchInput,
-      conflict?: ConflictContext,
-    ) {
-      return yield* patchLive(id, input, conflict)
-    })
-
-    const commitDraft = Effect.fn("ArchitectureGraph.commitDraft")(function* (
-      id: Architecture.ResourceID,
-      input: Architecture.DraftCommitInput,
+      input: Architecture.LiveInstanceCommitInput,
       conflict?: ConflictContext,
     ) {
       const storage = yield* roots.get
@@ -611,7 +593,7 @@ const layer = Layer.effect(
         Effect.gen(function* () {
           const saved = (yield* read(storage, id)).resource
           const savedDigest = ArchitecturePatch.digest(saved)
-          const entry = yield* drafts.get(id)
+          const entry = yield* instances.get(id)
           if (!entry)
             return yield* graphConflict(
               id,
@@ -619,21 +601,21 @@ const layer = Layer.effect(
               input,
               { revision: saved.revision, digest: savedDigest },
               conflict,
-              "graph_draft_commit",
+              "graph_instance_commit",
               [],
-              "draft_missing",
+              "instance_missing",
             )
-          const draftDigest = ArchitecturePatch.digest(entry.resource)
-          if (entry.resource.revision !== input.revision || draftDigest !== input.digest)
+          const instanceDigest = ArchitecturePatch.digest(entry.resource)
+          if (entry.resource.revision !== input.revision || instanceDigest !== input.digest)
             return yield* graphConflict(
               id,
               saved.name,
               input,
-              { revision: entry.resource.revision, digest: draftDigest },
+              { revision: entry.resource.revision, digest: instanceDigest },
               conflict,
-              "graph_draft_commit",
+              "graph_instance_commit",
               [],
-              "draft_changed",
+              "instance_changed",
             )
           if (entry.baseRevision !== saved.revision || entry.baseDigest !== savedDigest) {
             return yield* graphConflict(
@@ -642,7 +624,7 @@ const layer = Layer.effect(
               { revision: entry.baseRevision, digest: entry.baseDigest },
               { revision: saved.revision, digest: savedDigest },
               conflict,
-              "graph_draft_commit",
+              "graph_instance_commit",
             )
           }
           const result = yield* write(
@@ -650,30 +632,30 @@ const layer = Layer.effect(
             { ...entry.resource, revision: saved.revision + 1 },
             { revision: entry.baseRevision, digest: entry.baseDigest },
             conflict,
-            drafts.remove(id),
+            instances.remove(id),
           )
-          yield* publishDraftDiscarded(result)
+          yield* publishInstanceDiscarded(result)
           return result
         }),
       )
     })
 
-    const discardDraft = Effect.fn("ArchitectureGraph.discardDraft")(function* (id: Architecture.ResourceID) {
+    const discardInstance = Effect.fn("ArchitectureGraph.discardInstance")(function* (id: Architecture.ResourceID) {
       const storage = yield* roots.get
       return yield* locked(
         storage,
         Effect.gen(function* () {
           const saved = snapshot(storage, (yield* read(storage, id)).resource)
-          const entry = yield* drafts.get(id)
-          yield* drafts.remove(id)
-          if (entry) yield* publishDraftDiscarded(saved)
+          const entry = yield* instances.get(id)
+          yield* instances.remove(id)
+          if (entry) yield* publishInstanceDiscarded(saved)
           return { snapshot: saved, source: "saved" as const }
         }),
       )
     })
 
-    const reloadSaved = Effect.fn("ArchitectureGraph.reloadSaved")(function* (id: Architecture.ResourceID) {
-      return yield* discardDraft(id)
+    const reloadInstance = Effect.fn("ArchitectureGraph.reloadInstance")(function* (id: Architecture.ResourceID) {
+      return yield* discardInstance(id)
     })
 
     const remove = Effect.fn("ArchitectureGraph.remove")(function* (
@@ -705,7 +687,7 @@ const layer = Layer.effect(
                   cause,
                 }),
             ),
-            Effect.andThen(drafts.remove(id)),
+            Effect.andThen(instances.remove(id)),
             Effect.uninterruptible,
           )
           yield* events.publish(
@@ -751,7 +733,7 @@ const layer = Layer.effect(
                 ),
               )
             }
-            yield* drafts.remove(id)
+            yield* instances.remove(id)
           }).pipe(Effect.uninterruptible)
           return yield* write(
             storage,
@@ -772,7 +754,7 @@ const layer = Layer.effect(
       return queryResources(resources, input, summary)
     })
 
-    const queryLive = Effect.fn("ArchitectureGraph.queryLive")(function* (input: Architecture.QueryInput) {
+    const queryInstances = Effect.fn("ArchitectureGraph.queryInstances")(function* (input: Architecture.QueryInput) {
       const selected = new Set(input.resourceIDs)
       const resources = (yield* readAllLive(yield* roots.get)).filter(
         (item) => selected.size === 0 || selected.has(item.resource.id),
@@ -795,7 +777,7 @@ const layer = Layer.effect(
       return formatContext(resources, resourcePath)
     })
 
-    const contextLive = Effect.fn("ArchitectureGraph.contextLive")(function* (
+    const contextInstances = Effect.fn("ArchitectureGraph.contextInstances")(function* (
       ids?: ReadonlyArray<Architecture.ResourceID>,
     ) {
       const selected = new Set(ids)
@@ -812,23 +794,21 @@ const layer = Layer.effect(
 
     return Service.of({
       list,
-      listLive,
+      listInstances,
       create,
       duplicate,
       load,
-      loadLive,
-      loadDraft,
-      patchLive,
-      patchDraft,
-      commitDraft,
-      discardDraft,
-      reloadSaved,
+      loadInstance,
+      patchInstance,
+      commitInstance,
+      discardInstance,
+      reloadInstance,
       remove,
       reset,
       query,
-      queryLive,
+      queryInstances,
       context,
-      contextLive,
+      contextInstances,
     })
   }),
 )
@@ -836,7 +816,7 @@ const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [ArchitectureRoot.node, ArchitectureDraft.node, FSUtil.node, EffectFlock.node, EventV2.node, Location.node],
+  deps: [ArchitectureRoot.node, ArchitectureInstance.node, FSUtil.node, EffectFlock.node, EventV2.node, Location.node],
 })
 
 function migrate(resource: typeof PreviousResource.Type): Architecture.Resource {

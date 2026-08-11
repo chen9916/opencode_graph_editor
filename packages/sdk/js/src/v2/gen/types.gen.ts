@@ -55,8 +55,8 @@ export type Event =
   | EventInstallationUpdateAvailable
   | EventArchitectureResourceUpdated
   | EventArchitectureResourceRemoved
-  | EventArchitectureResourceDraftUpdated
-  | EventArchitectureResourceDraftDiscarded
+  | EventArchitectureResourceInstanceUpdated
+  | EventArchitectureResourceInstanceDiscarded
   | EventFileEdited
   | EventReferenceUpdated
   | EventPermissionV2Asked
@@ -646,6 +646,7 @@ export type Prompt = {
   text: string
   files?: Array<PromptFileAttachment>
   agents?: Array<PromptAgentAttachment>
+  modelContext?: Array<PromptModelContext>
 }
 
 export type Pty = {
@@ -1261,7 +1262,7 @@ export type GlobalEvent = {
       }
     | {
         id: string
-        type: "architecture.resource.draft.updated"
+        type: "architecture.resource.instance.updated"
         properties: {
           resourceID: string
           revision: number
@@ -1272,7 +1273,7 @@ export type GlobalEvent = {
       }
     | {
         id: string
-        type: "architecture.resource.draft.discarded"
+        type: "architecture.resource.instance.discarded"
         properties: {
           resourceID: string
           revision?: number
@@ -2762,7 +2763,7 @@ export type ArchitectureConflictError = {
   currentRevision?: number
   currentDigest?: string
   safeToRetry?: boolean | "unknown" | "partial"
-  conflictKind?: "draft_changed" | "draft_missing"
+  conflictKind?: "instance_changed" | "instance_missing"
   retryHint?: string
 }
 
@@ -2811,6 +2812,7 @@ export type PromptInput = {
   text: string
   files?: Array<PromptInputFileAttachment>
   agents?: Array<PromptAgentAttachment>
+  modelContext?: Array<PromptModelContext>
 }
 
 export type ConflictError = {
@@ -3005,8 +3007,8 @@ export type V2Event =
   | InstallationUpdateAvailable
   | ArchitectureResourceUpdated
   | ArchitectureResourceRemoved
-  | ArchitectureResourceDraftUpdated
-  | ArchitectureResourceDraftDiscarded
+  | ArchitectureResourceInstanceUpdated
+  | ArchitectureResourceInstanceDiscarded
   | FileEdited
   | ReferenceUpdated
   | PermissionV2Asked
@@ -3169,6 +3171,14 @@ export type PromptFileAttachment = {
 export type PromptAgentAttachment = {
   name: string
   source?: PromptSource
+}
+
+export type PromptModelContext = {
+  text: string
+  description?: string
+  metadata?: {
+    [key: string]: unknown
+  }
 }
 
 export type SessionErrorUnknown = {
@@ -4089,11 +4099,11 @@ export type ArchitectureResourceDuplicateInput = {
   name?: string
 }
 
-export type ArchitectureDraftSource = "live" | "saved"
+export type ArchitectureLiveInstanceSource = "live" | "saved"
 
-export type ArchitectureDraftSnapshot = {
+export type ArchitectureLiveInstanceSnapshot = {
   snapshot: ArchitectureResourceSnapshot
-  source: ArchitectureDraftSource
+  source: ArchitectureLiveInstanceSource
 }
 
 export type ArchitectureOperation =
@@ -4157,7 +4167,7 @@ export type ArchitecturePatchInput = {
   operations: Array<ArchitectureOperation>
 }
 
-export type ArchitectureDraftCommitInput = {
+export type ArchitectureLiveInstanceCommitInput = {
   revision: number
   digest: string
 }
@@ -4246,6 +4256,7 @@ export type SessionMessageUser = {
   text: string
   files?: Array<PromptFileAttachment>
   agents?: Array<PromptAgentAttachment>
+  modelContext?: Array<PromptModelContext>
   type: "user"
 }
 
@@ -5700,12 +5711,12 @@ export type ArchitectureResourceRemoved = {
   }
 }
 
-export type ArchitectureResourceDraftUpdated = {
+export type ArchitectureResourceInstanceUpdated = {
   id: string
   metadata?: {
     [key: string]: unknown
   }
-  type: "architecture.resource.draft.updated"
+  type: "architecture.resource.instance.updated"
   durable?: {
     aggregateID: string
     seq: number
@@ -5721,12 +5732,12 @@ export type ArchitectureResourceDraftUpdated = {
   }
 }
 
-export type ArchitectureResourceDraftDiscarded = {
+export type ArchitectureResourceInstanceDiscarded = {
   id: string
   metadata?: {
     [key: string]: unknown
   }
-  type: "architecture.resource.draft.discarded"
+  type: "architecture.resource.instance.discarded"
   durable?: {
     aggregateID: string
     seq: number
@@ -7065,9 +7076,9 @@ export type EventArchitectureResourceRemoved = {
   }
 }
 
-export type EventArchitectureResourceDraftUpdated = {
+export type EventArchitectureResourceInstanceUpdated = {
   id: string
-  type: "architecture.resource.draft.updated"
+  type: "architecture.resource.instance.updated"
   properties: {
     resourceID: string
     revision: number
@@ -7077,9 +7088,9 @@ export type EventArchitectureResourceDraftUpdated = {
   }
 }
 
-export type EventArchitectureResourceDraftDiscarded = {
+export type EventArchitectureResourceInstanceDiscarded = {
   id: string
-  type: "architecture.resource.draft.discarded"
+  type: "architecture.resource.instance.discarded"
   properties: {
     resourceID: string
     revision?: number
@@ -11989,7 +12000,7 @@ export type V2ArchitectureResourceDuplicateResponses = {
 export type V2ArchitectureResourceDuplicateResponse =
   V2ArchitectureResourceDuplicateResponses[keyof V2ArchitectureResourceDuplicateResponses]
 
-export type V2ArchitectureResourceDraftGetData = {
+export type V2ArchitectureResourceInstanceGetData = {
   body?: never
   path: {
     resourceID: string
@@ -12000,10 +12011,10 @@ export type V2ArchitectureResourceDraftGetData = {
       workspace?: string
     }
   }
-  url: "/api/architecture/resource/{resourceID}/draft"
+  url: "/api/architecture/resource/{resourceID}/instance"
 }
 
-export type V2ArchitectureResourceDraftGetErrors = {
+export type V2ArchitectureResourceInstanceGetErrors = {
   /**
    * InvalidRequestError
    */
@@ -12030,23 +12041,23 @@ export type V2ArchitectureResourceDraftGetErrors = {
   503: ArchitectureUnavailableError
 }
 
-export type V2ArchitectureResourceDraftGetError =
-  V2ArchitectureResourceDraftGetErrors[keyof V2ArchitectureResourceDraftGetErrors]
+export type V2ArchitectureResourceInstanceGetError =
+  V2ArchitectureResourceInstanceGetErrors[keyof V2ArchitectureResourceInstanceGetErrors]
 
-export type V2ArchitectureResourceDraftGetResponses = {
+export type V2ArchitectureResourceInstanceGetResponses = {
   /**
    * Success
    */
   200: {
     location: LocationInfo
-    data: ArchitectureDraftSnapshot
+    data: ArchitectureLiveInstanceSnapshot
   }
 }
 
-export type V2ArchitectureResourceDraftGetResponse =
-  V2ArchitectureResourceDraftGetResponses[keyof V2ArchitectureResourceDraftGetResponses]
+export type V2ArchitectureResourceInstanceGetResponse =
+  V2ArchitectureResourceInstanceGetResponses[keyof V2ArchitectureResourceInstanceGetResponses]
 
-export type V2ArchitectureResourceDraftPatchData = {
+export type V2ArchitectureResourceInstancePatchData = {
   body: ArchitecturePatchInput
   path: {
     resourceID: string
@@ -12057,10 +12068,10 @@ export type V2ArchitectureResourceDraftPatchData = {
       workspace?: string
     }
   }
-  url: "/api/architecture/resource/{resourceID}/draft"
+  url: "/api/architecture/resource/{resourceID}/instance"
 }
 
-export type V2ArchitectureResourceDraftPatchErrors = {
+export type V2ArchitectureResourceInstancePatchErrors = {
   /**
    * InvalidRequestError
    */
@@ -12087,24 +12098,24 @@ export type V2ArchitectureResourceDraftPatchErrors = {
   503: ArchitectureUnavailableError
 }
 
-export type V2ArchitectureResourceDraftPatchError =
-  V2ArchitectureResourceDraftPatchErrors[keyof V2ArchitectureResourceDraftPatchErrors]
+export type V2ArchitectureResourceInstancePatchError =
+  V2ArchitectureResourceInstancePatchErrors[keyof V2ArchitectureResourceInstancePatchErrors]
 
-export type V2ArchitectureResourceDraftPatchResponses = {
+export type V2ArchitectureResourceInstancePatchResponses = {
   /**
    * Success
    */
   200: {
     location: LocationInfo
-    data: ArchitectureDraftSnapshot
+    data: ArchitectureLiveInstanceSnapshot
   }
 }
 
-export type V2ArchitectureResourceDraftPatchResponse =
-  V2ArchitectureResourceDraftPatchResponses[keyof V2ArchitectureResourceDraftPatchResponses]
+export type V2ArchitectureResourceInstancePatchResponse =
+  V2ArchitectureResourceInstancePatchResponses[keyof V2ArchitectureResourceInstancePatchResponses]
 
-export type V2ArchitectureResourceDraftCommitData = {
-  body: ArchitectureDraftCommitInput
+export type V2ArchitectureResourceInstanceCommitData = {
+  body: ArchitectureLiveInstanceCommitInput
   path: {
     resourceID: string
   }
@@ -12114,10 +12125,10 @@ export type V2ArchitectureResourceDraftCommitData = {
       workspace?: string
     }
   }
-  url: "/api/architecture/resource/{resourceID}/draft/commit"
+  url: "/api/architecture/resource/{resourceID}/instance/commit"
 }
 
-export type V2ArchitectureResourceDraftCommitErrors = {
+export type V2ArchitectureResourceInstanceCommitErrors = {
   /**
    * InvalidRequestError
    */
@@ -12144,10 +12155,10 @@ export type V2ArchitectureResourceDraftCommitErrors = {
   503: ArchitectureUnavailableError
 }
 
-export type V2ArchitectureResourceDraftCommitError =
-  V2ArchitectureResourceDraftCommitErrors[keyof V2ArchitectureResourceDraftCommitErrors]
+export type V2ArchitectureResourceInstanceCommitError =
+  V2ArchitectureResourceInstanceCommitErrors[keyof V2ArchitectureResourceInstanceCommitErrors]
 
-export type V2ArchitectureResourceDraftCommitResponses = {
+export type V2ArchitectureResourceInstanceCommitResponses = {
   /**
    * Success
    */
@@ -12157,10 +12168,10 @@ export type V2ArchitectureResourceDraftCommitResponses = {
   }
 }
 
-export type V2ArchitectureResourceDraftCommitResponse =
-  V2ArchitectureResourceDraftCommitResponses[keyof V2ArchitectureResourceDraftCommitResponses]
+export type V2ArchitectureResourceInstanceCommitResponse =
+  V2ArchitectureResourceInstanceCommitResponses[keyof V2ArchitectureResourceInstanceCommitResponses]
 
-export type V2ArchitectureResourceDraftDiscardData = {
+export type V2ArchitectureResourceInstanceDiscardData = {
   body?: never
   path: {
     resourceID: string
@@ -12171,10 +12182,10 @@ export type V2ArchitectureResourceDraftDiscardData = {
       workspace?: string
     }
   }
-  url: "/api/architecture/resource/{resourceID}/draft/discard"
+  url: "/api/architecture/resource/{resourceID}/instance/discard"
 }
 
-export type V2ArchitectureResourceDraftDiscardErrors = {
+export type V2ArchitectureResourceInstanceDiscardErrors = {
   /**
    * InvalidRequestError
    */
@@ -12201,23 +12212,23 @@ export type V2ArchitectureResourceDraftDiscardErrors = {
   503: ArchitectureUnavailableError
 }
 
-export type V2ArchitectureResourceDraftDiscardError =
-  V2ArchitectureResourceDraftDiscardErrors[keyof V2ArchitectureResourceDraftDiscardErrors]
+export type V2ArchitectureResourceInstanceDiscardError =
+  V2ArchitectureResourceInstanceDiscardErrors[keyof V2ArchitectureResourceInstanceDiscardErrors]
 
-export type V2ArchitectureResourceDraftDiscardResponses = {
+export type V2ArchitectureResourceInstanceDiscardResponses = {
   /**
    * Success
    */
   200: {
     location: LocationInfo
-    data: ArchitectureDraftSnapshot
+    data: ArchitectureLiveInstanceSnapshot
   }
 }
 
-export type V2ArchitectureResourceDraftDiscardResponse =
-  V2ArchitectureResourceDraftDiscardResponses[keyof V2ArchitectureResourceDraftDiscardResponses]
+export type V2ArchitectureResourceInstanceDiscardResponse =
+  V2ArchitectureResourceInstanceDiscardResponses[keyof V2ArchitectureResourceInstanceDiscardResponses]
 
-export type V2ArchitectureResourceDraftReloadData = {
+export type V2ArchitectureResourceInstanceReloadData = {
   body?: never
   path: {
     resourceID: string
@@ -12228,10 +12239,10 @@ export type V2ArchitectureResourceDraftReloadData = {
       workspace?: string
     }
   }
-  url: "/api/architecture/resource/{resourceID}/draft/reload"
+  url: "/api/architecture/resource/{resourceID}/instance/reload"
 }
 
-export type V2ArchitectureResourceDraftReloadErrors = {
+export type V2ArchitectureResourceInstanceReloadErrors = {
   /**
    * InvalidRequestError
    */
@@ -12258,21 +12269,21 @@ export type V2ArchitectureResourceDraftReloadErrors = {
   503: ArchitectureUnavailableError
 }
 
-export type V2ArchitectureResourceDraftReloadError =
-  V2ArchitectureResourceDraftReloadErrors[keyof V2ArchitectureResourceDraftReloadErrors]
+export type V2ArchitectureResourceInstanceReloadError =
+  V2ArchitectureResourceInstanceReloadErrors[keyof V2ArchitectureResourceInstanceReloadErrors]
 
-export type V2ArchitectureResourceDraftReloadResponses = {
+export type V2ArchitectureResourceInstanceReloadResponses = {
   /**
    * Success
    */
   200: {
     location: LocationInfo
-    data: ArchitectureDraftSnapshot
+    data: ArchitectureLiveInstanceSnapshot
   }
 }
 
-export type V2ArchitectureResourceDraftReloadResponse =
-  V2ArchitectureResourceDraftReloadResponses[keyof V2ArchitectureResourceDraftReloadResponses]
+export type V2ArchitectureResourceInstanceReloadResponse =
+  V2ArchitectureResourceInstanceReloadResponses[keyof V2ArchitectureResourceInstanceReloadResponses]
 
 export type V2ArchitectureResourceResetData = {
   body?: never

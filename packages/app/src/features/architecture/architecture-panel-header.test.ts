@@ -35,4 +35,29 @@ describe("architecture resource header", () => {
     expect(source).toContain("const scope = operationScope(id)")
     expect(source).toContain("confirm(labels().discardConfirm, labels().reload, () => void reloadResource(scope))")
   })
+
+  test("bumps the same-resource live instance after save or reload replaces the backend instance", async () => {
+    const source = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
+    const save = source.match(
+      /const save = async \(change: ArchitectureInstanceChange\) => \{[\s\S]*?\n  const confirm = /,
+    )?.[0]
+    const reloadResource = source.match(
+      /const reloadResource = async \(scope: ReturnType<typeof operationScope>\) => \{[\s\S]*?\n  const reload = \(\) => \{/,
+    )?.[0]
+
+    if (!save) throw new Error("Save handler was not found")
+    if (!reloadResource) throw new Error("Reload resource handler was not found")
+    expect(source).toContain("liveInstanceVersions")
+    expect(save).toContain('setPersistedState("pendingOverlays", id, undefined)')
+    expect(save).toContain('setState("liveInstanceVersions", id, (current) => (current ?? 0) + 1)')
+    expect(reloadResource).toContain('setState("liveInstanceVersions", id, (current) => (current ?? 0) + 1)')
+    expect(source).toContain("liveInstanceVersion={liveInstanceVersion()}")
+  })
+
+  test("applies live instance event payloads as authoritative live instance updates", async () => {
+    const source = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
+
+    expect(source).toContain("adoptArchitectureLiveInstanceCache")
+    expect(source).toContain("adoptArchitectureLiveInstanceCache(current, eventInstance)")
+  })
 })

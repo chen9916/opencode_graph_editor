@@ -1,14 +1,18 @@
 import type { ArchitectureListResourcesOutput } from "@opencode-ai/client/promise"
 import type {
-  ArchitectureDraftChange,
+  ArchitectureInstanceChange,
+  ArchitectureLiveInstanceCache,
   ArchitectureOperation,
+  ArchitecturePendingOverlay,
   ArchitectureSnapshot,
 } from "./contract"
 import type { ArchitectureConflict } from "./journal"
+import { applyOperations } from "./journal"
 import {
   architectureSnapshotCoversEvent,
   type ArchitectureResourceEventInfo,
 } from "./event"
+import { reconcileArchitectureInstanceChange, rebaseArchitecturePendingOverlay } from "./live-instance"
 
 export type ArchitectureResourceSummary = ArchitectureListResourcesOutput["data"][number]
 
@@ -27,32 +31,87 @@ export function selectedArchitectureSnapshot(
   return snapshot
 }
 
-export function architectureDraftResourceID(change: ArchitectureDraftChange) {
+export function architectureVisibleLiveInstance(input: {
+  readonly saved: ArchitectureSnapshot | undefined
+  readonly live: ArchitectureLiveInstanceCache | undefined
+  readonly pending: ArchitecturePendingOverlay | undefined
+}) {
+  const source = input.live?.snapshot ?? input.saved
+  if (!source) return { snapshot: undefined, pending: undefined, pendingCovered: false }
+  if (!input.pending)
+    return {
+      snapshot: source,
+      pending: input.live ? liveInstancePendingOverlay(source, input.live) : undefined,
+      pendingCovered: false,
+    }
+  const rebased = rebaseArchitecturePendingOverlay(
+    input.pending.journalBase ?? (input.pending.origin ?? input.pending.base).resource,
+    input.pending.operations,
+    source.resource,
+  )
+  const operations = reconcileArchitectureInstanceChange(source.resource, applyOperations(rebased.base, rebased.operations))
+  const conflicts = [...input.pending.conflicts, ...rebased.conflicts]
+  const covered = operations.length === 0 && conflicts.length === 0
+  if (covered)
+    return {
+      snapshot: source,
+      pending: input.live ? liveInstancePendingOverlay(source, input.live) : undefined,
+      pendingCovered: true,
+    }
+  return {
+    snapshot: source,
+    pending: {
+      base: source,
+      origin: source,
+      journalBase: source.resource,
+      operations,
+      conflicts,
+      instance: input.live ?? undefined,
+    },
+    pendingCovered: false,
+  }
+}
+
+export function architectureInstanceResourceID(change: ArchitectureInstanceChange) {
   return change.resource.id
 }
 
-export function architectureDraftHasVisibleChanges(change: ArchitectureDraftChange) {
+export function architectureInstanceHasVisibleChanges(change: ArchitectureInstanceChange) {
   return change.operations.length > 0
 }
 
-export function architectureDraftCanSkipSave(change: ArchitectureDraftChange) {
-  return !architectureDraftHasVisibleChanges(change) && change.conflicts.length === 0
+function liveInstancePendingOverlay(
+  snapshot: ArchitectureSnapshot,
+  instance: NonNullable<ArchitectureLiveInstanceCache>,
+): ArchitecturePendingOverlay {
+  return {
+    base: snapshot,
+    origin: snapshot,
+    journalBase: snapshot.resource,
+    operations: [],
+    conflicts: [],
+    instance,
+  }
 }
 
-export function architectureDraftIsDirty(input: {
-  readonly draft:
+export function architectureInstanceCanSkipSave(change: ArchitectureInstanceChange) {
+  return !architectureInstanceHasVisibleChanges(change) && change.conflicts.length === 0
+}
+
+export function architectureInstanceIsDirty(input: {
+  readonly pending:
     | {
         readonly operations?: ReadonlyArray<ArchitectureOperation>
         readonly conflicts?: ReadonlyArray<ArchitectureConflict>
-        readonly live?: unknown
+        readonly instance?: unknown
       }
     | undefined
   readonly operations?: ReadonlyArray<ArchitectureOperation>
 }) {
   return (
-    !!input.draft?.live ||
-    (input.operations ?? input.draft?.operations ?? []).length > 0 ||
-    (input.draft?.conflicts?.length ?? 0) > 0
+    !!input.pending?.instance ||
+    (input.operations ?? input.pending?.operations ?? []).length > 0 ||
+    (input.pending?.conflicts?.length ?? 0) > 0
   )
 }
 

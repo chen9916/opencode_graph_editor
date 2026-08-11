@@ -30,11 +30,12 @@ test("exposes every standard HTTP API group", () => {
     "listResources",
     "createResource",
     "getResource",
-    "getDraft",
-    "patchDraft",
-    "commitDraft",
-    "discardDraft",
-    "reloadSaved",
+    "duplicateResource",
+    "getInstance",
+    "patchInstance",
+    "commitInstance",
+    "discardInstance",
+    "reloadInstance",
     "removeResource",
     "resetResource",
   ])
@@ -67,7 +68,7 @@ test("sessions.get returns the wire projection", async () => {
   expect(result.time.created).toBe(1_717_171_717_000)
 })
 
-test("architecture commit sends the expected live draft identity", async () => {
+test("architecture commit sends the expected live instance identity", async () => {
   let body: unknown
   const client = OpenCode.make({
     baseUrl: "http://localhost:3000",
@@ -84,7 +85,7 @@ test("architecture commit sends the expected live draft identity", async () => {
     },
   })
 
-  await client.architecture.commitDraft({
+  await client.architecture.commitInstance({
     resourceID: "design",
     revision: 7,
     digest: "observed-live-digest",

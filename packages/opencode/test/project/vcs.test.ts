@@ -248,7 +248,7 @@ describe("Vcs diff", () => {
         yield* write(path.join(test.directory, "file.txt"), "changed\n")
         yield* write(path.join(test.directory, "new.txt"), "new\n")
         yield* write(path.join(test.directory, ".opencode", "architecture", "resources", "design.json"), "changed\n")
-        yield* write(path.join(test.directory, ".opencode", "architecture", "resources", "draft.json"), "draft\n")
+        yield* write(path.join(test.directory, ".opencode", "architecture", "resources", "instance.json"), "instance\n")
 
         const vcs = yield* init()
         const status = yield* vcs.status()

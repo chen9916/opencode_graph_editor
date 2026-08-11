@@ -811,7 +811,7 @@ describe("HttpApi SDK", () => {
   )
 
   httpapi(
-    "shares live Graph drafts between editor HTTP and legacy tools",
+    "shares live Graph instances between editor HTTP and legacy tools",
     withFakeLlm("raw", ({ sdk, llm, directory }) =>
       Effect.gen(function* () {
         Flag.OPENCODE_WORKSPACE_ID = WorkspaceV2.ID.ascending()
@@ -825,22 +825,22 @@ describe("HttpApi SDK", () => {
         )
 
         const editorFetch = yield* serverFetch("raw")
-        const editorDraft = () =>
+        const editorInstance = () =>
           Effect.promise(() =>
             editorFetch(
-              new Request(`http://localhost/api/architecture/resource/${resourceID}/draft`, {
+              new Request(`http://localhost/api/architecture/resource/${resourceID}/instance`, {
                 headers: { "x-opencode-directory": directory },
               }),
             ),
           )
-        const initial = yield* editorDraft()
+        const initial = yield* editorInstance()
         expect(initial.status).toBe(200)
         const initialBody = record(yield* Effect.promise(() => initial.json()))
         const initialSnapshot = record(record(initialBody.data).snapshot)
         const initialResource = record(initialSnapshot.resource)
         const patched = yield* Effect.promise(() =>
           editorFetch(
-            new Request(`http://localhost/api/architecture/resource/${resourceID}/draft`, {
+            new Request(`http://localhost/api/architecture/resource/${resourceID}/instance`, {
               method: "PATCH",
               headers: { "content-type": "application/json", "x-opencode-directory": directory },
               body: JSON.stringify({
@@ -863,14 +863,14 @@ describe("HttpApi SDK", () => {
           ),
         )
         expect(patched.status).toBe(200)
-        const afterPatchResponse = yield* editorDraft()
+        const afterPatchResponse = yield* editorInstance()
         const afterPatch = record(yield* Effect.promise(() => afterPatchResponse.json()))
         expect(record(afterPatch.data).source).toBe("live")
 
         yield* llm.tool("graph_create_node", {
           resourceID,
           id: "shared-node",
-          text: "Visible in the editor draft",
+          text: "Visible in the editor instance",
           position: { x: 40, y: 80 },
         })
         yield* llm.text("Graph updated", { usage: { input: 1, output: 1 } })
@@ -890,7 +890,7 @@ describe("HttpApi SDK", () => {
         )
         expect(prompt.status).toBe(200)
 
-        const response = yield* editorDraft()
+        const response = yield* editorInstance()
         const body = record(yield* Effect.promise(() => response.json()))
         const data = record(body.data)
         const snapshot = record(data.snapshot)
@@ -898,7 +898,7 @@ describe("HttpApi SDK", () => {
         expect(response.status).toBe(200)
         expect(data.source).toBe("live")
         expect(array(live.nodes)).toContainEqual(
-          expect.objectContaining({ id: "shared-node", text: "Visible in the editor draft" }),
+          expect.objectContaining({ id: "shared-node", text: "Visible in the editor instance" }),
         )
 
         const saved = yield* Effect.promise(() =>
@@ -928,9 +928,9 @@ describe("HttpApi SDK", () => {
           layout: { position: { x: 12, y: 34 } },
         }
         const request = yield* serverFetch("raw")
-        const draftResponse = yield* Effect.promise(() =>
+        const instanceResponse = yield* Effect.promise(() =>
           request(
-            new Request(`http://localhost/api/architecture/resource/${resourceID}/draft`, {
+            new Request(`http://localhost/api/architecture/resource/${resourceID}/instance`, {
               method: "PATCH",
               headers: { "content-type": "application/json", "x-opencode-directory": directory },
               body: JSON.stringify({
@@ -961,7 +961,7 @@ describe("HttpApi SDK", () => {
             }),
           ),
         )
-        const draft = { status: draftResponse.status }
+        const instance = { status: instanceResponse.status }
         const duplicated = yield* capture(() =>
           sdk.v2.architecture.resource.duplicate({
             resourceID,
@@ -974,7 +974,7 @@ describe("HttpApi SDK", () => {
           Bun.file(path.join(directory, ".opencode", "architecture", "resources", `${resourceID}.json`)).json(),
         )
 
-        expect(statuses({ created, draft, duplicated })).toEqual({ created: 200, draft: 200, duplicated: 200 })
+        expect(statuses({ created, instance, duplicated })).toEqual({ created: 200, instance: 200, duplicated: 200 })
         expect(copyResource).toMatchObject({ id: "duplicate-copy", name: "Duplicate copy", revision: 0 })
         expect(record(copyResource.tagColors).planned).toBe("#4c82ff")
         expect(array(copyResource.nodes)).toContainEqual(baseNode)
@@ -992,11 +992,11 @@ describe("HttpApi SDK", () => {
   )
 
   httpapi(
-    "rejects changed and missing expected Graph drafts over HTTP",
+    "rejects changed and missing expected Graph instances over HTTP",
     withProject("raw", {}, ({ directory }) =>
       Effect.gen(function* () {
-        const resourceID = Architecture.ResourceID.make("draft-compare-commit")
-        const resource = ArchitecturePatch.empty({ id: resourceID, name: "Draft compare commit" })
+        const resourceID = Architecture.ResourceID.make("instance-compare-commit")
+        const resource = ArchitecturePatch.empty({ id: resourceID, name: "Instance compare commit" })
         yield* FSUtil.Service.use((fs) =>
           fs.writeWithDirs(
             path.join(directory, ".opencode", "architecture", "resources", `${resourceID}.json`),
@@ -1004,7 +1004,7 @@ describe("HttpApi SDK", () => {
           ),
         )
         const request = yield* serverFetch("raw")
-        const url = `http://localhost/api/architecture/resource/${resourceID}/draft`
+        const url = `http://localhost/api/architecture/resource/${resourceID}/instance`
         const headers = { "content-type": "application/json", "x-opencode-directory": directory }
         const initialResponse = yield* Effect.promise(() => request(new Request(url, { headers })))
         const initial = record(record(yield* Effect.promise(() => initialResponse.json())).data)
@@ -1020,11 +1020,11 @@ describe("HttpApi SDK", () => {
                 digest: initialSnapshot.digest,
                 operations: [
                   {
-                    id: "first-draft-operation",
+                    id: "first-instance-operation",
                     type: "node.create",
                     node: {
-                      id: "first-draft-node",
-                      text: "First draft node",
+                      id: "first-instance-node",
+                      text: "First instance node",
                       tags: [],
                       layout: { position: { x: 0, y: 0 } },
                     },
@@ -1047,11 +1047,11 @@ describe("HttpApi SDK", () => {
                 digest: firstSnapshot.digest,
                 operations: [
                   {
-                    id: "second-draft-operation",
+                    id: "second-instance-operation",
                     type: "node.create",
                     node: {
-                      id: "second-draft-node",
-                      text: "Second draft node",
+                      id: "second-instance-node",
+                      text: "Second instance node",
                       tags: [],
                       layout: { position: { x: 20, y: 20 } },
                     },
@@ -1079,8 +1079,8 @@ describe("HttpApi SDK", () => {
         expect(changedResponse.status).toBe(409)
         expect(changed).toMatchObject({
           error: "GraphConflictError",
-          operation: "graph_draft_commit",
-          conflictKind: "draft_changed",
+          operation: "graph_instance_commit",
+          conflictKind: "instance_changed",
         })
 
         const discardResponse = yield* Effect.promise(() =>
@@ -1101,8 +1101,8 @@ describe("HttpApi SDK", () => {
         expect(missingResponse.status).toBe(409)
         expect(missing).toMatchObject({
           error: "GraphConflictError",
-          operation: "graph_draft_commit",
-          conflictKind: "draft_missing",
+          operation: "graph_instance_commit",
+          conflictKind: "instance_missing",
         })
       }),
     ),

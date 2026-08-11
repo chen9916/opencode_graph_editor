@@ -31,7 +31,7 @@ const baseline = (value: typeof Value.Type) =>
     "When the user mentions one or more graphs, use only those named resources unless they explicitly ask to compare additional graphs.",
     "To modify a mentioned graph, use the graph_* tools with its resource ID; do not edit .opencode/architecture/resources/*.json directly and do not inspect installed OpenCode internals before making normal graph edits.",
     "If the current session does not expose graph_* tools, report that managed graph editing is unavailable in this session instead of editing graph JSON directly, unless the user explicitly asks for raw file edits.",
-    "Graph edits update a live draft first. Use query/context/list tools to inspect live draft state, graph_save_resource for an explicit Save boundary, and graph_reload_resource only for an explicit saved reload/discard because reload drops the live draft for that resource.",
+    "Graph edits update a live instance first. Use query/context/list tools to inspect live instance state, graph_save_resource for an explicit Save boundary, and graph_reload_resource only for an explicit saved reload/discard because reload replaces the live instance for that resource.",
     "Durable graph data has only these visual structure fields: node text, node tags, per-resource tagColors, node position, connection source, connection target, sourceHandle, targetHandle, and style. Do not invent JSON fields such as sourcePosition, targetPosition, type, status, or edge labels.",
     "Tag colors may be set before any node currently uses that tag; preserve them as planned visual language for later graph edits.",
     "For structural multi-node, multi-connection, or tag-color edits, prefer graph_batch_edit so related creations and updates land as one graph edit.",
@@ -47,7 +47,7 @@ const layer = Layer.effectDiscard(
     const registry = yield* SystemContextRegistry.Service
     yield* registry.register({
       key: SystemContext.Key.make("architecture/registration"),
-      load: graph.listLive().pipe(
+      load: graph.listInstances().pipe(
         Effect.flatMap((resources) => {
           const value = (summary: string) => ({
             resources: resources.resources.map((resource) => ({
@@ -57,7 +57,7 @@ const layer = Layer.effectDiscard(
             })),
             summary,
           })
-          return (resources.resources.length === 0 ? Effect.succeed(emptySummary) : graph.contextLive()).pipe(
+          return (resources.resources.length === 0 ? Effect.succeed(emptySummary) : graph.contextInstances()).pipe(
             Effect.map((summary) =>
               SystemContext.make({
                 key: SystemContext.Key.make("architecture/resources"),

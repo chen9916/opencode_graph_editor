@@ -36,7 +36,7 @@ export type ArchitectureConflictError = {
   readonly currentRevision?: number | undefined
   readonly currentDigest?: string | undefined
   readonly safeToRetry?: boolean | "unknown" | "partial" | undefined
-  readonly conflictKind?: "draft_changed" | "draft_missing" | undefined
+  readonly conflictKind?: "instance_changed" | "instance_missing" | undefined
   readonly retryHint?: string | undefined
 }
 export const isArchitectureConflictError = (value: unknown): value is ArchitectureConflictError =>
@@ -335,14 +335,14 @@ export type ArchitectureDuplicateResourceOutput = {
   }
 }
 
-export type ArchitectureGetDraftInput = {
+export type ArchitectureGetInstanceInput = {
   readonly resourceID: { readonly resourceID: string }["resourceID"]
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
   }["location"]
 }
 
-export type ArchitectureGetDraftOutput = {
+export type ArchitectureGetInstanceOutput = {
   readonly location: {
     readonly directory: string
     readonly workspaceID?: string
@@ -378,7 +378,7 @@ export type ArchitectureGetDraftOutput = {
   }
 }
 
-export type ArchitecturePatchDraftInput = {
+export type ArchitecturePatchInstanceInput = {
   readonly resourceID: { readonly resourceID: string }["resourceID"]
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
@@ -592,7 +592,7 @@ export type ArchitecturePatchDraftInput = {
   }["operations"]
 }
 
-export type ArchitecturePatchDraftOutput = {
+export type ArchitecturePatchInstanceOutput = {
   readonly location: {
     readonly directory: string
     readonly workspaceID?: string
@@ -628,7 +628,7 @@ export type ArchitecturePatchDraftOutput = {
   }
 }
 
-export type ArchitectureCommitDraftInput = {
+export type ArchitectureCommitInstanceInput = {
   readonly resourceID: { readonly resourceID: string }["resourceID"]
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
@@ -637,7 +637,7 @@ export type ArchitectureCommitDraftInput = {
   readonly digest: { readonly revision: number; readonly digest: string }["digest"]
 }
 
-export type ArchitectureCommitDraftOutput = {
+export type ArchitectureCommitInstanceOutput = {
   readonly location: {
     readonly directory: string
     readonly workspaceID?: string
@@ -670,14 +670,14 @@ export type ArchitectureCommitDraftOutput = {
   }
 }
 
-export type ArchitectureDiscardDraftInput = {
+export type ArchitectureDiscardInstanceInput = {
   readonly resourceID: { readonly resourceID: string }["resourceID"]
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
   }["location"]
 }
 
-export type ArchitectureDiscardDraftOutput = {
+export type ArchitectureDiscardInstanceOutput = {
   readonly location: {
     readonly directory: string
     readonly workspaceID?: string
@@ -713,14 +713,14 @@ export type ArchitectureDiscardDraftOutput = {
   }
 }
 
-export type ArchitectureReloadSavedInput = {
+export type ArchitectureReloadInstanceInput = {
   readonly resourceID: { readonly resourceID: string }["resourceID"]
   readonly location?: {
     readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
   }["location"]
 }
 
-export type ArchitectureReloadSavedOutput = {
+export type ArchitectureReloadInstanceOutput = {
   readonly location: {
     readonly directory: string
     readonly workspaceID?: string

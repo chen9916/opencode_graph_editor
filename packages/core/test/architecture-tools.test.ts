@@ -359,7 +359,7 @@ describe("ArchitectureTools", () => {
         ],
       })
 
-      const reloaded = yield* graph.loadLive(layoutResourceID)
+      const reloaded = yield* graph.loadInstance(layoutResourceID)
       expect(reloaded.source).toBe("live")
       expect(reloaded.snapshot.resource.nodes.map((node) => ({ id: node.id, position: node.layout.position }))).toEqual([
         { id: Architecture.NodeID.make("a"), position: { x: 0, y: 0 } },
@@ -441,7 +441,7 @@ describe("ArchitectureTools", () => {
         updatedTagColors: ["interaction", "implemented"],
       })
 
-      const reloaded = yield* graph.loadLive(resourceID)
+      const reloaded = yield* graph.loadInstance(resourceID)
       expect(reloaded).toMatchObject({
         source: "live",
         snapshot: { resource: {
@@ -470,7 +470,7 @@ describe("ArchitectureTools", () => {
     }),
   )
 
-  it.effect("saves live drafts and no-ops when already saved", () =>
+  it.effect("saves live instances and no-ops when already saved", () =>
     Effect.gen(function* () {
       assertions.length = 0
       deny = false
@@ -497,18 +497,18 @@ describe("ArchitectureTools", () => {
         registry,
         call(ArchitectureTools.names.createNode, {
           resourceID: saveResourceID,
-          id: "draft-node",
-          text: "Draft node",
+          id: "instance-node",
+          text: "Instance node",
         }),
       )
-      const draft = yield* graph.loadLive(saveResourceID)
-      expect(draft.source).toBe("live")
+      const instance = yield* graph.loadInstance(saveResourceID)
+      expect(instance.source).toBe("live")
 
       const saved = yield* settleTool(
         registry,
         call(ArchitectureTools.names.saveResource, {
           resourceID: saveResourceID,
-          expectedDigest: draft.snapshot.digest,
+          expectedDigest: instance.snapshot.digest,
         }),
       )
       expect(saved.output?.structured).toMatchObject({
@@ -516,8 +516,8 @@ describe("ArchitectureTools", () => {
         source: "saved",
         saved: true,
       })
-      expect((yield* graph.loadLive(saveResourceID)).source).toBe("saved")
-      expect((yield* graph.load(saveResourceID)).resource.nodes).toMatchObject([{ id: "draft-node", text: "Draft node" }])
+      expect((yield* graph.loadInstance(saveResourceID)).source).toBe("saved")
+      expect((yield* graph.load(saveResourceID)).resource.nodes).toMatchObject([{ id: "instance-node", text: "Instance node" }])
     }),
   )
 

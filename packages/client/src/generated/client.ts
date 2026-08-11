@@ -12,16 +12,16 @@ import type {
   ArchitectureGetResourceOutput,
   ArchitectureDuplicateResourceInput,
   ArchitectureDuplicateResourceOutput,
-  ArchitectureGetDraftInput,
-  ArchitectureGetDraftOutput,
-  ArchitecturePatchDraftInput,
-  ArchitecturePatchDraftOutput,
-  ArchitectureCommitDraftInput,
-  ArchitectureCommitDraftOutput,
-  ArchitectureDiscardDraftInput,
-  ArchitectureDiscardDraftOutput,
-  ArchitectureReloadSavedInput,
-  ArchitectureReloadSavedOutput,
+  ArchitectureGetInstanceInput,
+  ArchitectureGetInstanceOutput,
+  ArchitecturePatchInstanceInput,
+  ArchitecturePatchInstanceOutput,
+  ArchitectureCommitInstanceInput,
+  ArchitectureCommitInstanceOutput,
+  ArchitectureDiscardInstanceInput,
+  ArchitectureDiscardInstanceOutput,
+  ArchitectureReloadInstanceInput,
+  ArchitectureReloadInstanceOutput,
   ArchitectureRemoveResourceInput,
   ArchitectureRemoveResourceOutput,
   ArchitectureResetResourceInput,
@@ -355,11 +355,11 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      getDraft: (input: ArchitectureGetDraftInput, requestOptions?: RequestOptions) =>
-        request<ArchitectureGetDraftOutput>(
+      getInstance: (input: ArchitectureGetInstanceInput, requestOptions?: RequestOptions) =>
+        request<ArchitectureGetInstanceOutput>(
           {
             method: "GET",
-            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/draft`,
+            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/instance`,
             query: { location: input["location"] },
             successStatus: 200,
             declaredStatuses: [409, 422, 404, 503, 401, 400],
@@ -367,11 +367,11 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      patchDraft: (input: ArchitecturePatchDraftInput, requestOptions?: RequestOptions) =>
-        request<ArchitecturePatchDraftOutput>(
+      patchInstance: (input: ArchitecturePatchInstanceInput, requestOptions?: RequestOptions) =>
+        request<ArchitecturePatchInstanceOutput>(
           {
             method: "PATCH",
-            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/draft`,
+            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/instance`,
             query: { location: input["location"] },
             body: { revision: input["revision"], digest: input["digest"], operations: input["operations"] },
             successStatus: 200,
@@ -380,11 +380,11 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      commitDraft: (input: ArchitectureCommitDraftInput, requestOptions?: RequestOptions) =>
-        request<ArchitectureCommitDraftOutput>(
+      commitInstance: (input: ArchitectureCommitInstanceInput, requestOptions?: RequestOptions) =>
+        request<ArchitectureCommitInstanceOutput>(
           {
             method: "POST",
-            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/draft/commit`,
+            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/instance/commit`,
             query: { location: input["location"] },
             body: { revision: input["revision"], digest: input["digest"] },
             successStatus: 200,
@@ -393,11 +393,11 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      discardDraft: (input: ArchitectureDiscardDraftInput, requestOptions?: RequestOptions) =>
-        request<ArchitectureDiscardDraftOutput>(
+      discardInstance: (input: ArchitectureDiscardInstanceInput, requestOptions?: RequestOptions) =>
+        request<ArchitectureDiscardInstanceOutput>(
           {
             method: "POST",
-            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/draft/discard`,
+            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/instance/discard`,
             query: { location: input["location"] },
             successStatus: 200,
             declaredStatuses: [409, 422, 404, 503, 401, 400],
@@ -405,11 +405,11 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
-      reloadSaved: (input: ArchitectureReloadSavedInput, requestOptions?: RequestOptions) =>
-        request<ArchitectureReloadSavedOutput>(
+      reloadInstance: (input: ArchitectureReloadInstanceInput, requestOptions?: RequestOptions) =>
+        request<ArchitectureReloadInstanceOutput>(
           {
             method: "POST",
-            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/draft/reload`,
+            path: `/api/architecture/resource/${encodeURIComponent(input.resourceID)}/instance/reload`,
             query: { location: input["location"] },
             successStatus: 200,
             declaredStatuses: [409, 422, 404, 503, 401, 400],

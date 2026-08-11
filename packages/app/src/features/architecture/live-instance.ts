@@ -1,30 +1,30 @@
 import type {
-  ArchitectureDraftSnapshot,
-  ArchitectureLiveDraft,
-  ArchitectureLiveDraftCache,
+  ArchitectureInstanceSnapshot,
+  ArchitectureLiveInstance,
+  ArchitectureLiveInstanceCache,
   ArchitectureOperation,
   ArchitectureResource,
   ArchitectureSnapshot,
 } from "./contract"
 import { applyOperations, operationID, rebaseOperations } from "./journal"
 
-export class ArchitectureDraftSynchronizationCancelled extends Error {
-  readonly _tag = "ArchitectureDraftSynchronizationCancelled"
+export class ArchitectureInstanceSynchronizationCancelled extends Error {
+  readonly _tag = "ArchitectureInstanceSynchronizationCancelled"
 
   constructor() {
-    super("Architecture draft synchronization was invalidated")
-    this.name = "ArchitectureDraftSynchronizationCancelled"
+    super("Architecture instance synchronization was invalidated")
+    this.name = "ArchitectureInstanceSynchronizationCancelled"
   }
 }
 
-export function architectureLiveDraftCache(draft: ArchitectureDraftSnapshot): ArchitectureLiveDraftCache {
-  if (draft.source === "live") return { ...draft, source: "live" }
+export function architectureLiveInstanceCache(instance: ArchitectureInstanceSnapshot): ArchitectureLiveInstanceCache {
+  if (instance.source === "live") return { ...instance, source: "live" }
   return null
 }
 
-export function latestArchitectureLiveDraftCache(
-  current: ArchitectureLiveDraftCache | undefined,
-  candidate: ArchitectureLiveDraftCache,
+export function latestArchitectureLiveInstanceCache(
+  current: ArchitectureLiveInstanceCache | undefined,
+  candidate: ArchitectureLiveInstanceCache,
 ) {
   if (!candidate) return current ?? candidate
   if (current?.snapshot.resource.id !== candidate.snapshot.resource.id) return candidate
@@ -33,8 +33,21 @@ export function latestArchitectureLiveDraftCache(
   return candidate
 }
 
-export function discardSavedArchitectureLiveDraftCache(
-  current: ArchitectureLiveDraftCache | undefined,
+export function adoptArchitectureLiveInstanceCache(
+  current: ArchitectureLiveInstanceCache | undefined,
+  candidate: ArchitectureLiveInstanceCache,
+) {
+  if (!candidate) return candidate
+  if (
+    current?.snapshot.resource.id === candidate.snapshot.resource.id &&
+    current.snapshot.resource.revision > candidate.snapshot.resource.revision
+  )
+    return current
+  return candidate
+}
+
+export function discardSavedArchitectureLiveInstanceCache(
+  current: ArchitectureLiveInstanceCache | undefined,
   saved: ArchitectureSnapshot,
 ) {
   if (!current) return null
@@ -49,7 +62,7 @@ export function sameArchitectureResource(left: ArchitectureResource, right: Arch
   return canonical(left) === canonical(right)
 }
 
-export function rebaseArchitectureDraft(
+export function rebaseArchitecturePendingOverlay(
   origin: ArchitectureResource,
   operations: ReadonlyArray<ArchitectureOperation>,
   live: ArchitectureResource,
@@ -71,7 +84,7 @@ export function rebaseArchitectureDraft(
   }
 }
 
-export function reconcileArchitectureDraft(current: ArchitectureResource, target: ArchitectureResource) {
+export function reconcileArchitectureInstanceChange(current: ArchitectureResource, target: ArchitectureResource) {
   const removedNodeIDs = new Set(
     current.nodes.filter((node) => !target.nodes.some((candidate) => candidate.id === node.id)).map((node) => node.id),
   )
@@ -108,13 +121,13 @@ export function reconcileArchitectureDraft(current: ArchitectureResource, target
   ]
 }
 
-export function createArchitectureDraftSynchronizer(input: {
+export function createArchitectureInstanceSynchronizer(input: {
   readonly patch: (
     base: ArchitectureSnapshot,
     operations: ReadonlyArray<ArchitectureOperation>,
-  ) => Promise<ArchitectureLiveDraftCache>
-  readonly update: (draft: ArchitectureLiveDraftCache) => void
-  readonly adopt?: (draft: ArchitectureLiveDraftCache) => void
+  ) => Promise<ArchitectureLiveInstanceCache>
+  readonly update: (instance: ArchitectureLiveInstanceCache) => void
+  readonly adopt?: (instance: ArchitectureLiveInstanceCache) => void
 }) {
   let generation = 0
   let latest: ArchitectureSnapshot | undefined
@@ -134,13 +147,13 @@ export function createArchitectureDraftSynchronizer(input: {
     const task = tail.then(async () => {
       if (admitted !== generation) return
       const current = latest?.resource.id === target.id ? latest : base
-      const operations = reconcileArchitectureDraft(current.resource, target)
+      const operations = reconcileArchitectureInstanceChange(current.resource, target)
       if (operations.length === 0) {
         latest = current
         return
       }
       const updated = await patch(current, operations)
-      if (!updated) throw new Error("Architecture draft patch did not return a live draft")
+      if (!updated) throw new Error("Architecture instance patch did not return a live instance")
       if (admitted !== generation) return
       latest = updated.snapshot
       input.update(updated)
@@ -150,24 +163,24 @@ export function createArchitectureDraftSynchronizer(input: {
   }
 
   const synchronizeAuthoritative = (
-    observe: () => Promise<ArchitectureDraftSnapshot>,
-    target: ArchitectureResource | ((observed: ArchitectureDraftSnapshot) => ArchitectureResource),
+    observe: () => Promise<ArchitectureInstanceSnapshot>,
+    target: ArchitectureResource | ((observed: ArchitectureInstanceSnapshot) => ArchitectureResource),
   ) => {
     const admitted = generation
     const task = tail.then(async () => {
-      if (admitted !== generation) throw new ArchitectureDraftSynchronizationCancelled()
+      if (admitted !== generation) throw new ArchitectureInstanceSynchronizationCancelled()
       const observed = await observe()
-      if (admitted !== generation) throw new ArchitectureDraftSynchronizationCancelled()
+      if (admitted !== generation) throw new ArchitectureInstanceSynchronizationCancelled()
       latest = observed.snapshot
       const desired = typeof target === "function" ? target(observed) : target
-      const operations = reconcileArchitectureDraft(observed.snapshot.resource, desired)
+      const operations = reconcileArchitectureInstanceChange(observed.snapshot.resource, desired)
       if (operations.length === 0 && observed.source === "live") {
         latest = observed.snapshot
         return observed.snapshot
       }
       const updated = await patch(observed.snapshot, operations)
-      if (!updated) throw new Error("Architecture draft patch did not return a live draft")
-      if (admitted !== generation) throw new ArchitectureDraftSynchronizationCancelled()
+      if (!updated) throw new Error("Architecture instance patch did not return a live instance")
+      if (admitted !== generation) throw new ArchitectureInstanceSynchronizationCancelled()
       latest = updated.snapshot
       updateAuthoritative(updated)
       return updated.snapshot
@@ -176,28 +189,28 @@ export function createArchitectureDraftSynchronizer(input: {
     return task
   }
 
-  const adopt = (draft: ArchitectureLiveDraftCache) => {
+  const adopt = (instance: ArchitectureLiveInstanceCache) => {
     const admitted = generation
     const task = tail.then(() => {
-      if (admitted !== generation) throw new ArchitectureDraftSynchronizationCancelled()
-      latest = draft?.snapshot
-      updateAuthoritative(draft)
-      return draft
+      if (admitted !== generation) throw new ArchitectureInstanceSynchronizationCancelled()
+      latest = instance?.snapshot
+      updateAuthoritative(instance)
+      return instance
     })
     tail = task.catch(() => undefined)
     return task
   }
 
-  const adoptSnapshot = (observe: () => Promise<ArchitectureDraftSnapshot>) => {
+  const adoptSnapshot = (observe: () => Promise<ArchitectureInstanceSnapshot>) => {
     const admitted = generation
     const task = tail.then(async () => {
-      if (admitted !== generation) throw new ArchitectureDraftSynchronizationCancelled()
+      if (admitted !== generation) throw new ArchitectureInstanceSynchronizationCancelled()
       const observed = await observe()
-      if (admitted !== generation) throw new ArchitectureDraftSynchronizationCancelled()
+      if (admitted !== generation) throw new ArchitectureInstanceSynchronizationCancelled()
       latest = observed.snapshot
-      const draft = architectureLiveDraftCache(observed)
-      updateAuthoritative(draft)
-      return draft
+      const instance = architectureLiveInstanceCache(observed)
+      updateAuthoritative(instance)
+      return instance
     })
     tail = task.catch(() => undefined)
     return task
@@ -210,7 +223,7 @@ export function createArchitectureDraftSynchronizer(input: {
     await tail
   }
 
-  const updateAuthoritative = (draft: ArchitectureLiveDraftCache) => (input.adopt ?? input.update)(draft)
+  const updateAuthoritative = (instance: ArchitectureLiveInstanceCache) => (input.adopt ?? input.update)(instance)
 
   return { synchronize, synchronizeAuthoritative, adopt, adoptSnapshot, invalidate }
 }

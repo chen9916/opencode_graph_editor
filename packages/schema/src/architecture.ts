@@ -109,22 +109,22 @@ export const ResourceSnapshot = Schema.Struct({
   storage: Storage,
 }).annotate({ identifier: "Architecture.ResourceSnapshot" })
 
-export const DraftSource = Schema.Literals(["live", "saved"]).annotate({
-  identifier: "Architecture.DraftSource",
+export const LiveInstanceSource = Schema.Literals(["live", "saved"]).annotate({
+  identifier: "Architecture.LiveInstanceSource",
 })
-export type DraftSource = typeof DraftSource.Type
+export type LiveInstanceSource = typeof LiveInstanceSource.Type
 
-export interface DraftSnapshot extends Schema.Schema.Type<typeof DraftSnapshot> {}
-export const DraftSnapshot = Schema.Struct({
+export interface LiveInstanceSnapshot extends Schema.Schema.Type<typeof LiveInstanceSnapshot> {}
+export const LiveInstanceSnapshot = Schema.Struct({
   snapshot: ResourceSnapshot,
-  source: DraftSource,
-}).annotate({ identifier: "Architecture.DraftSnapshot" })
+  source: LiveInstanceSource,
+}).annotate({ identifier: "Architecture.LiveInstanceSnapshot" })
 
-export interface DraftCommitInput extends Schema.Schema.Type<typeof DraftCommitInput> {}
-export const DraftCommitInput = Schema.Struct({
+export interface LiveInstanceCommitInput extends Schema.Schema.Type<typeof LiveInstanceCommitInput> {}
+export const LiveInstanceCommitInput = Schema.Struct({
   revision: NonNegativeInt,
   digest: Schema.String,
-}).annotate({ identifier: "Architecture.DraftCommitInput" })
+}).annotate({ identifier: "Architecture.LiveInstanceCommitInput" })
 
 export interface ResourceCreateInput extends Schema.Schema.Type<typeof ResourceCreateInput> {}
 export const ResourceCreateInput = Schema.Struct({
@@ -281,8 +281,8 @@ const ResourceRemoved = define({
   schema: { resourceID: ResourceID },
 })
 
-const ResourceDraftUpdated = define({
-  type: "architecture.resource.draft.updated",
+const ResourceInstanceUpdated = define({
+  type: "architecture.resource.instance.updated",
   schema: {
     resourceID: ResourceID,
     revision: NonNegativeInt,
@@ -292,8 +292,8 @@ const ResourceDraftUpdated = define({
   },
 })
 
-const ResourceDraftDiscarded = define({
-  type: "architecture.resource.draft.discarded",
+const ResourceInstanceDiscarded = define({
+  type: "architecture.resource.instance.discarded",
   schema: {
     resourceID: ResourceID,
     revision: NonNegativeInt.pipe(optional),
@@ -304,7 +304,7 @@ const ResourceDraftDiscarded = define({
 export const Event = {
   ResourceUpdated,
   ResourceRemoved,
-  ResourceDraftUpdated,
-  ResourceDraftDiscarded,
-  Definitions: inventory(ResourceUpdated, ResourceRemoved, ResourceDraftUpdated, ResourceDraftDiscarded),
+  ResourceInstanceUpdated,
+  ResourceInstanceDiscarded,
+  Definitions: inventory(ResourceUpdated, ResourceRemoved, ResourceInstanceUpdated, ResourceInstanceDiscarded),
 }
