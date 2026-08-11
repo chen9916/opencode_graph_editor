@@ -213,6 +213,28 @@ describe("createSessionTabs", () => {
     })
   })
 
+  test("ignores a persisted Review tab until project review is available", () => {
+    createRoot((dispose) => {
+      const [state] = createStore({
+        active: "review" as string | undefined,
+        all: [],
+      })
+      const tabs = createMemo(() => ({ active: () => state.active, all: () => state.all }))
+      const result = createSessionTabs({
+        tabs,
+        pathFromTab: () => undefined,
+        normalizeTab: (tab) => tab,
+        architecture: () => true,
+        review: () => true,
+        hasReview: () => false,
+        fallback: () => SESSION_ARCHITECTURE_TAB,
+      })
+
+      expect(result.activeTab()).toBe(SESSION_ARCHITECTURE_TAB)
+      dispose()
+    })
+  })
+
   test("exposes the Open File tab without treating it as a file tab", () => {
     createRoot((dispose) => {
       const [state] = createStore({

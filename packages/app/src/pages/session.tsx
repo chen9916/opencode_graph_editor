@@ -519,10 +519,13 @@ export default function Page() {
   })
   const activeTab = tabState.activeTab
   const activeFileTab = tabState.activeFileTab
-  const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
+  const desktopPanelTabOpen = createMemo(() => isDesktop() && activeTab() !== "empty")
+  const desktopReviewOpen = createMemo(() => isDesktop() && (view().reviewPanel.opened() || activeTab() === "review"))
   const desktopArchitectureOpen = createMemo(() => isDesktop() && activeTab() === SESSION_ARCHITECTURE_TAB)
-  const desktopDetailOpen = createMemo(() => desktopReviewOpen() || desktopArchitectureOpen())
-  const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen())
+  const desktopDetailOpen = createMemo(() => desktopPanelTabOpen())
+  const desktopV2ReviewOpen = createMemo(
+    () => newSessionDesign() && desktopPanelTabOpen() && !desktopArchitectureOpen(),
+  )
   const terminalOpen = createMemo(() => view().terminal.opened())
   const desktopTerminalOpen = createMemo(() => isDesktop() && terminalOpen())
   const desktopInlineTerminalOnlyOpen = createMemo(
@@ -537,7 +540,7 @@ export default function Page() {
       }),
   )
   const desktopSessionResizeOpen = createMemo(() =>
-    newSessionDesign() ? desktopV2ReviewOpen() || desktopArchitectureOpen() || desktopTerminalOpen() : desktopDetailOpen(),
+    newSessionDesign() ? desktopDetailOpen() || desktopTerminalOpen() : desktopDetailOpen(),
   )
   const desktopSidePanelOpen = createMemo(() => desktopSessionResizeOpen() || desktopFileTreeOpen())
   const splitReview = createMemo(
@@ -572,7 +575,7 @@ export default function Page() {
   const centered = createMemo(() => isDesktop() && (newSessionDesign() || !desktopDetailOpen()))
   const desktopV2PanelLayout = createMemo(() =>
     sessionPanelLayout({
-      review: desktopV2ReviewOpen() || desktopArchitectureOpen(),
+      review: desktopDetailOpen(),
       terminal: desktopTerminalOpen(),
       files: desktopFileTreeOpen(),
     }),
@@ -703,7 +706,7 @@ export default function Page() {
   const wantsReview = createMemo(() =>
     isDesktop()
       ? desktopFileTreeOpen() ||
-        (desktopReviewOpen() && (activeTab() === "review" || (newSessionDesign() && !!activeFileTab())))
+        (desktopDetailOpen() && (activeTab() === "review" || (newSessionDesign() && !!activeFileTab())))
       : store.mobileTab === "changes",
   )
   const vcsMode = createMemo<VcsMode | undefined>(() => {
@@ -2389,7 +2392,7 @@ export default function Page() {
         <Show when={newSessionDesign()}>
           <Show when={isDesktop() ? desktopV2PanelLayout().visible : terminalOpen()}>
             <div class="min-w-0 h-full flex flex-1 flex-col">
-              <Show when={isDesktop() && (desktopV2ReviewOpen() || desktopArchitectureOpen() || desktopFileTreeOpen())}>
+              <Show when={isDesktop() && (desktopDetailOpen() || desktopFileTreeOpen())}>
                 <div class="min-h-0 flex-1">
                   <Suspense>
                     <SessionSidePanel

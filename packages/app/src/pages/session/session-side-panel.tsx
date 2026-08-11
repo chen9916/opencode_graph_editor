@@ -101,7 +101,6 @@ export function SessionSidePanel(props: {
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const shown = settings.visibility.fileTree
 
-  const reviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
   const fileOpen = createMemo(
     () =>
       isDesktop() &&
@@ -191,7 +190,7 @@ export function SessionSidePanel(props: {
   const activeTab = tabState.activeTab
   const activeFileTab = tabState.activeFileTab
   const architectureOpen = createMemo(() => architectureTab() && activeTab() === SESSION_ARCHITECTURE_TAB)
-  const detailOpen = createMemo(() => reviewOpen() || architectureOpen())
+  const detailOpen = createMemo(() => isDesktop() && activeTab() !== "empty")
   const open = createMemo(() => detailOpen() || fileOpen())
   const panelWidth = createMemo(() => {
     if (!open()) return "0px"

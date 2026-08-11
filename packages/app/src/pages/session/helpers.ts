@@ -69,7 +69,7 @@ export const createSessionTabs = (input: TabsInput) => {
     if (active === "context") return active
     if (active === SESSION_ARCHITECTURE_TAB && architecture()) return active
     if (active === SESSION_OPEN_FILE_TAB && openFileOpen()) return active
-    if (active === "review" && review()) return active
+    if (active === "review" && review() && hasReview()) return active
     if (active && input.pathFromTab(active)) return input.normalizeTab(active)
 
     const first = openedTabs()[0]
