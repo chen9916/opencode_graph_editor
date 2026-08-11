@@ -69,12 +69,17 @@ describe("architecture live instance", () => {
     expect(latestArchitectureLiveInstanceCache(newer, stale)).toBe(newer)
   })
 
-  test("keeps the visible live instance over a late null or same-revision response", () => {
+  test("keeps the visible live instance over a late same-revision response", () => {
     const current = live(resource("current"), "current")
     const stale = live(resource("stale"), "stale")
 
-    expect(latestArchitectureLiveInstanceCache(current, null)).toBe(current)
     expect(latestArchitectureLiveInstanceCache(current, stale)).toBe(current)
+  })
+
+  test("clears the live cache when the backend explicitly discards the instance", () => {
+    const current = live(resource("current"), "current")
+
+    expect(latestArchitectureLiveInstanceCache(current, null)).toBeNull()
   })
 
   test("adopts authoritative live instance updates for the same saved revision", () => {
@@ -101,7 +106,7 @@ describe("architecture live instance", () => {
     const aiInstance = live({ ...resource("AI"), revision: 2 }, "ai-instance")
 
     expect(discardSavedArchitectureLiveInstanceCache(aiInstance, saved)).toBe(aiInstance)
-    expect(latestArchitectureLiveInstanceCache(aiInstance, null)).toBe(aiInstance)
+    expect(latestArchitectureLiveInstanceCache(aiInstance, null)).toBeNull()
   })
 
   test("reconciles two cumulative edits as incremental patches", async () => {

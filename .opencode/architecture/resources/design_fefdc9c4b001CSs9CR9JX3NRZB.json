@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "revision": 11,
+  "revision": 20,
   "id": "design_fefdc9c4b001CSs9CR9JX3NRZB",
   "name": "Graph 1",
   "tagColors": {
@@ -14,586 +14,370 @@
     "core": "#b91c1c",
     "current-system": "#111827",
     "custom-build": "#f97316",
+    "data": "#0d9488",
     "editor": "#16a34a",
     "entrypoint": "#f59e0b",
     "event": "#eab308",
     "fix-plan": "#22c55e",
     "guardrail": "#6b7280",
     "implemented": "#10b981",
+    "indicator": "#eab308",
     "live-instance": "#06b6d4",
     "local": "#22c55e",
     "model": "#64748b",
     "reload": "#f97316",
+    "responsibility": "#6366f1",
+    "saved": "#92400e",
     "schema": "#9333ea",
     "server": "#dc2626",
     "state": "#0d9488",
     "storage": "#92400e",
     "sync": "#14b8a6",
     "test": "#0ea5e9",
-    "tools": "#0284c7"
+    "tools": "#0284c7",
+    "visible": "#0ea5e9"
   },
   "nodes": [
     {
-      "id": "node_bug_base_identity_cause",
-      "text": "Resolved reload cause: stale local layer identity\nThe previous editor reset depended on saved snapshot/base identity. Same-resource Reload now bumps the live instance version so React rebuilds immediately.",
-      "tags": [
-        "bug",
-        "implemented",
-        "reload",
-        "state"
-      ],
-      "layout": {
-        "position": {
-          "x": -230,
-          "y": 830
-        }
-      }
-    },
-    {
-      "id": "node_bug_editor_reset_effect",
-      "text": "Implemented reset effect\n`ArchitectureEditor` rebuilds internal React Flow state from `architectureEditorLiveInstanceKey(saved identity + liveInstanceVersion)`, not only from base object identity.",
-      "tags": [
-        "code",
-        "editor",
-        "implemented"
-      ],
-      "layout": {
-        "position": {
-          "x": 70,
-          "y": 830
-        }
-      }
-    },
-    {
-      "id": "node_bug_fix_editor_dep",
-      "text": "Implemented editor fix\n`liveInstanceVersion` is passed through `ArchitecturePanelProps` and included in the reset key, so Reload/Save replaces the visible graph instance even for the same resource.",
-      "tags": [
-        "code",
-        "editor",
-        "implemented"
-      ],
-      "layout": {
-        "position": {
-          "x": 971.1040895025028,
-          "y": 826.6877314924918
-        }
-      }
-    },
-    {
-      "id": "node_bug_fix_guardrail",
-      "text": "Architecture guardrail\nNo page refresh, graph switching, raw JSON reads, or file watcher hacks. UI and AI converge on the backend live graph instance; Save remains the disk boundary.",
-      "tags": [
-        "guardrail",
-        "implemented",
-        "live-instance"
-      ],
-      "layout": {
-        "position": {
-          "x": 670,
-          "y": 1060
-        }
-      }
-    },
-    {
-      "id": "node_bug_fix_reset_token",
-      "text": "Implemented: liveInstanceVersion\nSame-resource reset signal increments after successful Save or Reload so the editor projection replaces its current instance source.",
-      "tags": [
-        "implemented",
-        "live-instance",
-        "reload",
-        "sync"
-      ],
-      "layout": {
-        "position": {
-          "x": 670,
-          "y": 830
-        }
-      }
-    },
-    {
-      "id": "node_bug_fix_tests",
-      "text": "Tests\nFocused tests cover same-resource Reload reset, Save/Reload instance version bumps, AI live-instance event adoption, pending-overlay clearing, and undo after backend ack.",
-      "tags": [
-        "implemented",
-        "test"
-      ],
-      "layout": {
-        "position": {
-          "x": 1270,
-          "y": 830
-        }
-      }
-    },
-    {
-      "id": "node_bug_reload_panel_path",
-      "text": "Reload path: ArchitecturePanel\n`reloadResource()` invalidates synchronization, calls `reloadArchitectureResourceInstance()`, sets saved snapshot cache, clears live instance cache, clears pending overlay, and bumps `liveInstanceVersion`.",
-      "tags": [
-        "code",
-        "implemented",
-        "reload",
-        "sync"
-      ],
-      "layout": {
-        "position": {
-          "x": -550,
-          "y": 830
-        }
-      }
-    },
-    {
-      "id": "node_bug_reload_stale_ui",
-      "text": "Bug: Reload does not refresh canvas\nAfter Reload, the Graph UI can keep showing stale local edits until you switch to another graph and back.",
-      "tags": [
-        "bug",
-        "current-system",
-        "reload"
-      ],
-      "layout": {
-        "position": {
-          "x": -870.0000000000002,
-          "y": 830
-        }
-      }
-    },
-    {
-      "id": "node_bug_switch_back_why",
-      "text": "Why switching graphs fixes it\nSwitching resource changes the resource/base identity, so the reset effect finally runs and rebuilds from the saved graph.",
-      "tags": [
-        "bug",
-        "editor",
-        "state"
-      ],
-      "layout": {
-        "position": {
-          "x": 371.21901364392625,
-          "y": 833.6570409317787
-        }
-      }
-    },
-    {
       "id": "node_current_backend_live_instance",
-      "text": "Backend live graph instance\nShared in-memory managed instance for the open resource. UI patches and AI graph_* edits meet here; instance events let the editor adopt/refetch changes before Save.",
+      "text": "Per-resource live instance\nIn-memory resource state keeps the saved base revision/digest. Editor and AI patches share it; instance-updated/discarded events let every view reconcile.",
       "tags": [
         "core",
         "current-system",
+        "data",
         "event",
         "live-instance",
         "state"
       ],
       "layout": {
         "position": {
-          "x": 1216.234895499401,
-          "y": 283.6071103939828
+          "x": 450,
+          "y": 310
         }
       }
     },
     {
       "id": "node_current_client_sdk",
-      "text": "Local Graph bridge\nUI and Graph tools call the local backend boundary. No external networking mental model, no Graph availability probe, and no raw JSON edits from the renderer.",
+      "text": "App API bridge\nThe panel calls the current server API through the shared Server SDK. Graph is always enabled in this local build; it does not use the protocol detector or a Graph capability probe.",
       "tags": [
         "app",
         "current-system",
         "local",
+        "responsibility",
         "sync"
       ],
       "layout": {
         "position": {
-          "x": 379.4836285982597,
-          "y": 400.359704614061
+          "x": 0,
+          "y": -390
         }
       }
     },
     {
       "id": "node_current_core_service",
-      "text": "Core architecture service\nApplies UI and AI graph patches to managed live instances, checks revisions/digests, validates operations, publishes instance/saved events, and commits Save to storage.",
+      "text": "Core graph service\nLocation-scoped service applies optimistic operations to live instances, locks resource storage, checks revisions/digests, publishes events, and commits an instance only at Save.",
       "tags": [
         "core",
         "current-system",
         "local",
+        "responsibility",
         "server"
       ],
       "layout": {
         "position": {
-          "x": 815.8080933171055,
-          "y": 21.611371024393804
+          "x": 450,
+          "y": -390
         }
       }
     },
     {
       "id": "node_current_editor_ux",
-      "text": "Editor UX controls\nOutline + Properties panels, filters, context menus, undo/redo, export, loading/error/empty states.",
+      "text": "Editor interaction surface\nOutline and Properties start closed; filters, context menus, inline editing, undo/redo, conflict display, export, resource actions, and loading/error/empty states are supported.",
       "tags": [
         "app",
         "current-system",
-        "editor"
+        "editor",
+        "responsibility",
+        "visible"
       ],
       "layout": {
         "position": {
-          "x": -775.9245990167188,
-          "y": 468.93778924763615
+          "x": 0,
+          "y": -720
         }
       }
     },
     {
       "id": "node_current_guardrail",
-      "text": "Custom product boundary\nThis Graph feature is for this local OpenCode build: a shared communication workspace, not a public compatibility layer or dependency scanner.",
+      "text": "Product boundary\nGraph is a human-and-AI communication workspace for authored design intent. It is not a dependency scanner, generated source of truth, fixed taxonomy, or automatic implementation model.",
       "tags": [
         "current-system",
-        "custom-build",
         "guardrail",
-        "model"
+        "model",
+        "responsibility"
       ],
       "layout": {
         "position": {
-          "x": 539.6071353823874,
-          "y": -548.6771312454173
+          "x": -1350,
+          "y": -390
         }
       }
     },
     {
       "id": "node_current_journal",
-      "text": "Local journal + viewport\nKeeps the canvas responsive and crash/reload recoverable. Manual UI edits are synchronized into the backend live graph instance as pending overlays until acknowledged.",
+      "text": "Persistent pending overlay + viewport\nUI changes are journaled per workspace/resource and rebased over refreshed saved or live state. The overlay survives reloads without a beforeunload blocker and records visible conflicts.",
       "tags": [
         "current-system",
+        "data",
         "editor",
+        "indicator",
         "state",
         "sync"
       ],
       "layout": {
         "position": {
-          "x": -428,
-          "y": 518
+          "x": 0,
+          "y": 310
         }
       }
     },
     {
       "id": "node_current_mention_filtering",
-      "text": "@Graph mention + media filtering\nMentions stay visible in chat, while managed graph JSON is omitted from provider file/media parts.",
+      "text": "Managed @Graph references\nMentions remain visible to the conversation, but managed Graph JSON is excluded from provider file/media parts in current and legacy message paths (including source.path fallbacks).",
       "tags": [
         "ai",
         "context",
-        "current-system"
+        "current-system",
+        "responsibility"
       ],
       "layout": {
         "position": {
-          "x": 20,
-          "y": -320
+          "x": -900,
+          "y": -390
         }
       }
     },
     {
       "id": "node_current_react_editor",
-      "text": "Lazy React Flow Graph editor\nThe UI you see: resource switch/create/delete, text nodes, free-form tags, drag persistence, selected-node/wire highlighting.",
+      "text": "Lazy React Flow editor\nNamed-resource selection/create/duplicate/delete; editable text and free-form tags; persistent drag positions; multi-selection; node/edge context menus; selection prompts; and custom visible wires.",
       "tags": [
         "app",
         "current-system",
-        "editor"
+        "editor",
+        "responsibility",
+        "visible"
       ],
       "layout": {
         "position": {
-          "x": -907.6406707064821,
-          "y": 108.84109902405035
+          "x": -450,
+          "y": -720
         }
       }
     },
     {
       "id": "node_current_resource_model",
-      "text": "Resource model\nMany named resources; nodes are text/tags/positions; edges store source/target handles/style; status is just a tag; no stored cross-resource refs.",
+      "text": "Resource model\nVersion-2 named resources contain text nodes, free-form tags, per-resource tag colors, positions, and directed edges with explicit endpoint sides and route style. Status is only a normal tag; cross-resource refs are not stored.",
       "tags": [
         "current-system",
+        "data",
         "model"
       ],
       "layout": {
         "position": {
-          "x": 1276.0255433065704,
-          "y": -307.9723151055874
+          "x": 900,
+          "y": -40
         }
       }
     },
     {
       "id": "node_current_schema",
-      "text": "Schema layer\nValidates graph resources and edit inputs: nodes, tags, positions, handles, styles, revisions, digests, and operation shapes.",
+      "text": "Shared schema + optimistic operations\nBrowser-safe contracts define resource snapshots, live-instance snapshots, node/tag/position data, connection sides/styles, patches, revision/digest concurrency, and Graph events.",
       "tags": [
         "current-system",
+        "data",
         "model",
         "schema"
       ],
       "layout": {
         "position": {
-          "x": 503.5123798397857,
-          "y": -243.98615755279374
+          "x": 450,
+          "y": -40
         }
       }
     },
     {
       "id": "node_current_session_surface",
-      "text": "Session surfaces\nCustom local build assumes Graph is available: desktop side panel + mobile Graph tab, no /api/architecture/resource capability probe.",
+      "text": "Session entry points\nGraph is available through the desktop session side panel and a full mobile tab; the composer hides on mobile Graph. Commands open Graph and invoke Save, Reload, fit, undo/redo, add, delete, and export.",
       "tags": [
         "app",
         "current-system",
-        "custom-build",
-        "entrypoint"
+        "entrypoint",
+        "local",
+        "responsibility",
+        "visible"
       ],
       "layout": {
         "position": {
-          "x": -1146.0185955725792,
-          "y": 535.7918209949945
+          "x": -1350,
+          "y": -720
         }
       }
     },
     {
       "id": "node_current_system_context",
-      "text": "Bounded dynamic System Context\nAI sees selected/named Graph summaries and exact IDs/aliases from managed resources, not raw graph JSON media.",
+      "text": "Bounded dynamic System Context\nThe registered Graph context summarizes managed live resources, exact IDs, aliases, nodes, tags, and wires for AI. It preserves authored meaning rather than treating Graph content as implementation proof.",
       "tags": [
         "ai",
         "context",
-        "current-system"
+        "current-system",
+        "responsibility"
       ],
       "layout": {
         "position": {
-          "x": -274,
-          "y": -540
+          "x": -450,
+          "y": -390
         }
       }
     },
     {
       "id": "node_current_wire_model",
-      "text": "Wire model + routing UI\nExplicit top/right/bottom/left endpoints and rectangular/curved/straight routes persist for users and AI to inspect/edit.",
+      "text": "Inspectable wire routing\nEdges persist top/right/bottom/left source and target handles plus rectangular, curved, or straight style. Selected-wire and inspector controls change routing immediately, then journal and synchronize it.",
       "tags": [
         "current-system",
         "editor",
-        "model"
+        "model",
+        "responsibility",
+        "visible"
       ],
       "layout": {
         "position": {
-          "x": -493.8868982368038,
-          "y": -176.05089137126743
+          "x": 450,
+          "y": -720
         }
       }
     },
     {
       "id": "node_msodnwlx",
-      "text": "Saved resource JSON\nDisk storage under .opencode/architecture/resources/<resource-id>.json. This changes only through managed Save, not direct UI/AI file edits.",
+      "text": "Durable resource storage\nVersion-2 JSON lives under .opencode/architecture/resources/<resource-id>.json in the primary worktree. Managed Save writes atomically under process/cross-process locks; reset preserves invalid data as a recovery file.",
       "tags": [
         "current-system",
+        "data",
         "model",
+        "saved",
         "storage"
       ],
       "layout": {
         "position": {
-          "x": 1449.3569125815848,
-          "y": -59.12522107006524
+          "x": 450,
+          "y": 660
         }
       }
     },
     {
       "id": "node_msodobgy",
-      "text": "AI assistant + Graph context\nUses @Graph mentions and bounded resource summaries; no dedicated in-editor AI button.",
+      "text": "AI conversation surface\nUsers bring a resource into chat with @Graph. Context-menu “Ask selection” adds bounded selection context to a chat prompt; there is no separate global in-editor AI workflow.",
       "tags": [
         "ai",
         "current-system",
-        "entrypoint"
+        "entrypoint",
+        "responsibility",
+        "visible"
       ],
       "layout": {
         "position": {
-          "x": -943.77590850591,
-          "y": -325.9439771264774
+          "x": 900,
+          "y": -720
         }
       }
     },
     {
       "id": "node_msodojhd",
-      "text": "Editor-visible graph projection\nReact Flow projection from the backend live graph instance when present, otherwise saved snapshot. Local pending overlay only bridges unacknowledged UI edits.",
+      "text": "Resolved canvas state\nNot a separate visible renderer: the panel reconciles the backend live instance (or saved snapshot) with any local pending overlay, then passes this data to the lazy React Flow editor to render on screen.",
       "tags": [
         "current-system",
+        "data",
         "editor",
+        "indicator",
         "live-instance",
         "state"
       ],
       "layout": {
         "position": {
-          "x": -501.7706212191107,
-          "y": 63.14995455345611
+          "x": -450,
+          "y": -40
         }
       }
     },
     {
       "id": "node_msodotvs",
-      "text": "Native managed graph_* tools\nAI creates/updates nodes, tags, colors, wires, layout, and Save/Reload by operating on the managed backend live graph instance through core services.",
+      "text": "Native managed graph_* tools\nAI lists, queries, validates, edits, lays out, routes, saves, or reloads managed resources through the same location-scoped live instance as the editor; tools never edit Graph JSON directly.",
       "tags": [
         "ai",
         "current-system",
         "live-instance",
+        "responsibility",
         "tools"
       ],
       "layout": {
         "position": {
-          "x": -576,
-          "y": -644
+          "x": 1350,
+          "y": -720
         }
       }
     },
     {
       "id": "node_msodp7k2",
-      "text": "Explicit Save boundary\nSave synchronizes visible editor changes into the live graph instance, then commits that instance to the saved JSON resource on disk.",
+      "text": "Explicit Save boundary\nSave invalidates queued sync work, re-observes the authoritative live instance, patches any remaining editor change, then commits that instance to disk and clears the live instance + local overlay.",
       "tags": [
         "current-system",
         "editor",
+        "responsibility",
         "sync"
       ],
       "layout": {
         "position": {
-          "x": -128.68481599607497,
-          "y": 22.107519437155133
+          "x": 900,
+          "y": -390
         }
       }
     },
     {
       "id": "node_msodpc1x",
-      "text": "Reload boundary\nReload replaces the backend live graph instance from disk, clears local pending overlay, and refreshes the visible editor projection immediately.",
+      "text": "Explicit Reload / discard boundary\nReload invalidates pending synchronization, discards the backend live instance in favor of its saved snapshot, clears the local overlay, then refreshes the editor projection.",
       "tags": [
         "current-system",
         "editor",
         "reload",
+        "responsibility",
         "sync"
       ],
       "layout": {
         "position": {
-          "x": -137.46144453705256,
-          "y": 246.0159991261085
+          "x": 1350,
+          "y": -390
         }
       }
     },
     {
       "id": "node_msodq6qn",
-      "text": "Human manual edits\nCanvas edits, inline text, tags, wire controls, panels, and commands update the UI immediately and sync to the backend live graph instance.",
+      "text": "Human manual edits\nCanvas, inline text, tags, wire controls, panels, and commands update local editor history immediately. The journal persists the pending change while a serialized synchronizer patches the shared live instance.",
       "tags": [
         "current-system",
         "editor",
         "entrypoint",
-        "live-instance"
+        "live-instance",
+        "responsibility",
+        "visible"
       ],
       "layout": {
         "position": {
-          "x": -1252,
-          "y": 80
+          "x": -924,
+          "y": -712
         }
       }
     }
   ],
   "edges": [
-    {
-      "id": "edge_bug_cause_to_editor_reset",
-      "source": "node_bug_base_identity_cause",
-      "target": "node_bug_editor_reset_effect",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "edge_bug_editor_reset_to_switch",
-      "source": "node_bug_editor_reset_effect",
-      "target": "node_bug_switch_back_why",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "edge_bug_fix_editor_to_tests",
-      "source": "node_bug_fix_editor_dep",
-      "target": "node_bug_fix_tests",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "edge_bug_fix_token_to_editor",
-      "source": "node_bug_fix_reset_token",
-      "target": "node_bug_fix_editor_dep",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "edge_bug_guardrail_to_fix_token",
-      "source": "node_bug_fix_guardrail",
-      "target": "node_bug_fix_reset_token",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "rectangular"
-    },
-    {
-      "id": "edge_bug_guardrail_to_live_instance",
-      "source": "node_bug_fix_guardrail",
-      "target": "node_current_backend_live_instance",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
-      "style": "curved"
-    },
-    {
-      "id": "edge_bug_journal_to_cause",
-      "source": "node_current_journal",
-      "target": "node_bug_base_identity_cause",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
-      "style": "curved"
-    },
-    {
-      "id": "edge_bug_manual_to_bug",
-      "source": "node_msodq6qn",
-      "target": "node_bug_reload_stale_ui",
-      "sourceHandle": "bottom",
-      "targetHandle": "left",
-      "style": "curved"
-    },
-    {
-      "id": "edge_bug_panel_to_cause",
-      "source": "node_bug_reload_panel_path",
-      "target": "node_bug_base_identity_cause",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "edge_bug_reload_boundary_to_bug",
-      "source": "node_msodpc1x",
-      "target": "node_bug_reload_stale_ui",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
-      "style": "curved"
-    },
-    {
-      "id": "edge_bug_reload_to_fix_token",
-      "source": "node_msodpc1x",
-      "target": "node_bug_fix_reset_token",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
-      "style": "curved"
-    },
-    {
-      "id": "edge_bug_switch_to_fix_token",
-      "source": "node_bug_switch_back_why",
-      "target": "node_bug_fix_reset_token",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "edge_bug_to_panel_path",
-      "source": "node_bug_reload_stale_ui",
-      "target": "node_bug_reload_panel_path",
-      "sourceHandle": "right",
-      "targetHandle": "left",
-      "style": "rectangular"
-    },
-    {
-      "id": "edge_bug_visible_state_to_reset",
-      "source": "node_msodojhd",
-      "target": "node_bug_editor_reset_effect",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
-      "style": "curved"
-    },
     {
       "id": "edge_current_backend_live_instance_to_editor",
       "source": "node_current_backend_live_instance",
@@ -614,16 +398,16 @@
       "id": "edge_current_client_to_session",
       "source": "node_current_session_surface",
       "target": "node_current_client_sdk",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "left",
+      "targetHandle": "right",
       "style": "curved"
     },
     {
       "id": "edge_current_context_to_ai",
       "source": "node_current_system_context",
       "target": "node_msodobgy",
-      "sourceHandle": "left",
-      "targetHandle": "right",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "style": "curved"
     },
     {
@@ -638,40 +422,40 @@
       "id": "edge_current_core_to_live_instance",
       "source": "node_current_core_service",
       "target": "node_current_backend_live_instance",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "style": "rectangular"
     },
     {
       "id": "edge_current_core_to_schema",
       "source": "node_current_core_service",
       "target": "node_current_schema",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "style": "rectangular"
     },
     {
       "id": "edge_current_core_to_storage",
       "source": "node_current_core_service",
       "target": "node_msodnwlx",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "style": "rectangular"
     },
     {
       "id": "edge_current_editor_to_projection",
       "source": "node_current_react_editor",
       "target": "node_msodojhd",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "style": "curved"
     },
     {
       "id": "edge_current_guardrail_to_ai",
       "source": "node_current_guardrail",
       "target": "node_msodobgy",
-      "sourceHandle": "left",
-      "targetHandle": "right",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "style": "curved"
     },
     {
@@ -686,7 +470,7 @@
       "id": "edge_current_journal_to_bridge",
       "source": "node_current_journal",
       "target": "node_current_client_sdk",
-      "sourceHandle": "right",
+      "sourceHandle": "top",
       "targetHandle": "bottom",
       "style": "curved"
     },
@@ -694,48 +478,48 @@
       "id": "edge_current_journal_to_projection",
       "source": "node_current_journal",
       "target": "node_msodojhd",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
+      "sourceHandle": "left",
+      "targetHandle": "right",
       "style": "curved"
     },
     {
       "id": "edge_current_live_instance_to_save",
       "source": "node_current_backend_live_instance",
       "target": "node_msodp7k2",
-      "sourceHandle": "left",
-      "targetHandle": "right",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
       "style": "curved"
     },
     {
       "id": "edge_current_live_instance_to_storage",
       "source": "node_current_backend_live_instance",
       "target": "node_msodnwlx",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "style": "rectangular"
     },
     {
       "id": "edge_current_mention_to_ai",
       "source": "node_current_mention_filtering",
       "target": "node_msodobgy",
-      "sourceHandle": "left",
-      "targetHandle": "right",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "style": "curved"
     },
     {
       "id": "edge_current_mention_to_context",
       "source": "node_current_mention_filtering",
       "target": "node_current_system_context",
-      "sourceHandle": "left",
-      "targetHandle": "right",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "style": "rectangular"
     },
     {
       "id": "edge_current_projection_to_journal",
       "source": "node_msodojhd",
       "target": "node_current_journal",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "style": "curved"
     },
     {
@@ -750,24 +534,24 @@
       "id": "edge_current_reload_to_client",
       "source": "node_msodpc1x",
       "target": "node_current_client_sdk",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "left",
+      "targetHandle": "right",
       "style": "rectangular"
     },
     {
       "id": "edge_current_reload_to_live_instance",
       "source": "node_msodpc1x",
       "target": "node_current_backend_live_instance",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "left",
+      "targetHandle": "right",
       "style": "curved"
     },
     {
       "id": "edge_current_resource_model_to_storage",
       "source": "node_current_resource_model",
       "target": "node_msodnwlx",
-      "sourceHandle": "bottom",
-      "targetHandle": "top",
+      "sourceHandle": "left",
+      "targetHandle": "right",
       "style": "rectangular"
     },
     {
@@ -782,24 +566,24 @@
       "id": "edge_current_session_to_editor",
       "source": "node_current_session_surface",
       "target": "node_current_react_editor",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
+      "sourceHandle": "right",
+      "targetHandle": "left",
       "style": "curved"
     },
     {
       "id": "edge_current_ux_to_editor",
       "source": "node_current_editor_ux",
       "target": "node_current_react_editor",
-      "sourceHandle": "top",
-      "targetHandle": "bottom",
+      "sourceHandle": "left",
+      "targetHandle": "right",
       "style": "curved"
     },
     {
       "id": "edge_current_wire_to_resource_model",
       "source": "node_current_wire_model",
       "target": "node_current_resource_model",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
       "style": "curved"
     },
     {
@@ -814,24 +598,24 @@
       "id": "edge_msodp3rr_58mpba",
       "source": "node_msodotvs",
       "target": "node_current_core_service",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "left",
+      "targetHandle": "right",
       "style": "curved"
     },
     {
       "id": "edge_msodpi3h_mdvlge",
       "source": "node_msodnwlx",
       "target": "node_msodpc1x",
-      "sourceHandle": "left",
-      "targetHandle": "right",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
       "style": "curved"
     },
     {
       "id": "edge_msodpjv6_sl00bw",
       "source": "node_msodp7k2",
       "target": "node_current_client_sdk",
-      "sourceHandle": "right",
-      "targetHandle": "left",
+      "sourceHandle": "left",
+      "targetHandle": "right",
       "style": "rectangular"
     },
     {

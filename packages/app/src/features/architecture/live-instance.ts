@@ -26,6 +26,8 @@ export function latestArchitectureLiveInstanceCache(
   current: ArchitectureLiveInstanceCache | undefined,
   candidate: ArchitectureLiveInstanceCache,
 ) {
+  // An explicit discard from save/reload must clear the visible live instance.
+  if (candidate === null) return null
   if (!candidate) return current ?? candidate
   if (current?.snapshot.resource.id !== candidate.snapshot.resource.id) return candidate
   if (current.snapshot.resource.revision > candidate.snapshot.resource.revision) return current
