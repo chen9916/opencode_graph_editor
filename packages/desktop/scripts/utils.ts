@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const CLI_VERSION = "0.0.0-next-16350"
+const LOCAL_MODELS_DEV_API_JSON = join(import.meta.dirname, "..", "..", "opencode", "test", "tool", "fixtures", "models-api.json")
 
 export type Channel = "dev" | "beta" | "prod"
 
@@ -11,6 +12,13 @@ export function resolveChannel(): Channel {
   const raw = Bun.env.OPENCODE_CHANNEL
   if (raw === "dev" || raw === "beta" || raw === "prod") return raw
   return "dev"
+}
+
+export function buildNodeEnv(channel: Channel) {
+  return {
+    OPENCODE_CHANNEL: channel,
+    MODELS_DEV_API_JSON: process.env.MODELS_DEV_API_JSON ?? LOCAL_MODELS_DEV_API_JSON,
+  }
 }
 
 export const CLI_BINARIES: Array<{ rustTarget: string; package: string; os: string; cpu: string }> = [
@@ -71,8 +79,13 @@ export function getCurrentCli(target = RUST_TARGET ?? nativeTarget()) {
 
 export async function downloadCliToResources() {
   const cli = getCurrentCli()
+  const dest = windowsify(join(import.meta.dirname, "..", "resources", "opencode-cli"))
+  if (await Bun.file(dest).exists()) {
+    console.log(`Using existing ${dest}`)
+    return
+  }
+
   const directory = await mkdtemp(join(tmpdir(), "opencode-cli-"))
-  const dest = windowsify("resources/opencode-cli")
   try {
     await $`bun install --no-save --cwd ${directory} ${`${cli.package}@${CLI_VERSION}`} ${`--os=${cli.os}`} ${`--cpu=${cli.cpu}`}`
     await copyFile(

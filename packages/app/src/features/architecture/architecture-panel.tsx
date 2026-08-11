@@ -126,6 +126,7 @@ function ArchitecturePanelWorkspace() {
     action: undefined as ArchitectureCommandAction | undefined,
     liveInstanceVersions: {} as Record<string, number | undefined>,
     debugEvents: {} as Record<string, ReadonlyArray<ArchitectureRuntimeDebugEvent> | undefined>,
+    removedResourceIDs: {} as Record<string, true | undefined>,
   })
   const instanceSynchronizers = new Map<string, ReturnType<typeof createArchitectureInstanceSynchronizer>>()
   const cacheOrder = createArchitectureCacheOrder()
@@ -163,8 +164,15 @@ function ArchitecturePanelWorkspace() {
       refetchIntervalInBackground: true,
     }
   })
+  const selectableResources = createMemo(() =>
+    resources.data?.filter((resource) => !state.removedResourceIDs[resource.id]),
+  )
+  const selectedID = createMemo(() => {
+    const id = persistedState.selectedID
+    return id && state.removedResourceIDs[id] ? undefined : id
+  })
   const resourceID = createMemo(() =>
-    persistedReady() ? resolveArchitectureResourceID(persistedState.selectedID, resources.data) : undefined,
+    persistedReady() ? resolveArchitectureResourceID(selectedID(), selectableResources()) : undefined,
   )
   const localPendingOverlay = createMemo(() => {
     const id = resourceID()
@@ -217,7 +225,7 @@ function ArchitecturePanelWorkspace() {
   const runtimeController = createMemo(() =>
     architectureRuntimeController({
       selectedResourceID: resourceID(),
-      resources: resources.data,
+      resources: selectableResources(),
       saved: resource.data,
       live: liveInstance.data,
       pending: localPendingOverlay(),
@@ -292,7 +300,7 @@ function ArchitecturePanelWorkspace() {
   createEffect(() => {
     const missing = missingSelectedArchitectureResourceID({
       selectedID: persistedState.selectedID,
-      resources: resources.data,
+      resources: selectableResources(),
       snapshot: resource.data,
       resourceError: resource.error,
     })
@@ -522,16 +530,19 @@ function ArchitecturePanelWorkspace() {
         event: eventInfo,
       })
       if (plan.removed) {
-        setArchitectureQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
-          removeResourceSummary(current, eventInfo.resourceID),
-        )
-        setPersistedState("pendingOverlays", eventInfo.resourceID, undefined)
-        setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-          architectureResourceInstanceQueryKey(current.url, current.directory, eventInfo.resourceID),
-          null,
-        )
-        setPersistedState("viewports", eventInfo.resourceID, undefined)
-        if (persistedState.selectedID === eventInfo.resourceID) setPersistedState("selectedID", undefined)
+        batch(() => {
+          setState("removedResourceIDs", eventInfo.resourceID, true)
+          setArchitectureQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
+            removeResourceSummary(current, eventInfo.resourceID),
+          )
+          setPersistedState("pendingOverlays", eventInfo.resourceID, undefined)
+          setArchitectureQueryData<ArchitectureLiveInstanceCache>(
+            architectureResourceInstanceQueryKey(current.url, current.directory, eventInfo.resourceID),
+            null,
+          )
+          setPersistedState("viewports", eventInfo.resourceID, undefined)
+          if (persistedState.selectedID === eventInfo.resourceID) setPersistedState("selectedID", undefined)
+        })
         return
       }
 
@@ -722,7 +733,7 @@ function ArchitecturePanelWorkspace() {
     setState("busy", true)
     try {
       const created = await createArchitectureResource(api, workspace.directory, {
-        name: language.t("architecture.resource.defaultName", { number: (resources.data?.length ?? 0) + 1 }),
+        name: language.t("architecture.resource.defaultName", { number: (selectableResources()?.length ?? 0) + 1 }),
       })
       batch(() => {
         setArchitectureQueryData(architectureResourceQueryKey(workspace.url, workspace.directory, created.resource.id), created)
@@ -799,24 +810,42 @@ function ArchitecturePanelWorkspace() {
     if (!current || state.busy) return
     const workspace = sdk()
     const api = serverSDK().currentApi
+    const id = current.resource.id
+    const resourcesKey = architectureResourcesQueryKey(workspace.url, workspace.directory)
+    const instanceKey = architectureResourceInstanceQueryKey(workspace.url, workspace.directory, id)
     confirm(language.t("architecture.confirm.deleteResource"), labels().delete, () => {
-      setState("busy", true)
+      const previousSelectedID = persistedState.selectedID
+      const previousPending = persistedState.pendingOverlays[id]
+      const previousViewport = persistedState.viewports[id]
+      const previousLive = queryClient.getQueryData<ArchitectureLiveInstanceCache>(instanceKey)
+      batch(() => {
+        setState("busy", true)
+        setState("removedResourceIDs", id, true)
+        setArchitectureQueryData(resourcesKey, (list: ArchitectureListResourcesOutput["data"] | undefined) =>
+          removeResourceSummary(list, id),
+        )
+        setPersistedState("pendingOverlays", id, undefined)
+        setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, null)
+        setPersistedState("viewports", id, undefined)
+        setPersistedState("selectedID", undefined)
+      })
       void removeArchitectureResource(api, workspace.directory, current)
-        .then(async () => {
-          setArchitectureQueryData(
-            architectureResourcesQueryKey(workspace.url, workspace.directory),
-            (list: ArchitectureListResourcesOutput["data"] | undefined) =>
-              removeResourceSummary(list, current.resource.id),
-          )
-          setPersistedState("pendingOverlays", current.resource.id, undefined)
-          setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-            architectureResourceInstanceQueryKey(workspace.url, workspace.directory, current.resource.id),
-            null,
-          )
-          setPersistedState("viewports", current.resource.id, undefined)
-          setPersistedState("selectedID", undefined)
+        .then(() => {
+          void queryClient.refetchQueries({ queryKey: resourcesKey, exact: true, type: "active" })
         })
-        .catch(() => showToast({ variant: "error", title: language.t("architecture.toast.resourceDeleteFailed") }))
+        .catch(() => {
+          batch(() => {
+            setState("removedResourceIDs", id, undefined)
+            setArchitectureQueryData(resourcesKey, (list: ArchitectureListResourcesOutput["data"] | undefined) =>
+              updateArchitectureResourceSummaries(list, architectureResourceSummary(current)),
+            )
+            setPersistedState("pendingOverlays", id, previousPending)
+            if (previousLive !== undefined) setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, previousLive)
+            setPersistedState("viewports", id, previousViewport)
+            setPersistedState("selectedID", previousSelectedID)
+          })
+          showToast({ variant: "error", title: language.t("architecture.toast.resourceDeleteFailed") })
+        })
         .finally(() => setState("busy", false))
     })
   }

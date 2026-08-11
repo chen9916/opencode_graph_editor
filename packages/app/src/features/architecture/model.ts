@@ -8,6 +8,7 @@ import type {
 } from "./contract"
 
 type ArchitectureEndpointHandleType = "source" | "target"
+type Position = { readonly x: number; readonly y: number }
 
 export type ArchitectureFlowEndpointHandle = {
   readonly id: string
@@ -56,7 +57,7 @@ export function toReactFlow(
   controls?: ArchitectureFlowEdgeControls,
 ) {
   const colorsKey = tagColorsKey(resource.tagColors)
-  const endpointHandles = architectureFlowEndpointHandles(resource.edges)
+  const endpointHandles = architectureFlowEndpointHandles(resource.edges, resource.nodes)
   return {
     nodes: resource.nodes.map(
       (node): ArchitectureFlowNode => ({
@@ -75,17 +76,42 @@ export function toReactFlow(
       }),
     ),
     edges: resource.edges.map(
-      (edge): ArchitectureFlowEdge => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        sourceHandle: architectureRenderEdgeHandleID(edge.id, "source", edge.sourceHandle ?? "right"),
-        targetHandle: architectureRenderEdgeHandleID(edge.id, "target", edge.targetHandle ?? "left"),
-        type: "architecture",
-        data: { edge, style: edge.style ?? "rectangular", controls },
-      }),
+      (edge): ArchitectureFlowEdge => {
+        const sides = architectureRenderedConnectionSides(edge, resource.nodes)
+        return {
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          sourceHandle: architectureRenderEdgeHandleID(edge.id, "source", sides.sourceHandle),
+          targetHandle: architectureRenderEdgeHandleID(edge.id, "target", sides.targetHandle),
+          type: "architecture",
+          data: { edge, style: edge.style ?? "rectangular", controls },
+        }
+      },
     ),
   }
+}
+
+export function architectureRenderedConnectionSides(
+  edge: ArchitectureEdge,
+  nodes: ReadonlyArray<ArchitectureNode>,
+): { readonly sourceHandle: ArchitectureConnectionSide; readonly targetHandle: ArchitectureConnectionSide } {
+  const source = nodes.find((node) => node.id === edge.source)?.layout.position
+  const target = nodes.find((node) => node.id === edge.target)?.layout.position
+  const saved = { sourceHandle: edge.sourceHandle ?? "right", targetHandle: edge.targetHandle ?? "left" }
+  if (!source || !target || samePosition(source, target))
+    return saved
+  // Keep explicit non-default endpoint choices stable; legacy/default right-left
+  // anchors are the ones we reflow from layout to reduce crossed wires.
+  if (hasExplicitConnectionSides(edge)) return saved
+  const delta = { x: target.x - source.x, y: target.y - source.y }
+  if (Math.abs(delta.x) >= Math.abs(delta.y))
+    return delta.x >= 0
+      ? { sourceHandle: "right", targetHandle: "left" }
+      : { sourceHandle: "left", targetHandle: "right" }
+  return delta.y >= 0
+    ? { sourceHandle: "bottom", targetHandle: "top" }
+    : { sourceHandle: "top", targetHandle: "bottom" }
 }
 
 export function architectureRenderEdgeHandleID(
@@ -113,23 +139,26 @@ export function architectureNodeClass() {
   return "architecture-node"
 }
 
-function architectureFlowEndpointHandles(edges: ReadonlyArray<ArchitectureEdge>) {
-  const endpoints = edges.flatMap((edge) => [
-    {
-      edgeID: edge.id,
-      nodeID: edge.source,
-      type: "source" as const,
-      side: edge.sourceHandle ?? "right",
-      id: architectureRenderEdgeHandleID(edge.id, "source", edge.sourceHandle ?? "right"),
-    },
-    {
-      edgeID: edge.id,
-      nodeID: edge.target,
-      type: "target" as const,
-      side: edge.targetHandle ?? "left",
-      id: architectureRenderEdgeHandleID(edge.id, "target", edge.targetHandle ?? "left"),
-    },
-  ])
+function architectureFlowEndpointHandles(edges: ReadonlyArray<ArchitectureEdge>, nodes: ReadonlyArray<ArchitectureNode>) {
+  const endpoints = edges.flatMap((edge) => {
+    const sides = architectureRenderedConnectionSides(edge, nodes)
+    return [
+      {
+        edgeID: edge.id,
+        nodeID: edge.source,
+        type: "source" as const,
+        side: sides.sourceHandle,
+        id: architectureRenderEdgeHandleID(edge.id, "source", sides.sourceHandle),
+      },
+      {
+        edgeID: edge.id,
+        nodeID: edge.target,
+        type: "target" as const,
+        side: sides.targetHandle,
+        id: architectureRenderEdgeHandleID(edge.id, "target", sides.targetHandle),
+      },
+    ]
+  })
   return endpoints.map((endpoint) => {
     const siblings = endpoints
       .filter((candidate) => candidate.nodeID === endpoint.nodeID && candidate.side === endpoint.side)
@@ -140,6 +169,14 @@ function architectureFlowEndpointHandles(edges: ReadonlyArray<ArchitectureEdge>)
         ((siblings.findIndex((candidate) => candidate.id === endpoint.id) + 1) / (siblings.length + 1)) * 100,
     }
   })
+}
+
+function samePosition(left: Position, right: Position) {
+  return left.x === right.x && left.y === right.y
+}
+
+function hasExplicitConnectionSides(edge: ArchitectureEdge) {
+  return (!!edge.sourceHandle && edge.sourceHandle !== "right") || (!!edge.targetHandle && edge.targetHandle !== "left")
 }
 
 function endpointHandleOrder(

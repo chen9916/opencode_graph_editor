@@ -130,7 +130,7 @@ export function SelectV2<T>(props: SelectV2Props<T>) {
       flip={local.flip ?? true}
       slide={local.slide ?? true}
       fitViewport={local.fitViewport ?? false}
-      value={local.current}
+      value={local.current === undefined ? null : local.current}
       options={grouped()}
       optionValue={(x) => (local.value ? local.value(x) : String(x as string))}
       optionTextValue={(x) => (local.label ? local.label(x) : String(x as string))}
