@@ -139,6 +139,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const additiveSelectionModifier = useRef(false)
   const handledAction = useRef<number>()
   const suppressEmptySelectionUntil = useRef(0)
+  const suppressConnectionContextMenuUntil = useRef(0)
   const connecting = useRef(false)
   const connectionStart = useRef<ConnectionStart>()
   const outlineID = useId()
@@ -362,6 +363,20 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     setConnectionPreview(undefined)
   }
 
+  const shouldSuppressConnectionContextMenu = () =>
+    connecting.current || performanceNow() < suppressConnectionContextMenuUntil.current
+
+  const cancelConnectionContextMenu = (event: { preventDefault: () => void; stopPropagation: () => void }) => {
+    const now = performanceNow()
+    suppressConnectionContextMenuUntil.current = now + 500
+    suppressEmptySelectionUntil.current = now + 220
+    event.preventDefault()
+    event.stopPropagation()
+    setContextMenu(undefined)
+    setAskPopover(undefined)
+    clearConnectionDrag()
+  }
+
   const updateConnectionDragPreview = (event: MouseEvent | TouchEvent) => {
     const start = connectionStart.current
     const position = flowPositionFromEvent(flow, event)
@@ -371,6 +386,10 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
 
   useEffect(() => {
     const pointer = (event: PointerEvent) => {
+      if (connecting.current && event.button === 2) {
+        cancelConnectionContextMenu(event)
+        return
+      }
       if (
         event.target instanceof Element &&
         event.target.closest(
@@ -387,10 +406,10 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
       setAskPopover(undefined)
       clearConnectionDrag()
     }
-    document.addEventListener("pointerdown", pointer)
+    document.addEventListener("pointerdown", pointer, { capture: true })
     document.addEventListener("keydown", keyboard)
     return () => {
-      document.removeEventListener("pointerdown", pointer)
+      document.removeEventListener("pointerdown", pointer, { capture: true })
       document.removeEventListener("keydown", keyboard)
     }
   }, [])
@@ -871,7 +890,12 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
           className="architecture-editor__canvas"
           dir="ltr"
           onContextMenu={(event) => {
-            if (event.defaultPrevented || !flow) return
+            if (event.defaultPrevented) return
+            if (shouldSuppressConnectionContextMenu()) {
+              cancelConnectionContextMenu(event)
+              return
+            }
+            if (!flow) return
             event.preventDefault()
             const at = menuPosition(event.clientX, event.clientY)
             select(undefined)
@@ -919,6 +943,10 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               setAskPopover(undefined)
             }}
             onPaneContextMenu={(event) => {
+              if (shouldSuppressConnectionContextMenu()) {
+                cancelConnectionContextMenu(event)
+                return
+              }
               event.preventDefault()
               if (!flow) return
               const at = menuPosition(event.clientX, event.clientY)
@@ -931,6 +959,10 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               })
             }}
             onNodeContextMenu={(event, node) => {
+              if (shouldSuppressConnectionContextMenu()) {
+                cancelConnectionContextMenu(event)
+                return
+              }
               event.preventDefault()
               const at = menuPosition(event.clientX, event.clientY)
               const next = selectionForContextTarget({ type: "node", id: node.id }, selectionRef.current)
@@ -960,6 +992,10 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
               setAskPopover(undefined)
             }}
             onEdgeContextMenu={(event, edge) => {
+              if (shouldSuppressConnectionContextMenu()) {
+                cancelConnectionContextMenu(event)
+                return
+              }
               event.preventDefault()
               const at = menuPosition(event.clientX, event.clientY)
               const next = selectionForContextTarget({ type: "edge", id: edge.id }, selectionRef.current)

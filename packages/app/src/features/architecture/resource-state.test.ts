@@ -59,6 +59,12 @@ describe("architecture resource state", () => {
   test("reports a persisted selection as missing only after the resource load fails", () => {
     const auth = architectureResourceSummary(snapshot("auth_resourceID", "Auth"))
     const billing = snapshot("billing_resourceID", "Billing")
+    const notFound = {
+      _tag: "ArchitectureNotFoundError",
+      entity: "resource",
+      id: "new_graph",
+      message: "resource not found: new_graph",
+    }
 
     expect(
       missingSelectedArchitectureResourceID({
@@ -74,6 +80,14 @@ describe("architecture resource state", () => {
         resources: [auth],
         snapshot: undefined,
         resourceError: new Error("missing"),
+      }),
+    ).toBe("new_graph")
+    expect(
+      missingSelectedArchitectureResourceID({
+        selectedID: "new_graph",
+        resources: [auth, { ...auth, id: "new_graph", name: "New Graph" }],
+        snapshot: undefined,
+        resourceError: new Error(notFound.message, { cause: { body: notFound, status: 404 } }),
       }),
     ).toBe("new_graph")
     expect(

@@ -96,22 +96,21 @@ export function architectureRenderedConnectionSides(
   edge: ArchitectureEdge,
   nodes: ReadonlyArray<ArchitectureNode>,
 ): { readonly sourceHandle: ArchitectureConnectionSide; readonly targetHandle: ArchitectureConnectionSide } {
+  const saved = savedConnectionSides(edge)
+  if (hasExplicitConnectionSides(edge)) return saved
+  return architectureAutoConnectionSides(edge, nodes)
+}
+
+export function architectureAutoConnectionSides(
+  edge: ArchitectureEdge,
+  nodes: ReadonlyArray<ArchitectureNode>,
+): { readonly sourceHandle: ArchitectureConnectionSide; readonly targetHandle: ArchitectureConnectionSide } {
   const source = nodes.find((node) => node.id === edge.source)?.layout.position
   const target = nodes.find((node) => node.id === edge.target)?.layout.position
-  const saved = { sourceHandle: edge.sourceHandle ?? "right", targetHandle: edge.targetHandle ?? "left" }
+  const saved = savedConnectionSides(edge)
   if (!source || !target || samePosition(source, target))
     return saved
-  // Keep explicit non-default endpoint choices stable; legacy/default right-left
-  // anchors are the ones we reflow from layout to reduce crossed wires.
-  if (hasExplicitConnectionSides(edge)) return saved
-  const delta = { x: target.x - source.x, y: target.y - source.y }
-  if (Math.abs(delta.x) >= Math.abs(delta.y))
-    return delta.x >= 0
-      ? { sourceHandle: "right", targetHandle: "left" }
-      : { sourceHandle: "left", targetHandle: "right" }
-  return delta.y >= 0
-    ? { sourceHandle: "bottom", targetHandle: "top" }
-    : { sourceHandle: "top", targetHandle: "bottom" }
+  return architectureConnectionSidesFromPositions(source, target)
 }
 
 export function architectureRenderEdgeHandleID(
@@ -140,12 +139,14 @@ export function architectureNodeClass() {
 }
 
 function architectureFlowEndpointHandles(edges: ReadonlyArray<ArchitectureEdge>, nodes: ReadonlyArray<ArchitectureNode>) {
+  const positions = new Map(nodes.map((node) => [node.id, node.layout.position] as const))
   const endpoints = edges.flatMap((edge) => {
     const sides = architectureRenderedConnectionSides(edge, nodes)
     return [
       {
         edgeID: edge.id,
         nodeID: edge.source,
+        connectedPosition: positions.get(edge.target),
         type: "source" as const,
         side: sides.sourceHandle,
         id: architectureRenderEdgeHandleID(edge.id, "source", sides.sourceHandle),
@@ -153,6 +154,7 @@ function architectureFlowEndpointHandles(edges: ReadonlyArray<ArchitectureEdge>,
       {
         edgeID: edge.id,
         nodeID: edge.target,
+        connectedPosition: positions.get(edge.source),
         type: "target" as const,
         side: sides.targetHandle,
         id: architectureRenderEdgeHandleID(edge.id, "target", sides.targetHandle),
@@ -175,15 +177,61 @@ function samePosition(left: Position, right: Position) {
   return left.x === right.x && left.y === right.y
 }
 
+function savedConnectionSides(edge: ArchitectureEdge) {
+  return { sourceHandle: edge.sourceHandle ?? "right", targetHandle: edge.targetHandle ?? "left" }
+}
+
+function architectureConnectionSidesFromPositions(source: Position, target: Position) {
+  const delta = { x: target.x - source.x, y: target.y - source.y }
+  if (Math.abs(delta.x) >= Math.abs(delta.y))
+    return delta.x >= 0
+      ? { sourceHandle: "right" as const, targetHandle: "left" as const }
+      : { sourceHandle: "left" as const, targetHandle: "right" as const }
+  return delta.y >= 0
+    ? { sourceHandle: "bottom" as const, targetHandle: "top" as const }
+    : { sourceHandle: "top" as const, targetHandle: "bottom" as const }
+}
+
 function hasExplicitConnectionSides(edge: ArchitectureEdge) {
   return (!!edge.sourceHandle && edge.sourceHandle !== "right") || (!!edge.targetHandle && edge.targetHandle !== "left")
 }
 
 function endpointHandleOrder(
-  left: { readonly edgeID: string; readonly type: ArchitectureEndpointHandleType; readonly id: string },
-  right: { readonly edgeID: string; readonly type: ArchitectureEndpointHandleType; readonly id: string },
+  left: {
+    readonly edgeID: string
+    readonly type: ArchitectureEndpointHandleType
+    readonly id: string
+    readonly side: ArchitectureConnectionSide
+    readonly connectedPosition?: Position
+  },
+  right: {
+    readonly edgeID: string
+    readonly type: ArchitectureEndpointHandleType
+    readonly id: string
+    readonly side: ArchitectureConnectionSide
+    readonly connectedPosition?: Position
+  },
 ) {
   return (
-    left.edgeID.localeCompare(right.edgeID) || left.type.localeCompare(right.type) || left.id.localeCompare(right.id)
+    endpointHandlePosition(left) - endpointHandlePosition(right) ||
+    endpointHandleSecondaryPosition(left) - endpointHandleSecondaryPosition(right) ||
+    left.edgeID.localeCompare(right.edgeID) ||
+    left.type.localeCompare(right.type) ||
+    left.id.localeCompare(right.id)
   )
+}
+
+function endpointHandlePosition(endpoint: { readonly side: ArchitectureConnectionSide; readonly connectedPosition?: Position }) {
+  if (!endpoint.connectedPosition) return 0
+  if (endpoint.side === "top" || endpoint.side === "bottom") return endpoint.connectedPosition.x
+  return endpoint.connectedPosition.y
+}
+
+function endpointHandleSecondaryPosition(endpoint: {
+  readonly side: ArchitectureConnectionSide
+  readonly connectedPosition?: Position
+}) {
+  if (!endpoint.connectedPosition) return 0
+  if (endpoint.side === "top" || endpoint.side === "bottom") return endpoint.connectedPosition.y
+  return endpoint.connectedPosition.x
 }

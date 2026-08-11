@@ -29,10 +29,27 @@ export function missingSelectedArchitectureResourceID(input: {
   readonly snapshot: ArchitectureSnapshot | undefined
   readonly resourceError: unknown
 }) {
-  if (!input.selectedID || !input.resourceError || !input.resources) return
+  if (!input.selectedID || !input.resourceError) return
+  if (architectureResourceNotFoundErrorID(input.resourceError) === input.selectedID) return input.selectedID
+  if (!input.resources) return
   if (input.snapshot?.resource.id === input.selectedID) return
   if (input.resources.some((resource) => resource.id === input.selectedID)) return
   return input.selectedID
+}
+
+function architectureResourceNotFoundErrorID(error: unknown) {
+  const value = unwrapArchitectureError(error)
+  if (typeof value !== "object" || value === null) return
+  const record = value as Record<string, unknown>
+  if (record._tag !== "ArchitectureNotFoundError" || record.entity !== "resource") return
+  return typeof record.id === "string" ? record.id : undefined
+}
+
+function unwrapArchitectureError(error: unknown) {
+  if (error instanceof Error && error.cause && typeof error.cause === "object" && "body" in error.cause) {
+    return (error.cause as Record<string, unknown>).body
+  }
+  return error
 }
 
 export function selectedArchitectureSnapshot(

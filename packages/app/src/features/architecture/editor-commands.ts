@@ -7,7 +7,7 @@ import type {
   ArchitectureResource,
 } from "./contract"
 import { operationID } from "./journal"
-import { architectureRenderEdgeHandleSide } from "./model"
+import { architectureAutoConnectionSides, architectureRenderEdgeHandleSide } from "./model"
 
 type Position = { readonly x: number; readonly y: number }
 type ConnectionInput = {
@@ -112,12 +112,31 @@ export function architectureNodePositionOperations(
   nodeIDs: ReadonlyArray<string>,
   movedNodes: ReadonlyArray<{ readonly id: string; readonly position: Position }>,
 ) {
-  return nodeIDs.flatMap((nodeID): ArchitectureOperation[] => {
+  const positionOperations = nodeIDs.flatMap((nodeID): ArchitectureOperation[] => {
     const current = resource.nodes.find((node) => node.id === nodeID)
     const moved = movedNodes.find((node) => node.id === nodeID)
     if (!moved || !current || samePosition(moved.position, current.layout.position)) return []
     return [{ id: operationID(), type: "node.position", nodeID, position: moved.position }]
   })
+  if (positionOperations.length === 0) return []
+  const moved = new Map(
+    positionOperations
+      .filter((operation) => operation.type === "node.position")
+      .map((operation) => [operation.nodeID, operation.position] as const),
+  )
+  const nextNodes = resource.nodes.map((node) => {
+    const position = moved.get(node.id)
+    if (!position) return node
+    return { ...node, layout: { position } }
+  })
+  const edgeOperations = resource.edges.flatMap((edge): ArchitectureOperation[] => {
+    if (!moved.has(edge.source) && !moved.has(edge.target)) return []
+    const sides = architectureAutoConnectionSides(edge, nextNodes)
+    if ((edge.sourceHandle ?? "right") === sides.sourceHandle && (edge.targetHandle ?? "left") === sides.targetHandle)
+      return []
+    return [architectureEdgeUpdateOperation({ ...edge, ...sides })]
+  })
+  return [...positionOperations, ...edgeOperations]
 }
 
 export function architectureNodeRemoveOperation(nodeID: string): ArchitectureOperation {

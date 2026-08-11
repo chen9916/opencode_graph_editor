@@ -94,6 +94,15 @@ describe("architecture editor command builders", () => {
     ])
   })
 
+  test("reroutes connected edge handles when nodes move", () => {
+    expect(
+      architectureNodePositionOperations(resource(), ["b"], [{ id: "b", position: { x: 20, y: 180 } }]),
+    ).toMatchObject([
+      { type: "node.position", nodeID: "b", position: { x: 20, y: 180 } },
+      { type: "edge.update", edge: { id: "ab", sourceHandle: "bottom", targetHandle: "top" } },
+    ])
+  })
+
   test("renames tags and preserves colors when the target tag is new", () => {
     expect(architectureRenameTagOperations(resource(), "old", "new")).toMatchObject([
       { type: "tag.color", tag: "old", color: undefined },

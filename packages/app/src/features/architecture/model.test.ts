@@ -76,6 +76,26 @@ describe("architecture flow model", () => {
     ).toEqual({ sourceHandle: "bottom", targetHandle: "top" })
   })
 
+  test("orders shared side sockets by the connected node position", () => {
+    const shared: ArchitectureResource = {
+      ...resource,
+      nodes: [
+        { id: "hub", text: "Hub", tags: [], layout: { position: { x: 0, y: 0 } } },
+        { id: "upper", text: "Upper", tags: [], layout: { position: { x: 240, y: -80 } } },
+        { id: "lower", text: "Lower", tags: [], layout: { position: { x: 220, y: 120 } } },
+      ],
+      edges: [
+        { id: "a-lower", source: "hub", target: "lower", sourceHandle: "right", targetHandle: "left" },
+        { id: "z-upper", source: "hub", target: "upper", sourceHandle: "right", targetHandle: "left" },
+      ],
+    }
+    const handles = toReactFlow(shared, () => {}).nodes.find((node) => node.id === "hub")?.data.edgeHandles ?? []
+    const offsets = endpointOffsets(handles)
+
+    expect(offsets[architectureRenderEdgeHandleID("z-upper", "source", "right")]).toBeCloseTo(100 / 3)
+    expect(offsets[architectureRenderEdgeHandleID("a-lower", "source", "right")]).toBeCloseTo(200 / 3)
+  })
+
   test("separates render-only endpoint handles sharing the same node side", () => {
     const shared: ArchitectureResource = {
       ...resource,
