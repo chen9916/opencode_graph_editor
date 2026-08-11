@@ -82,9 +82,9 @@ export function openSessionTab(current: SessionTabState, tab: string): SessionTa
 
 export function closeSessionTab(current: SessionTabState, tab: string): SessionTabState {
   if (tab === "review" || tab === SESSION_ARCHITECTURE_TAB) {
-    if (current.tabs.active !== tab) return current
+    if (current.tabs.active !== tab && current.tabs.active !== undefined) return current
     return {
-      tabs: { all: current.tabs.all, active: current.tabs.all[0] },
+      tabs: { all: current.tabs.all, active: current.tabs.all[0] ?? "empty" },
       preview: current.preview,
     }
   }

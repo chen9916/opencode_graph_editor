@@ -21,6 +21,7 @@ type TabsInput = {
   architecture?: Accessor<boolean>
   hasReview?: Accessor<boolean>
   fileBrowser?: Accessor<boolean>
+  fallback?: Accessor<string | undefined>
 }
 
 export const getSessionKey = (dir: string | undefined, id: string | undefined) => `${dir ?? ""}${id ? `/${id}` : ""}`
@@ -34,6 +35,7 @@ export const createSessionTabs = (input: TabsInput) => {
   const architecture = input.architecture ?? (() => false)
   const hasReview = input.hasReview ?? (() => false)
   const fileBrowser = input.fileBrowser ?? (() => false)
+  const fallback = input.fallback ?? (() => undefined)
   const contextOpen = createMemo(() => input.tabs().active() === "context" || input.tabs().all().includes("context"))
   const openFileOpen = createMemo(
     () =>
@@ -63,6 +65,7 @@ export const createSessionTabs = (input: TabsInput) => {
   })
   const activeTab = createMemo(() => {
     const active = input.tabs().active()
+    if (active === "empty") return active
     if (active === "context") return active
     if (active === SESSION_ARCHITECTURE_TAB && architecture()) return active
     if (active === SESSION_OPEN_FILE_TAB && openFileOpen()) return active
@@ -72,7 +75,11 @@ export const createSessionTabs = (input: TabsInput) => {
     const first = openedTabs()[0]
     if (first) return first
     if (contextOpen()) return "context"
+    const fallbackTab = fallback()
+    if (fallbackTab === "review" && review() && hasReview()) return "review"
+    if (fallbackTab === SESSION_ARCHITECTURE_TAB && architecture()) return SESSION_ARCHITECTURE_TAB
     if (review() && hasReview()) return "review"
+    if (architecture()) return SESSION_ARCHITECTURE_TAB
     return "empty"
   })
   const activeFileTab = createMemo(() => {

@@ -214,6 +214,7 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
   const language = useLanguage()
   const server = useServer()
   const tabs = useTabs()
+  const navigate = useNavigate()
   const displayServer = createMemo(() => {
     const key = props.serverKey ?? server.key
     const conn = server.list.find((item) => ServerConnection.key(item) === key)
@@ -221,7 +222,20 @@ function SessionErrorFallback(props: { error: unknown; sessionID?: string; serve
   })
   const closeTab = () => {
     if (!props.sessionID) return
-    tabs.removeSessionTab({ server: props.serverKey ?? server.key, sessionId: props.sessionID })
+    const target = { server: props.serverKey ?? server.key, sessionId: props.sessionID }
+    const open = tabs.store.some(
+      (tab) => tab.type === "session" && tab.server === target.server && tab.sessionId === target.sessionId,
+    )
+    tabs.removeSessionTab(target)
+    if (open) return
+
+    const next = tabs.store.find((tab) => tab.type === "session" || tab.type === "draft")
+    if (next) {
+      tabs.select(next)
+      return
+    }
+
+    navigate("/")
   }
   if (isCurrentSessionNotFoundError(props.error, props.sessionID)) {
     return (
@@ -462,10 +476,51 @@ export default function Page() {
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const architectureAvailable = useServerArchitectureAvailable()
   const size = createSizing()
-  const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
-  const desktopArchitectureOpen = createMemo(
-    () => isDesktop() && architectureAvailable() === true && tabs().active() === SESSION_ARCHITECTURE_TAB,
+  let panelRow: HTMLDivElement | undefined
+  const [panelRowWidth, setPanelRowWidth] = createSignal<number>()
+  createResizeObserver(
+    () => panelRow,
+    ({ width }) => setPanelRowWidth(width),
   )
+
+  function normalizeTab(tab: string) {
+    if (!tab.startsWith("file://")) return tab
+    return file.tab(tab)
+  }
+
+  function normalizeTabs(list: string[]) {
+    const seen = new Set<string>()
+    const next: string[] = []
+    for (const item of list) {
+      const value = normalizeTab(item)
+      if (seen.has(value)) continue
+      seen.add(value)
+      next.push(value)
+    }
+    return next
+  }
+
+  const openReviewPanel = () => {
+    if (!view().reviewPanel.opened()) view().reviewPanel.open()
+  }
+
+  const info = createMemo(() => (params.id ? sync().session.get(params.id) : undefined))
+  const isChildSession = createMemo(() => !!info()?.parentID)
+  const canReview = createMemo(() => !!sync().project)
+  const reviewTab = createMemo(() => isDesktop())
+  const tabState = createSessionTabs({
+    tabs,
+    pathFromTab: file.pathFromTab,
+    normalizeTab,
+    review: reviewTab,
+    architecture: () => architectureAvailable() === true,
+    hasReview: canReview,
+    fallback: () => (view().reviewPanel.opened() ? "review" : SESSION_ARCHITECTURE_TAB),
+  })
+  const activeTab = tabState.activeTab
+  const activeFileTab = tabState.activeFileTab
+  const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
+  const desktopArchitectureOpen = createMemo(() => isDesktop() && activeTab() === SESSION_ARCHITECTURE_TAB)
   const desktopDetailOpen = createMemo(() => desktopReviewOpen() || desktopArchitectureOpen())
   const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen())
   const terminalOpen = createMemo(() => view().terminal.opened())
@@ -485,12 +540,6 @@ export default function Page() {
     newSessionDesign() ? desktopV2ReviewOpen() || desktopArchitectureOpen() || desktopTerminalOpen() : desktopDetailOpen(),
   )
   const desktopSidePanelOpen = createMemo(() => desktopSessionResizeOpen() || desktopFileTreeOpen())
-  let panelRow: HTMLDivElement | undefined
-  const [panelRowWidth, setPanelRowWidth] = createSignal<number>()
-  createResizeObserver(
-    () => panelRow,
-    ({ width }) => setPanelRowWidth(width),
-  )
   const splitReview = createMemo(
     () => (newSessionDesign() ? desktopV2ReviewOpen() : desktopReviewOpen()) && layout.review.diffStyle() === "split",
   )
@@ -528,42 +577,6 @@ export default function Page() {
       files: desktopFileTreeOpen(),
     }),
   )
-
-  function normalizeTab(tab: string) {
-    if (!tab.startsWith("file://")) return tab
-    return file.tab(tab)
-  }
-
-  function normalizeTabs(list: string[]) {
-    const seen = new Set<string>()
-    const next: string[] = []
-    for (const item of list) {
-      const value = normalizeTab(item)
-      if (seen.has(value)) continue
-      seen.add(value)
-      next.push(value)
-    }
-    return next
-  }
-
-  const openReviewPanel = () => {
-    if (!view().reviewPanel.opened()) view().reviewPanel.open()
-  }
-
-  const info = createMemo(() => (params.id ? sync().session.get(params.id) : undefined))
-  const isChildSession = createMemo(() => !!info()?.parentID)
-  const canReview = createMemo(() => !!sync().project)
-  const reviewTab = createMemo(() => isDesktop())
-  const tabState = createSessionTabs({
-    tabs,
-    pathFromTab: file.pathFromTab,
-    normalizeTab,
-    review: reviewTab,
-    architecture: () => architectureAvailable() === true,
-    hasReview: canReview,
-  })
-  const activeTab = tabState.activeTab
-  const activeFileTab = tabState.activeFileTab
   const revertMessageID = createMemo(() => info()?.revert?.messageID)
   const timeline = createTimelineModel({ sessionID: () => params.id, revertMessageID })
   const historyLoading = timeline.history.loading

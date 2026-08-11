@@ -86,6 +86,10 @@ function windowLastActiveUrlKey(windowID: string) {
   return `opencode.desktop.window.${windowID}.last-active-url`
 }
 
+function windowStoreName(windowID: string) {
+  return `opencode.window.${(windowID || "browser").replace(/[^a-zA-Z0-9._-]/g, "-")}.dat`
+}
+
 function getLastActiveUrl(windowID: string) {
   if (typeof localStorage !== "object") return "/"
   try {
@@ -102,9 +106,48 @@ function setLastActiveUrl(windowID: string, value: string) {
   } catch {}
 }
 
-function DesktopMemoryRouter(props: BaseRouterProps & { windowID: string }) {
+function sessionIDFromLastActiveUrl(value: string) {
+  const parts = value.split(/[?#]/, 1)[0]?.split("/").filter(Boolean) ?? []
+  if (parts[0] === "server" && parts[2] === "session" && parts[3]) return parts[3]
+  if (parts[1] === "session" && parts[2]) return parts[2]
+}
+
+function openSessionIDs(raw: string | null) {
+  if (raw === null) return new Set<string>()
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return
+
+    return new Set(
+      parsed.flatMap((tab) => {
+        if (!tab || typeof tab !== "object") return []
+        const entry = tab as { type?: unknown; sessionId?: unknown }
+        if (entry.type !== "session" || typeof entry.sessionId !== "string") return []
+        return [entry.sessionId]
+      }),
+    )
+  } catch {
+    return
+  }
+}
+
+async function getRestorableLastActiveUrl(windowID: string) {
+  const value = getLastActiveUrl(windowID)
+  const sessionID = sessionIDFromLastActiveUrl(value)
+  if (!sessionID) return value
+
+  const sessionIDs = await window.api.storeGet(windowStoreName(windowID), "tabs").then(openSessionIDs, () => undefined)
+  if (!sessionIDs) return value
+  if (sessionIDs.has(sessionID)) return value
+
+  setLastActiveUrl(windowID, "/")
+  return "/"
+}
+
+function DesktopMemoryRouter(props: BaseRouterProps & { windowID: string; initialUrl: string }) {
   const history = createMemoryHistory()
-  const initialUrl = getLastActiveUrl(props.windowID)
+  const initialUrl = props.initialUrl
   if (initialUrl !== "/") history.set({ value: initialUrl, replace: true, scroll: false })
   onCleanup(history.listen((value) => setLastActiveUrl(props.windowID, value)))
   return <MemoryRouter {...props} history={history} />
@@ -333,6 +376,7 @@ function LoadingSplash() {
 
 function DesktopRoot(props: { windowState: DesktopWindowState }) {
   const platform = createPlatform(props.windowState)
+  const windowID = platform.windowID ?? "browser"
   const loadLocale = async () => {
     const current = await platform.storage?.("opencode.global.dat").getItem("language")
     const legacy = current ? undefined : await platform.storage?.().getItem("language.v1")
@@ -348,10 +392,11 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
   // Fetch sidecar credentials (available immediately, before health check)
   const [sidecar] = createResource(() => window.api.awaitInitialization())
 
+  const [initialUrl] = createResource(() => windowID, getRestorableLastActiveUrl)
   const [defaultServer] = createResource(() => platform.getDefaultServer?.())
   const [locale] = createResource(loadLocale)
   const router = (props: BaseRouterProps) => (
-    <DesktopMemoryRouter {...props} windowID={platform.windowID ?? "browser"} />
+    <DesktopMemoryRouter {...props} windowID={windowID} initialUrl={initialUrl.latest ?? "/"} />
   )
   const onboarding = Promise.withResolvers<void>()
 
@@ -377,7 +422,7 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
     const wslServers = useWslServers()
     const language = useLanguage()
     const ready = createMemo(
-      () => !defaultServer.loading && !sidecar.loading && !locale.loading && !wslServers.isLoading,
+      () => !defaultServer.loading && !sidecar.loading && !initialUrl.loading && !locale.loading && !wslServers.isLoading,
     )
     const servers = createMemo(() => {
       const data = initializationData(sidecar)
@@ -411,7 +456,7 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
               startup={onboarding.promise}
               serverScoped={
                 <DesktopFirstLaunchOnboarding
-                  initialUrl={getLastActiveUrl(platform.windowID ?? "browser")}
+                  initialUrl={initialUrl.latest ?? "/"}
                   onLoaded={onboarding.resolve}
                 />
               }

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import {
+  SESSION_ARCHITECTURE_TAB,
   SESSION_OPEN_FILE_TAB,
   closeSessionTab,
   openSessionTab,
@@ -78,5 +79,9 @@ describe("closeSessionTab", () => {
         "file://b.ts",
       ),
     ).toEqual(state(["file://a.ts", "file://c.ts"], "file://a.ts"))
+  })
+
+  test("closes an implicit Architecture fallback to an explicit empty tab", () => {
+    expect(closeSessionTab(state([], undefined), SESSION_ARCHITECTURE_TAB)).toEqual(state([], "empty"))
   })
 })

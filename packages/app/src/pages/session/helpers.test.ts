@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { createMemo, createRoot } from "solid-js"
 import { createStore } from "solid-js/store"
 import {
+  SESSION_ARCHITECTURE_TAB,
   SESSION_OPEN_FILE_TAB,
   createOpenReviewFile,
   createOpenSessionFileTab,
@@ -163,6 +164,51 @@ describe("createSessionTabs", () => {
       expect(result.activeTab()).toBe("review")
       expect(result.activeFileTab()).toBeUndefined()
       expect(result.closableTab()).toBeUndefined()
+      dispose()
+    })
+  })
+
+  test("uses Architecture as the empty desktop detail fallback when available", () => {
+    createRoot((dispose) => {
+      const [state] = createStore({
+        active: undefined as string | undefined,
+        all: [],
+      })
+      const tabs = createMemo(() => ({ active: () => state.active, all: () => state.all }))
+      const result = createSessionTabs({
+        tabs,
+        pathFromTab: () => undefined,
+        normalizeTab: (tab) => tab,
+        architecture: () => true,
+        review: () => true,
+        hasReview: () => true,
+        fallback: () => SESSION_ARCHITECTURE_TAB,
+      })
+
+      expect(result.activeTab()).toBe(SESSION_ARCHITECTURE_TAB)
+      expect(result.closableTab()).toBe(SESSION_ARCHITECTURE_TAB)
+      dispose()
+    })
+  })
+
+  test("uses Review as the explicit detail fallback before Architecture", () => {
+    createRoot((dispose) => {
+      const [state] = createStore({
+        active: undefined as string | undefined,
+        all: [],
+      })
+      const tabs = createMemo(() => ({ active: () => state.active, all: () => state.all }))
+      const result = createSessionTabs({
+        tabs,
+        pathFromTab: () => undefined,
+        normalizeTab: (tab) => tab,
+        architecture: () => true,
+        review: () => true,
+        hasReview: () => true,
+        fallback: () => "review",
+      })
+
+      expect(result.activeTab()).toBe("review")
       dispose()
     })
   })

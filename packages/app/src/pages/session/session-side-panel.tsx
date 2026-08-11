@@ -113,14 +113,6 @@ export function SessionSidePanel(props: {
   const fileTreeWidth = createMemo(() => Math.max(FILE_TREE_WIDTH_MIN, layout.fileTree.width()))
   const reviewTab = createMemo(() => isDesktop())
   const architectureTab = createMemo(() => isDesktop() && architectureAvailable() === true)
-  const architectureOpen = createMemo(() => architectureTab() && tabs().active() === SESSION_ARCHITECTURE_TAB)
-  const detailOpen = createMemo(() => reviewOpen() || architectureOpen())
-  const open = createMemo(() => detailOpen() || fileOpen())
-  const panelWidth = createMemo(() => {
-    if (!open()) return "0px"
-    if (detailOpen()) return "auto"
-    return `${fileTreeWidth()}px`
-  })
   const treeWidth = createMemo(() => (fileOpen() ? `${fileTreeWidth()}px` : "0px"))
 
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
@@ -190,6 +182,7 @@ export function SessionSidePanel(props: {
     architecture: architectureTab,
     hasReview: props.canReview,
     fileBrowser: () => !!props.fileBrowserState,
+    fallback: () => (view().reviewPanel.opened() ? "review" : SESSION_ARCHITECTURE_TAB),
   })
   const contextOpen = tabState.contextOpen
   const openFileOpen = tabState.openFileOpen
@@ -197,6 +190,14 @@ export function SessionSidePanel(props: {
   const openedTabs = tabState.openedTabs
   const activeTab = tabState.activeTab
   const activeFileTab = tabState.activeFileTab
+  const architectureOpen = createMemo(() => architectureTab() && activeTab() === SESSION_ARCHITECTURE_TAB)
+  const detailOpen = createMemo(() => reviewOpen() || architectureOpen())
+  const open = createMemo(() => detailOpen() || fileOpen())
+  const panelWidth = createMemo(() => {
+    if (!open()) return "0px"
+    if (detailOpen()) return "auto"
+    return `${fileTreeWidth()}px`
+  })
 
   const fileTreeTab = () => layout.fileTree.tab()
 
