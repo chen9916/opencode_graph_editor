@@ -1289,6 +1289,11 @@ function RuntimeDebugView(props: {
                       {props.labels.debug.visibleDigest}: <bdi>{event.digest}</bdi>
                     </span>
                   )}
+                  {event.details?.map((detail) => (
+                    <span key={detail.key}>
+                      <code>{detail.key}</code>: <bdi>{String(detail.value)}</bdi>
+                    </span>
+                  ))}
                 </small>
               </li>
             ))}

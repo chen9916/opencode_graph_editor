@@ -55,10 +55,6 @@ import type {
   ArchitectureSnapshot,
   ArchitectureViewport,
 } from "./contract"
-import {
-  architectureResourceEventInfo,
-  architectureResourceInstanceEventInfo,
-} from "./event"
 import { createArchitectureCacheOrder, guardedArchitectureCacheResponse } from "./cache-order"
 import { downloadArchitectureResourceExport } from "./export"
 import {
@@ -83,14 +79,13 @@ import {
   architectureFailedDebugEvent,
   architectureJournalDebugEvent,
   architectureReloadStartedDebugEvent,
-  architectureResourceServerDebugEvent,
   architectureSaveStartedDebugEvent,
   architectureSnapshotDebugEvent,
   prependArchitectureRuntimeDebugEvent,
 } from "./runtime-debug"
 import { architectureRuntimeController } from "./runtime-controller"
-import { architectureLiveInstanceEventPlan, architectureResourceEventRefreshPlan } from "./sync-events"
 import { architectureSelectionText } from "./selection-prompt"
+import { syncArchitectureServerEvent } from "./server-event-sync"
 import "./architecture-panel.css"
 
 export default function ArchitecturePanel() {
@@ -483,87 +478,53 @@ function ArchitecturePanelWorkspace() {
   createEffect(() => {
     const current = sdk()
     const unsubscribe = serverSDK().event.on(current.directory, (event) => {
-      const type = String(event.type)
       const resourcesKey = architectureResourcesQueryKey(current.url, current.directory)
-      const instanceEventInfo = architectureResourceInstanceEventInfo({
-        type,
-        properties: event.properties,
-        data: "data" in event ? event.data : undefined,
-      })
-      if (instanceEventInfo) {
-        if (instanceEventInfo.resourceID === resourceID())
-          appendDebugEvent(architectureResourceServerDebugEvent(instanceEventInfo))
-        const instanceKey = architectureResourceInstanceQueryKey(current.url, current.directory, instanceEventInfo.resourceID)
-        const resourceKey = architectureResourceQueryKey(current.url, current.directory, instanceEventInfo.resourceID)
-        const plan = architectureLiveInstanceEventPlan({
-          snapshot: queryClient.getQueryData<ArchitectureSnapshot>(resourceKey),
-          event: instanceEventInfo,
-        })
-        if (plan.action === "ignore-stale") return
-        if (plan.action === "adopt-cache") {
-          setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, (current) =>
-            plan.cache ? adoptArchitectureLiveInstanceCache(current, plan.cache) : plan.cache,
-          )
-          if (plan.cache === null && instanceEventInfo.resourceID === resourceID()) {
-            void queryClient.refetchQueries({ queryKey: resourcesKey, exact: true, type: "active" })
-            void queryClient.refetchQueries({ queryKey: resourceKey, exact: true, type: "active" })
-          }
-          return
-        }
-        void queryClient.refetchQueries({ queryKey: instanceKey, exact: true, type: "active" })
-        return
-      }
-      const eventInfo = architectureResourceEventInfo({
-        type,
-        properties: event.properties,
-        data: "data" in event ? event.data : undefined,
-      })
-      if (!eventInfo) return
-      if (eventInfo.resourceID === resourceID())
-        appendDebugEvent(architectureResourceServerDebugEvent(eventInfo))
-      const plan = architectureResourceEventRefreshPlan({
-        eventType: type,
-        currentResourceID: resourceID(),
-        localDirty: localDirty(),
-        resources: queryClient.getQueryData(resourcesKey),
-        snapshot: queryClient.getQueryData(architectureResourceQueryKey(current.url, current.directory, eventInfo.resourceID)),
-        event: eventInfo,
-      })
-      if (plan.removed) {
-        batch(() => {
-          setState("removedResourceIDs", eventInfo.resourceID, true)
-          setArchitectureQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
-            removeResourceSummary(current, eventInfo.resourceID),
-          )
-          setPersistedState("pendingOverlays", eventInfo.resourceID, undefined)
-          setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-            architectureResourceInstanceQueryKey(current.url, current.directory, eventInfo.resourceID),
-            null,
-          )
-          setPersistedState("viewports", eventInfo.resourceID, undefined)
-          if (persistedState.selectedID === eventInfo.resourceID) setPersistedState("selectedID", undefined)
-        })
-        return
-      }
-
-      if (plan.updateResources)
+      const refetchResources = () =>
+        void queryClient.refetchQueries({ queryKey: resourcesKey, exact: true, type: "active" })
+      const refetchResource = (resourceID: string) =>
         void queryClient.refetchQueries({
-          queryKey: resourcesKey,
+          queryKey: architectureResourceQueryKey(current.url, current.directory, resourceID),
           exact: true,
           type: "active",
         })
-
-      if (!plan.updateResource) return
-      const resourceKey = architectureResourceQueryKey(current.url, current.directory, eventInfo.resourceID)
-      if (plan.clearLiveInstance)
-        setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-          architectureResourceInstanceQueryKey(current.url, current.directory, eventInfo.resourceID),
-          null,
-        )
-      void queryClient.refetchQueries({
-        queryKey: resourceKey,
-        exact: true,
-        type: "active",
+      syncArchitectureServerEvent({
+        server: current.url,
+        directory: current.directory,
+        selectedResourceID: resourceID(),
+        localDirty: localDirty(),
+        resources: queryClient.getQueryData(resourcesKey),
+        event: { type: String(event.type), properties: event.properties, data: "data" in event ? event.data : undefined },
+        cacheOrder,
+        snapshot: (resourceID) =>
+          queryClient.getQueryData(architectureResourceQueryKey(current.url, current.directory, resourceID)),
+        currentInstance: (resourceID) =>
+          queryClient.getQueryData<ArchitectureLiveInstanceCache>(
+            architectureResourceInstanceQueryKey(current.url, current.directory, resourceID),
+          ),
+        loadInstance: (resourceID) => loadArchitectureResourceInstance(serverSDK().currentApi, current.directory, resourceID),
+        setInstance: (resourceID, value) =>
+          setArchitectureQueryData<ArchitectureLiveInstanceCache>(
+            architectureResourceInstanceQueryKey(current.url, current.directory, resourceID),
+            value,
+          ),
+        refetchResources,
+        refetchResource,
+        removeResource: (resourceID) => {
+          batch(() => {
+            setState("removedResourceIDs", resourceID, true)
+            setArchitectureQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
+              removeResourceSummary(current, resourceID),
+            )
+            setPersistedState("pendingOverlays", resourceID, undefined)
+            setArchitectureQueryData<ArchitectureLiveInstanceCache>(
+              architectureResourceInstanceQueryKey(current.url, current.directory, resourceID),
+              null,
+            )
+            setPersistedState("viewports", resourceID, undefined)
+            if (persistedState.selectedID === resourceID) setPersistedState("selectedID", undefined)
+          })
+        },
+        debug: appendDebugEvent,
       })
     })
     onCleanup(unsubscribe)

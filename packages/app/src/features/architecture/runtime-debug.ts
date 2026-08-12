@@ -18,6 +18,7 @@ export function createArchitectureRuntimeDebugEvent(input: {
   readonly conflictCount?: number
   readonly revision?: number
   readonly digest?: string
+  readonly details?: ArchitectureRuntimeDebugEvent["details"]
   readonly now?: number
   readonly unique?: string
 }): ArchitectureRuntimeDebugEvent {
@@ -34,6 +35,7 @@ export function createArchitectureRuntimeDebugEvent(input: {
     ...(input.conflictCount === undefined ? {} : { conflictCount: input.conflictCount }),
     ...(input.revision === undefined ? {} : { revision: input.revision }),
     ...(input.digest === undefined ? {} : { digest: input.digest }),
+    ...(input.details === undefined ? {} : { details: input.details }),
   }
 }
 
@@ -74,6 +76,7 @@ export function architectureSnapshotDebugEvent(input: {
   readonly type: "save" | "reload" | "sync"
   readonly status: Extract<ArchitectureRuntimeDebugEventStatus, "received" | "succeeded">
   readonly snapshot: ArchitectureSnapshot
+  readonly details?: ArchitectureRuntimeDebugEvent["details"]
 }) {
   return createArchitectureRuntimeDebugEvent({
     resourceID: input.resourceID,
@@ -81,6 +84,7 @@ export function architectureSnapshotDebugEvent(input: {
     status: input.status,
     revision: input.snapshot.resource.revision,
     digest: input.snapshot.digest,
+    details: input.details,
   })
 }
 
@@ -104,9 +108,82 @@ export function architectureResourceServerDebugEvent(
     status: "received",
     revision: event.revision,
     digest: event.digest,
+    details:
+      "action" in event
+        ? details({
+            action: event.action,
+            baseRevision: event.baseRevision,
+            baseDigest: event.baseDigest,
+            instance: event.instance ? event.instance.source : undefined,
+          })
+        : undefined,
+  })
+}
+
+export function architectureInstanceRefetchStartedDebugEvent(event: ArchitectureResourceInstanceEventInfo) {
+  return createArchitectureRuntimeDebugEvent({
+    resourceID: event.resourceID,
+    type: "sync",
+    status: "started",
+    revision: event.revision,
+    digest: event.digest,
+    details: details({
+      action: event.action,
+      baseRevision: event.baseRevision,
+      baseDigest: event.baseDigest,
+      reason: "metadata-only-instance-event",
+    }),
+  })
+}
+
+export function architectureInstanceRefetchFinishedDebugEvent(input: {
+  readonly event: ArchitectureResourceInstanceEventInfo
+  readonly status: Extract<ArchitectureRuntimeDebugEventStatus, "succeeded" | "failed">
+  readonly revision?: number
+  readonly digest?: string
+  readonly source?: "live" | "saved"
+  readonly reason?: string
+}) {
+  return createArchitectureRuntimeDebugEvent({
+    resourceID: input.event.resourceID,
+    type: "sync",
+    status: input.status,
+    revision: input.revision ?? input.event.revision,
+    digest: input.digest ?? input.event.digest,
+    details: details({
+      action: input.event.action,
+      source: input.source,
+      reason: input.reason,
+      eventRevision: input.event.revision,
+      eventDigest: input.event.digest,
+      baseRevision: input.event.baseRevision,
+      baseDigest: input.event.baseDigest,
+    }),
+  })
+}
+
+export function architectureSyncDecisionDebugEvent(input: {
+  readonly resourceID: string
+  readonly status?: Extract<ArchitectureRuntimeDebugEventStatus, "succeeded" | "failed">
+  readonly revision?: number
+  readonly digest?: string
+  readonly details: Record<string, string | number | boolean | undefined>
+}) {
+  return createArchitectureRuntimeDebugEvent({
+    resourceID: input.resourceID,
+    type: "sync",
+    status: input.status ?? "succeeded",
+    revision: input.revision,
+    digest: input.digest,
+    details: details(input.details),
   })
 }
 
 function operationTypes(operations: ReadonlyArray<ArchitectureOperation>) {
   return Array.from(new Set(operations.map((operation) => operation.type)))
+}
+
+function details(input: Record<string, string | number | boolean | undefined>) {
+  const values = Object.entries(input).flatMap(([key, value]) => (value === undefined ? [] : [{ key, value }]))
+  return values.length > 0 ? values : undefined
 }

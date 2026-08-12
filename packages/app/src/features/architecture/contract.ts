@@ -55,6 +55,7 @@ export type ArchitectureRuntimeDebugEvent = {
   readonly conflictCount?: number
   readonly revision?: number
   readonly digest?: string
+  readonly details?: ReadonlyArray<{ readonly key: string; readonly value: string | number | boolean }>
 }
 
 export type ArchitectureConflictExplanation = {

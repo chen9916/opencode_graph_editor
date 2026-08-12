@@ -22,6 +22,31 @@ export function architectureLiveInstanceEventPlan(input: {
   return { action: "refetch" }
 }
 
+export function architectureFetchedLiveInstanceEventPlan(input: {
+  readonly event: ArchitectureResourceInstanceEventInfo
+  readonly cache: ArchitectureLiveInstanceCache | undefined
+}):
+  | { readonly action: "adopt-cache"; readonly cache: ArchitectureLiveInstanceCache; readonly reason: "event-discarded" | "live-response" }
+  | {
+      readonly action: "ignore"
+      readonly reason: "missing-response" | "saved-response" | "resource-mismatch" | "older-than-event" | "digest-mismatch"
+    } {
+  if (input.event.action === "discarded") return { action: "adopt-cache", cache: null, reason: "event-discarded" }
+  if (input.cache === undefined) return { action: "ignore", reason: "missing-response" }
+  if (input.cache === null) return { action: "ignore", reason: "saved-response" }
+  if (input.cache.snapshot.resource.id !== input.event.resourceID) return { action: "ignore", reason: "resource-mismatch" }
+  if (input.event.revision !== undefined && input.cache.snapshot.resource.revision < input.event.revision)
+    return { action: "ignore", reason: "older-than-event" }
+  if (
+    input.event.revision !== undefined &&
+    input.event.digest !== undefined &&
+    input.cache.snapshot.resource.revision === input.event.revision &&
+    input.cache.snapshot.digest !== input.event.digest
+  )
+    return { action: "ignore", reason: "digest-mismatch" }
+  return { action: "adopt-cache", cache: input.cache, reason: "live-response" }
+}
+
 export function architectureResourceEventRefreshPlan(input: {
   readonly eventType: string
   readonly currentResourceID: string | undefined

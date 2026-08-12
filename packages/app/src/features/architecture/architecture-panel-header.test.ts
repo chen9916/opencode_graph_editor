@@ -54,10 +54,11 @@ describe("architecture resource header", () => {
     expect(source).toContain("liveInstanceVersion={liveInstanceVersion()}")
   })
 
-  test("applies live instance event payloads as authoritative live instance updates", async () => {
-    const source = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
+  test("delegates server event synchronization out of the panel", async () => {
+    const panel = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
+    const sync = await Bun.file(new URL("./server-event-sync.ts", import.meta.url)).text()
 
-    expect(source).toContain("adoptArchitectureLiveInstanceCache")
-    expect(source).toContain("adoptArchitectureLiveInstanceCache(current, plan.cache)")
+    expect(panel).toContain("syncArchitectureServerEvent")
+    expect(sync).toContain("adoptArchitectureLiveInstanceCache(current, plan.cache)")
   })
 })

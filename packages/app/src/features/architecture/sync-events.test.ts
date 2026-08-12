@@ -1,13 +1,19 @@
 import { describe, expect, test } from "bun:test"
-import type { ArchitectureSnapshot } from "./contract"
+import type { ArchitectureLiveInstance, ArchitectureLiveInstanceCache, ArchitectureSnapshot } from "./contract"
 import { architectureJournalDebugEvent, prependArchitectureRuntimeDebugEvent } from "./runtime-debug"
-import { architectureLiveInstanceEventPlan, architectureResourceEventRefreshPlan } from "./sync-events"
+import {
+  architectureFetchedLiveInstanceEventPlan,
+  architectureLiveInstanceEventPlan,
+  architectureResourceEventRefreshPlan,
+} from "./sync-events"
 
 const snapshot = (revision = 2, digest = "digest"): ArchitectureSnapshot => ({
   digest,
   storage: { root: "/repo/.opencode/architecture", path: ".opencode/architecture/resources/design.json" },
   resource: { version: 2, revision, id: "design", name: "Design", nodes: [], edges: [] },
 })
+
+const live = (revision = 2, digest = "live"): ArchitectureLiveInstance => ({ source: "live", snapshot: snapshot(revision, digest) })
 
 describe("architecture sync event helpers", () => {
   test("plans stale, discarded, and refetch instance event handling", () => {
@@ -26,6 +32,33 @@ describe("architecture sync event helpers", () => {
     expect(
       architectureLiveInstanceEventPlan({ snapshot: undefined, event: { resourceID: "design", action: "updated" } }).action,
     ).toBe("refetch")
+  })
+
+  test("plans authoritative adoption for metadata-only instance refetches", () => {
+    expect(
+      architectureFetchedLiveInstanceEventPlan({
+        event: { resourceID: "design", action: "updated", revision: 2, digest: "event" },
+        cache: live(2, "event"),
+      }),
+    ).toMatchObject({ action: "adopt-cache", reason: "live-response" })
+    expect(
+      architectureFetchedLiveInstanceEventPlan({
+        event: { resourceID: "design", action: "updated", revision: 2, digest: "event" },
+        cache: live(2, "other-same-revision"),
+      }),
+    ).toEqual({ action: "ignore", reason: "digest-mismatch" })
+    expect(
+      architectureFetchedLiveInstanceEventPlan({
+        event: { resourceID: "design", action: "updated", revision: 3, digest: "event" },
+        cache: live(2, "older"),
+      }),
+    ).toEqual({ action: "ignore", reason: "older-than-event" })
+    expect(
+      architectureFetchedLiveInstanceEventPlan({
+        event: { resourceID: "design", action: "updated", revision: 2, digest: "event" },
+        cache: null satisfies ArchitectureLiveInstanceCache,
+      }),
+    ).toEqual({ action: "ignore", reason: "saved-response" })
   })
 
   test("plans resource refetches without overriding dirty selected resources", () => {

@@ -1,0 +1,204 @@
+{
+  "version": 2,
+  "revision": 1,
+  "id": "design_ff684205f001f2bkgGKMdC6nAb",
+  "name": "Graph Debugging Demo",
+  "tagColors": {
+    "ai": "#a855f7",
+    "backend": "#10b981",
+    "debug": "#f97316",
+    "fix": "#22c55e",
+    "signal": "#eab308",
+    "ui": "#3b82f6"
+  },
+  "nodes": [
+    {
+      "id": "ai_tool_edit",
+      "text": "AI graph tool edit\nThe assistant uses managed graph tools to create/update nodes and edges. The edit is tagged as external to the local canvas gesture flow.",
+      "tags": [
+        "ai",
+        "debug"
+      ],
+      "layout": {
+        "position": {
+          "x": 720,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "backend_event",
+      "text": "Backend event\nThe resource service patches the managed graph, updates revision/digest, and emits resource or live-instance update events.",
+      "tags": [
+        "backend",
+        "signal"
+      ],
+      "layout": {
+        "position": {
+          "x": 1080,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "debug_trace",
+      "text": "Debug trace\nIf something looks wrong, inspect the activity log: event kind, action, source, base revision, event revision, digest reason, and conflict explanation.",
+      "tags": [
+        "debug",
+        "signal"
+      ],
+      "layout": {
+        "position": {
+          "x": 360,
+          "y": 260
+        }
+      }
+    },
+    {
+      "id": "event_sync",
+      "text": "UI event sync\nThe panel receives backend events, compares revision/digest, decides whether to refetch, adopt, ignore, or protect local pending work.",
+      "tags": [
+        "backend",
+        "debug",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 1080,
+          "y": 260
+        }
+      }
+    },
+    {
+      "id": "human_next_step",
+      "text": "Human next step\nUse the trace to decide: keep editing, save, reload, ask AI to explain, or report a backend/event-sync bug with concrete evidence.",
+      "tags": [
+        "ai",
+        "debug",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 0,
+          "y": 260
+        }
+      }
+    },
+    {
+      "id": "ui_debug_panel",
+      "text": "UI debug panel\nCollapsed Sync debug shows selected resource ID, dirty state, live instance status, pending operations, conflicts, revisions, and recent sync activity.",
+      "tags": [
+        "debug",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 360,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "user_reports_issue",
+      "text": "User reports issue\nExample: “AI changed the graph, but I do not see it in the editor.”",
+      "tags": [
+        "debug",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "visible_result",
+      "text": "Visible result\nThe canvas updates without manual reload when the event is safe to adopt. Recently changed nodes can be highlighted for the user.",
+      "tags": [
+        "fix",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 720,
+          "y": 260
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_ai_to_backend",
+      "source": "ai_tool_edit",
+      "target": "backend_event",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_backend_to_sync",
+      "source": "backend_event",
+      "target": "event_sync",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_next_to_report",
+      "source": "human_next_step",
+      "target": "user_reports_issue",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "e_panel_to_ai",
+      "source": "ui_debug_panel",
+      "target": "ai_tool_edit",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_report_to_panel",
+      "source": "user_reports_issue",
+      "target": "ui_debug_panel",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_result_to_trace",
+      "source": "visible_result",
+      "target": "debug_trace",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_sync_to_result",
+      "source": "event_sync",
+      "target": "visible_result",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_trace_to_next",
+      "source": "debug_trace",
+      "target": "human_next_step",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_trace_to_panel",
+      "source": "debug_trace",
+      "target": "ui_debug_panel",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    }
+  ]
+}

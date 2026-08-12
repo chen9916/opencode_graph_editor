@@ -193,4 +193,15 @@ describe("enqueueServerEvent", () => {
 
     expect(events).toHaveLength(2)
   })
+
+  test("normalizes Windows directory channels before dispatch", () => {
+    const events: Array<{ directory: string; payload: Event }> = []
+
+    enqueueServerEvent(events, {
+      directory: "E:\\dev\\opencode\\",
+      payload: { type: "architecture.resource.instance.updated", properties: {} } as Event,
+    })
+
+    expect(events[0]?.directory).toBe("E:/dev/opencode")
+  })
 })
