@@ -1,0 +1,143 @@
+{
+  "version": 2,
+  "revision": 3,
+  "id": "design_ff32bf42a0017rnh1LIxbIXlSA",
+  "name": "Graph 2",
+  "nodes": [
+    {
+      "id": "node_mspaq45l",
+      "text": "New node",
+      "tags": [],
+      "layout": {
+        "position": {
+          "x": 699.485925606836,
+          "y": 281.1756810905832
+        }
+      }
+    },
+    {
+      "id": "node_mspaq5d5",
+      "text": "New node",
+      "tags": [],
+      "layout": {
+        "position": {
+          "x": 308.339128639616,
+          "y": 262.5831157256848
+        }
+      }
+    },
+    {
+      "id": "node_mspaqa1w",
+      "text": "New node",
+      "tags": [],
+      "layout": {
+        "position": {
+          "x": 13.962487177454179,
+          "y": 130.14915755325555
+        }
+      }
+    },
+    {
+      "id": "node_mspaqj3f",
+      "text": "New node",
+      "tags": [],
+      "layout": {
+        "position": {
+          "x": 304.9372110003309,
+          "y": 495.11933438246484
+        }
+      }
+    },
+    {
+      "id": "node_mspaqtnn",
+      "text": "New node",
+      "tags": [],
+      "layout": {
+        "position": {
+          "x": 642.3798276208126,
+          "y": 72.52877896539978
+        }
+      }
+    },
+    {
+      "id": "node_mspar4qm",
+      "text": "New node",
+      "tags": [],
+      "layout": {
+        "position": {
+          "x": 680.2882664143559,
+          "y": 506.5164462160451
+        }
+      }
+    },
+    {
+      "id": "node_mspbdlu3",
+      "text": "dadwa\ndwad\nwdaddad",
+      "tags": [],
+      "layout": {
+        "position": {
+          "x": 317.3534325650951,
+          "y": -24.99909629303965
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_mspaq5d5_7175n7",
+      "source": "node_mspaq45l",
+      "target": "node_mspaq5d5",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_mspaqa1w_wy3ggv",
+      "source": "node_mspaq5d5",
+      "target": "node_mspaqa1w",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "curved"
+    },
+    {
+      "id": "edge_mspaqj3f_p6sv6c",
+      "source": "node_mspaq5d5",
+      "target": "node_mspaqj3f",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "edge_mspaqtnn_zgafpq",
+      "source": "node_mspaq5d5",
+      "target": "node_mspaqtnn",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_mspar4qm_7g2fxg",
+      "source": "node_mspaqj3f",
+      "target": "node_mspar4qm",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "edge_mspasejv_rl4rem",
+      "source": "node_mspar4qm",
+      "target": "node_mspaq45l",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "edge_mspbdlu3_h68gol",
+      "source": "node_mspaq5d5",
+      "target": "node_mspbdlu3",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    }
+  ]
+}

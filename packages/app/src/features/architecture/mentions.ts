@@ -2,7 +2,8 @@ import { createEffect, onCleanup } from "solid-js"
 import { createQuery, useQueryClient } from "@tanstack/solid-query"
 import { useSDK } from "@/context/sdk"
 import { useServerArchitectureAvailable, useServerSDK } from "@/context/server-sdk"
-import { architectureResourcesQueryKey, listArchitectureResources } from "./api"
+import { listArchitectureResources } from "./api"
+import { architectureResourcesQueryKey } from "./architecture-resource-queries"
 import { architectureResourceEventInfo, architectureSummaryMatchesEvent, isArchitectureLocalSaveEvent } from "./event"
 
 export function useArchitectureResourceMentions() {

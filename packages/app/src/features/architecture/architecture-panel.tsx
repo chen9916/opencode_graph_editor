@@ -2,8 +2,7 @@ import { batch, createEffect, createMemo, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { useParams } from "@solidjs/router"
-import { createQuery, useQueryClient } from "@tanstack/solid-query"
-import type { ArchitectureListResourcesOutput } from "@opencode-ai/client/promise"
+import { useQueryClient } from "@tanstack/solid-query"
 import { sendFollowupDraft } from "@/components/prompt-input/submit"
 import type { Prompt } from "@/context/prompt"
 import { useLanguage } from "@/context/language"
@@ -19,21 +18,16 @@ import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { DialogFooter, DialogHeader, DialogTitleGroup, DialogV2 } from "@opencode-ai/ui/v2/dialog-v2"
 import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
-import {
-  architectureResourceInstanceQueryKey,
-  architectureResourceQueryKey,
-  architectureResourcesQueryKey,
-  commitArchitectureResourceInstance,
-  createArchitectureResource,
-  listArchitectureResources,
-  loadArchitectureResource,
-  loadArchitectureResourceInstance,
-  loadArchitectureResourceInstanceSnapshot,
-  removeArchitectureResource,
-  reloadArchitectureResourceInstance,
-  updateArchitectureResourceInstance,
-} from "./api"
+import { loadArchitectureResourceInstance, updateArchitectureResourceInstance } from "./api"
 import { ArchitectureIsland } from "./architecture-island"
+import {
+  createArchitectureResourceAction,
+  duplicateArchitectureResourceAction,
+  reloadArchitectureResourceAction,
+  removeArchitectureResourceAction,
+  saveArchitectureResourceAction,
+  type ArchitectureResourceActionError,
+} from "./architecture-resource-actions"
 import {
   ARCHITECTURE_COMMAND_EVENT,
   architectureCommandRequest,
@@ -46,51 +40,39 @@ import type {
   ArchitectureInstanceChange,
   ArchitectureConflictExplanation,
   ArchitectureLabels,
-  ArchitectureLiveInstanceCache,
   ArchitectureOperation,
   ArchitecturePendingOverlay,
   ArchitectureResource,
   ArchitectureRuntimeDebugEvent,
   ArchitectureSelectionPrompt,
-  ArchitectureSnapshot,
   ArchitectureViewport,
 } from "./contract"
 import {
-  architectureResourceEventInfo,
-  architectureResourceInstanceEventInfo,
-} from "./event"
-import { createArchitectureCacheOrder, guardedArchitectureCacheResponse } from "./cache-order"
+  createArchitectureResourceListQuery,
+  createArchitectureResourceQueryCache,
+  createArchitectureSelectedResourceQueries,
+} from "./architecture-resource-queries"
 import { downloadArchitectureResourceExport } from "./export"
 import {
-  adoptArchitectureLiveInstanceCache,
   createArchitectureInstanceSynchronizer,
   discardSavedArchitectureLiveInstanceCache,
-  latestArchitectureLiveInstanceCache,
-  reconcileArchitectureInstanceChange,
 } from "./live-instance"
 import {
   architectureInstanceCanSkipSave,
   architectureInstanceIsDirty,
   architectureInstanceResourceID,
-  architectureResourceSummary,
-  latestArchitectureSnapshot,
   missingSelectedArchitectureResourceID,
   resolveArchitectureResourceSelection,
   resolveArchitectureResourceID,
-  updateArchitectureResourceSummaries,
 } from "./resource-state"
 import {
-  architectureFailedDebugEvent,
   architectureJournalDebugEvent,
-  architectureReloadStartedDebugEvent,
-  architectureResourceServerDebugEvent,
-  architectureSaveStartedDebugEvent,
   architectureSnapshotDebugEvent,
   prependArchitectureRuntimeDebugEvent,
 } from "./runtime-debug"
 import { architectureRuntimeController } from "./runtime-controller"
-import { architectureLiveInstanceEventPlan, architectureResourceEventRefreshPlan } from "./sync-events"
 import { architectureSelectionText } from "./selection-prompt"
+import { syncArchitectureServerEvent } from "./server-event-sync"
 import "./architecture-panel.css"
 
 export default function ArchitecturePanel() {
@@ -129,14 +111,11 @@ function ArchitecturePanelWorkspace() {
     removedResourceIDs: {} as Record<string, true | undefined>,
   })
   const instanceSynchronizers = new Map<string, ReturnType<typeof createArchitectureInstanceSynchronizer>>()
-  const cacheOrder = createArchitectureCacheOrder()
-  const setArchitectureQueryData = <T,>(
-    key: readonly unknown[],
-    value: T | ((current: T | undefined) => T | undefined),
-  ) => {
-    cacheOrder.mark(key)
-    queryClient.setQueryData<T>(key, value)
-  }
+  const architectureQueries = createArchitectureResourceQueryCache({
+    queryClient,
+    server: () => sdk().url,
+    directory: () => sdk().directory,
+  })
   const operationScope = (resourceID: string) => {
     const workspace = sdk()
     return {
@@ -146,27 +125,16 @@ function ArchitecturePanelWorkspace() {
       resourceID,
     }
   }
-  const resources = createQuery(() => {
-    const workspace = sdk()
-    const api = serverSDK().currentApi
-    const key = architectureResourcesQueryKey(workspace.url, workspace.directory)
-    return {
-      queryKey: key,
-      enabled: architectureAvailable() === true,
-      queryFn: ({ signal }) =>
-        guardedArchitectureCacheResponse<ArchitectureListResourcesOutput["data"]>({
-          cacheOrder,
-          key,
-          current: () => queryClient.getQueryData<ArchitectureListResourcesOutput["data"]>(key),
-          observe: () => listArchitectureResources(api, workspace.directory, signal),
-        }),
-      refetchInterval: state.busy ? false : 2_000,
-      refetchIntervalInBackground: true,
-    }
+  const resourceListQuery = createArchitectureResourceListQuery({
+    api: () => serverSDK().currentApi,
+    directory: () => sdk().directory,
+    available: architectureAvailable,
+    busy: () => state.busy,
+    removedResourceIDs: () => state.removedResourceIDs,
+    cache: architectureQueries,
   })
-  const selectableResources = createMemo(() =>
-    resources.data?.filter((resource) => !state.removedResourceIDs[resource.id]),
-  )
+  const resources = resourceListQuery.resources
+  const selectableResources = resourceListQuery.selectableResources
   const selectedID = createMemo(() => {
     const id = persistedState.selectedID
     return id && state.removedResourceIDs[id] ? undefined : id
@@ -182,46 +150,17 @@ function ArchitecturePanelWorkspace() {
   const appendDebugEvent = (event: ArchitectureRuntimeDebugEvent) => {
     setState("debugEvents", event.resourceID, (current) => prependArchitectureRuntimeDebugEvent(current, event))
   }
-  const resource = createQuery(() => {
-    const id = resourceID()
-    const workspace = sdk()
-    const api = serverSDK().currentApi
-    const key = architectureResourceQueryKey(workspace.url, workspace.directory, id ?? "")
-    return {
-      queryKey: key,
-      enabled: architectureAvailable() === true && !!id,
-      queryFn: ({ signal }) =>
-        guardedArchitectureCacheResponse<ArchitectureSnapshot>({
-          cacheOrder,
-          key,
-          current: () => queryClient.getQueryData<ArchitectureSnapshot>(key),
-          observe: () => loadArchitectureResource(api, workspace.directory, id!, signal),
-        }),
-      refetchInterval: state.busy || localDirty() ? false : 2_000,
-      refetchIntervalInBackground: true,
-      reconcile: latestArchitectureSnapshot,
-    }
+  const selectedResourceQueries = createArchitectureSelectedResourceQueries({
+    api: () => serverSDK().currentApi,
+    directory: () => sdk().directory,
+    available: architectureAvailable,
+    busy: () => state.busy,
+    localDirty,
+    selectedResourceID: resourceID,
+    cache: architectureQueries,
   })
-  const liveInstance = createQuery(() => {
-    const id = resourceID()
-    const workspace = sdk()
-    const api = serverSDK().currentApi
-    const key = architectureResourceInstanceQueryKey(workspace.url, workspace.directory, id ?? "")
-    return {
-      queryKey: key,
-      enabled: architectureAvailable() === true && !!id,
-      queryFn: ({ signal }) =>
-        guardedArchitectureCacheResponse<ArchitectureLiveInstanceCache>({
-          cacheOrder,
-          key,
-          current: () => queryClient.getQueryData<ArchitectureLiveInstanceCache>(key),
-          observe: () => loadArchitectureResourceInstance(api, workspace.directory, id!, signal),
-        }),
-      refetchInterval: state.busy ? false : 2_000,
-      refetchIntervalInBackground: true,
-      reconcile: latestArchitectureLiveInstanceCache,
-    }
-  })
+  const resource = selectedResourceQueries.resource
+  const liveInstance = selectedResourceQueries.liveInstance
   const runtimeController = createMemo(() =>
     architectureRuntimeController({
       selectedResourceID: resourceID(),
@@ -237,6 +176,7 @@ function ArchitecturePanelWorkspace() {
     const key = `${scope.server}\0${scope.directory}\0${scope.resourceID}`
     const current = instanceSynchronizers.get(key)
     if (current) return current
+    const scopeQueries = architectureQueries.scope({ server: scope.server, directory: scope.directory })
     const created = createArchitectureInstanceSynchronizer({
       patch: (base, operations) => updateArchitectureResourceInstance(scope.api, scope.directory, base, operations),
       update: (updated) => {
@@ -249,10 +189,7 @@ function ArchitecturePanelWorkspace() {
               snapshot: updated.snapshot,
             }),
           )
-        setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-          architectureResourceInstanceQueryKey(scope.server, scope.directory, scope.resourceID),
-          (current) => adoptArchitectureLiveInstanceCache(current, updated),
-        )
+        scopeQueries.adoptLiveInstance(scope.resourceID, updated)
       },
       adopt: (instance) => {
         if (instance)
@@ -264,10 +201,7 @@ function ArchitecturePanelWorkspace() {
               snapshot: instance.snapshot,
             }),
           )
-        setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-          architectureResourceInstanceQueryKey(scope.server, scope.directory, scope.resourceID),
-          instance,
-        )
+        scopeQueries.setLiveInstance(scope.resourceID, instance)
       },
     })
     instanceSynchronizers.set(key, created)
@@ -290,11 +224,7 @@ function ArchitecturePanelWorkspace() {
     const id = resourceID()
     const snapshot = runtimeView().snapshot
     if (!id || !snapshot) return
-    const workspace = sdk()
-    setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-      architectureResourceInstanceQueryKey(workspace.url, workspace.directory, id),
-      (current) => discardSavedArchitectureLiveInstanceCache(current, snapshot),
-    )
+    architectureQueries.setLiveInstance(id, (current) => discardSavedArchitectureLiveInstanceCache(current, snapshot))
   })
 
   createEffect(() => {
@@ -452,6 +382,7 @@ function ArchitecturePanelWorkspace() {
         "server-event": language.t("architecture.debug.event.serverEvent"),
         save: language.t("architecture.debug.event.save"),
         reload: language.t("architecture.debug.event.reload"),
+        "canvas-source": language.t("architecture.debug.event.canvasSource"),
       },
       eventStatuses: {
         recorded: language.t("architecture.debug.eventStatus.recorded"),
@@ -483,87 +414,31 @@ function ArchitecturePanelWorkspace() {
   createEffect(() => {
     const current = sdk()
     const unsubscribe = serverSDK().event.on(current.directory, (event) => {
-      const type = String(event.type)
-      const resourcesKey = architectureResourcesQueryKey(current.url, current.directory)
-      const instanceEventInfo = architectureResourceInstanceEventInfo({
-        type,
-        properties: event.properties,
-        data: "data" in event ? event.data : undefined,
-      })
-      if (instanceEventInfo) {
-        if (instanceEventInfo.resourceID === resourceID())
-          appendDebugEvent(architectureResourceServerDebugEvent(instanceEventInfo))
-        const instanceKey = architectureResourceInstanceQueryKey(current.url, current.directory, instanceEventInfo.resourceID)
-        const resourceKey = architectureResourceQueryKey(current.url, current.directory, instanceEventInfo.resourceID)
-        const plan = architectureLiveInstanceEventPlan({
-          snapshot: queryClient.getQueryData<ArchitectureSnapshot>(resourceKey),
-          event: instanceEventInfo,
-        })
-        if (plan.action === "ignore-stale") return
-        if (plan.action === "adopt-cache") {
-          setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, (current) =>
-            plan.cache ? adoptArchitectureLiveInstanceCache(current, plan.cache) : plan.cache,
-          )
-          if (plan.cache === null && instanceEventInfo.resourceID === resourceID()) {
-            void queryClient.refetchQueries({ queryKey: resourcesKey, exact: true, type: "active" })
-            void queryClient.refetchQueries({ queryKey: resourceKey, exact: true, type: "active" })
-          }
-          return
-        }
-        void queryClient.refetchQueries({ queryKey: instanceKey, exact: true, type: "active" })
-        return
-      }
-      const eventInfo = architectureResourceEventInfo({
-        type,
-        properties: event.properties,
-        data: "data" in event ? event.data : undefined,
-      })
-      if (!eventInfo) return
-      if (eventInfo.resourceID === resourceID())
-        appendDebugEvent(architectureResourceServerDebugEvent(eventInfo))
-      const plan = architectureResourceEventRefreshPlan({
-        eventType: type,
-        currentResourceID: resourceID(),
+      const eventQueries = architectureQueries.scope({ server: current.url, directory: current.directory })
+      syncArchitectureServerEvent({
+        selectedResourceID: resourceID(),
         localDirty: localDirty(),
-        resources: queryClient.getQueryData(resourcesKey),
-        snapshot: queryClient.getQueryData(architectureResourceQueryKey(current.url, current.directory, eventInfo.resourceID)),
-        event: eventInfo,
-      })
-      if (plan.removed) {
-        batch(() => {
-          setState("removedResourceIDs", eventInfo.resourceID, true)
-          setArchitectureQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
-            removeResourceSummary(current, eventInfo.resourceID),
-          )
-          setPersistedState("pendingOverlays", eventInfo.resourceID, undefined)
-          setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-            architectureResourceInstanceQueryKey(current.url, current.directory, eventInfo.resourceID),
-            null,
-          )
-          setPersistedState("viewports", eventInfo.resourceID, undefined)
-          if (persistedState.selectedID === eventInfo.resourceID) setPersistedState("selectedID", undefined)
-        })
-        return
-      }
-
-      if (plan.updateResources)
-        void queryClient.refetchQueries({
-          queryKey: resourcesKey,
-          exact: true,
-          type: "active",
-        })
-
-      if (!plan.updateResource) return
-      const resourceKey = architectureResourceQueryKey(current.url, current.directory, eventInfo.resourceID)
-      if (plan.clearLiveInstance)
-        setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-          architectureResourceInstanceQueryKey(current.url, current.directory, eventInfo.resourceID),
-          null,
-        )
-      void queryClient.refetchQueries({
-        queryKey: resourceKey,
-        exact: true,
-        type: "active",
+        resources: eventQueries.getResources(),
+        event: { type: String(event.type), properties: event.properties, data: "data" in event ? event.data : undefined },
+        snapshot: eventQueries.getSnapshot,
+        currentInstance: eventQueries.getLiveInstance,
+        loadInstance: (resourceID) =>
+          eventQueries.observeLiveInstance(resourceID, () =>
+            loadArchitectureResourceInstance(serverSDK().currentApi, current.directory, resourceID),
+          ),
+        setInstance: eventQueries.setLiveInstance,
+        refetchResources: eventQueries.refetchResources,
+        refetchResource: eventQueries.refetchResource,
+        removeResource: (resourceID) => {
+          batch(() => {
+            setState("removedResourceIDs", resourceID, true)
+            eventQueries.removeResource(resourceID)
+            setPersistedState("pendingOverlays", resourceID, undefined)
+            setPersistedState("viewports", resourceID, undefined)
+            if (persistedState.selectedID === resourceID) setPersistedState("selectedID", undefined)
+          })
+        },
+        debug: appendDebugEvent,
       })
     })
     onCleanup(unsubscribe)
@@ -606,54 +481,51 @@ function ArchitecturePanelWorkspace() {
           },
     )
     const scope = operationScope(id)
-    const live = queryClient.getQueryData<ArchitectureLiveInstanceCache>(
-      architectureResourceInstanceQueryKey(scope.server, scope.directory, id),
-    )
+    const live = architectureQueries.scope({ server: scope.server, directory: scope.directory }).getLiveInstance(id)
     void instanceSynchronizer(scope)
       .synchronize(live?.snapshot ?? change.origin, change.resource)
       .catch(() => undefined)
   }
 
+  const reportResourceActionError = (error: ArchitectureResourceActionError) => {
+    if (error.action === "save") {
+      showToast({ variant: "error", title: labels().saveFailed })
+      return
+    }
+    if (error.action === "reload") {
+      showToast({ variant: "error", title: language.t("architecture.panel.error") })
+      return
+    }
+    if (error.action === "create") {
+      showToast({ variant: "error", title: language.t("architecture.toast.resourceCreateFailed") })
+      return
+    }
+    if (error.action === "duplicate") {
+      showToast({ variant: "error", title: language.t("architecture.toast.resourceDuplicateFailed") })
+      return
+    }
+    showToast({ variant: "error", title: language.t("architecture.toast.resourceDeleteFailed") })
+  }
+
   const save = async (change: ArchitectureInstanceChange) => {
     const id = architectureInstanceResourceID(change)
-    if (state.busy) return false
-    const live = pending()?.instance
-    if (architectureInstanceCanSkipSave(change) && !live) return true
     const workspace = sdk()
-    if (change.server !== workspace.url || change.directory !== workspace.directory) return false
     const scope = operationScope(id)
-    setState("busy", true)
-    const resourceKey = architectureResourceQueryKey(scope.server, scope.directory, id)
-    const instanceKey = architectureResourceInstanceQueryKey(scope.server, scope.directory, id)
-    const resourcesKey = architectureResourcesQueryKey(scope.server, scope.directory)
-    const synchronizer = instanceSynchronizer(scope)
-    appendDebugEvent(architectureSaveStartedDebugEvent(change))
-    try {
-      await synchronizer.invalidate()
-      const synchronized = await synchronizer.synchronizeAuthoritative(
-        () => loadArchitectureResourceInstanceSnapshot(scope.api, scope.directory, id),
-        change.resource,
-      )
-      const saved = await commitArchitectureResourceInstance(scope.api, scope.directory, synchronized)
-      batch(() => {
-        setArchitectureQueryData(resourceKey, saved)
-        setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, null)
-        setArchitectureQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
-          updateArchitectureResourceSummaries(current, architectureResourceSummary(saved)),
-        )
-        setPersistedState("pendingOverlays", id, undefined)
-        setState("liveInstanceVersions", id, (current) => (current ?? 0) + 1)
-      })
-      void synchronizer.adopt(null).catch(() => undefined)
-      appendDebugEvent(architectureSnapshotDebugEvent({ resourceID: id, type: "save", status: "succeeded", snapshot: saved }))
-      return true
-    } catch {
-      appendDebugEvent(architectureFailedDebugEvent({ resourceID: id, type: "save" }))
-      showToast({ variant: "error", title: labels().saveFailed })
-      return false
-    } finally {
-      setState("busy", false)
-    }
+    return saveArchitectureResourceAction({
+      change,
+      busy: state.busy,
+      currentServer: workspace.url,
+      currentDirectory: workspace.directory,
+      currentLivePending: pending()?.instance,
+      scope,
+      cache: architectureQueries,
+      synchronizer: instanceSynchronizer(scope),
+      setBusy: (busy) => setState("busy", busy),
+      clearPendingOverlay: (resourceID) => setPersistedState("pendingOverlays", resourceID, undefined),
+      bumpLiveInstanceVersion: (resourceID) => setState("liveInstanceVersions", resourceID, (current) => (current ?? 0) + 1),
+      debug: appendDebugEvent,
+      onError: reportResourceActionError,
+    }).then((result) => result.ok)
   }
 
   const confirm = (message: string, confirmLabel: string, action: () => void) => {
@@ -680,39 +552,18 @@ function ArchitecturePanelWorkspace() {
     ))
   }
 
-  const reloadResource = async (scope: ReturnType<typeof operationScope>) => {
-    const id = scope.resourceID
-    if (state.busy) return
-    setState("busy", true)
-    const resourceKey = architectureResourceQueryKey(scope.server, scope.directory, id)
-    const instanceKey = architectureResourceInstanceQueryKey(scope.server, scope.directory, id)
-    const resourcesKey = architectureResourcesQueryKey(scope.server, scope.directory)
-    const synchronizer = instanceSynchronizer(scope)
-    appendDebugEvent(architectureReloadStartedDebugEvent(id))
-    try {
-      await synchronizer.invalidate()
-      const reloaded = await reloadArchitectureResourceInstance(scope.api, scope.directory, id)
-      batch(() => {
-        setArchitectureQueryData(resourceKey, reloaded.snapshot)
-        setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, null)
-        setArchitectureQueryData(
-          resourcesKey,
-          (current: ArchitectureListResourcesOutput["data"] | undefined) =>
-            updateArchitectureResourceSummaries(current, architectureResourceSummary(reloaded.snapshot)),
-        )
-        setPersistedState("pendingOverlays", id, undefined)
-        setState("liveInstanceVersions", id, (current) => (current ?? 0) + 1)
-      })
-      void synchronizer.adopt(null).catch(() => undefined)
-      appendDebugEvent(
-        architectureSnapshotDebugEvent({ resourceID: id, type: "reload", status: "succeeded", snapshot: reloaded.snapshot }),
-      )
-    } catch {
-      appendDebugEvent(architectureFailedDebugEvent({ resourceID: id, type: "reload" }))
-      showToast({ variant: "error", title: language.t("architecture.panel.error") })
-    } finally {
-      setState("busy", false)
-    }
+  const executeReloadResource = async (scope: ReturnType<typeof operationScope>) => {
+    await reloadArchitectureResourceAction({
+      busy: state.busy,
+      scope,
+      cache: architectureQueries,
+      synchronizer: instanceSynchronizer(scope),
+      setBusy: (busy) => setState("busy", busy),
+      clearPendingOverlay: (resourceID) => setPersistedState("pendingOverlays", resourceID, undefined),
+      bumpLiveInstanceVersion: (resourceID) => setState("liveInstanceVersions", resourceID, (current) => (current ?? 0) + 1),
+      debug: appendDebugEvent,
+      onError: reportResourceActionError,
+    })
   }
 
   const reload = () => {
@@ -720,39 +571,24 @@ function ArchitecturePanelWorkspace() {
     if (!id || state.busy) return
     const scope = operationScope(id)
     if (!dirty()) {
-      void reloadResource(scope)
+      void executeReloadResource(scope)
       return
     }
-    confirm(labels().discardConfirm, labels().reload, () => void reloadResource(scope))
+    confirm(labels().discardConfirm, labels().reload, () => void executeReloadResource(scope))
   }
 
   const createResource = async () => {
-    if (state.busy || !persistedReady()) return
     const workspace = sdk()
-    const api = serverSDK().currentApi
-    setState("busy", true)
-    try {
-      const created = await createArchitectureResource(api, workspace.directory, {
-        name: language.t("architecture.resource.defaultName", { number: (selectableResources()?.length ?? 0) + 1 }),
-      })
-      batch(() => {
-        setArchitectureQueryData(architectureResourceQueryKey(workspace.url, workspace.directory, created.resource.id), created)
-        setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-          architectureResourceInstanceQueryKey(workspace.url, workspace.directory, created.resource.id),
-          null,
-        )
-        setArchitectureQueryData(
-          architectureResourcesQueryKey(workspace.url, workspace.directory),
-          (current: ArchitectureListResourcesOutput["data"] | undefined) =>
-            updateArchitectureResourceSummaries(current, architectureResourceSummary(created)),
-        )
-        setPersistedState("selectedID", created.resource.id)
-      })
-    } catch {
-      showToast({ variant: "error", title: language.t("architecture.toast.resourceCreateFailed") })
-    } finally {
-      setState("busy", false)
-    }
+    await createArchitectureResourceAction({
+      busy: state.busy,
+      persistedReady: persistedReady(),
+      scope: { api: serverSDK().currentApi, server: workspace.url, directory: workspace.directory },
+      cache: architectureQueries,
+      name: language.t("architecture.resource.defaultName", { number: (selectableResources()?.length ?? 0) + 1 }),
+      setBusy: (busy) => setState("busy", busy),
+      setSelectedID: (resourceID) => setPersistedState("selectedID", resourceID),
+      onError: reportResourceActionError,
+    })
   }
 
   const requestDuplicateResource = () => {
@@ -769,84 +605,45 @@ function ArchitecturePanelWorkspace() {
 
   const duplicateResource = async (change: ArchitectureInstanceChange) => {
     const id = architectureInstanceResourceID(change)
-    if (state.busy || !persistedReady()) return
     const workspace = sdk()
-    if (change.server !== workspace.url || change.directory !== workspace.directory) return
     const scope = operationScope(id)
-    setState("busy", true)
-    const resourcesKey = architectureResourcesQueryKey(scope.server, scope.directory)
-    try {
-      const created = await createArchitectureResource(scope.api, scope.directory, {
-        name: language.t("architecture.resource.duplicateName", { name: change.resource.name }),
-      })
-      const patched = await updateArchitectureResourceInstance(
-        scope.api,
-        scope.directory,
-        created,
-        reconcileArchitectureInstanceChange(created.resource, change.resource),
-      )
-      if (!patched) throw new Error("Architecture instance patch did not return a live instance")
-      const copy = await commitArchitectureResourceInstance(scope.api, scope.directory, patched.snapshot)
-      batch(() => {
-        setArchitectureQueryData(architectureResourceQueryKey(scope.server, scope.directory, copy.resource.id), copy)
-        setArchitectureQueryData<ArchitectureLiveInstanceCache>(
-          architectureResourceInstanceQueryKey(scope.server, scope.directory, copy.resource.id),
-          null,
-        )
-        setArchitectureQueryData(resourcesKey, (current: ArchitectureListResourcesOutput["data"] | undefined) =>
-          updateArchitectureResourceSummaries(current, architectureResourceSummary(copy)),
-        )
-        setPersistedState("selectedID", copy.resource.id)
-      })
-    } catch {
-      showToast({ variant: "error", title: language.t("architecture.toast.resourceDuplicateFailed") })
-    } finally {
-      setState("busy", false)
-    }
+    await duplicateArchitectureResourceAction({
+      change,
+      busy: state.busy,
+      persistedReady: persistedReady(),
+      currentServer: workspace.url,
+      currentDirectory: workspace.directory,
+      scope,
+      cache: architectureQueries,
+      name: language.t("architecture.resource.duplicateName", { name: change.resource.name }),
+      setBusy: (busy) => setState("busy", busy),
+      setSelectedID: (resourceID) => setPersistedState("selectedID", resourceID),
+      onError: reportResourceActionError,
+    })
   }
 
   const removeResource = () => {
     const current = runtimeView().snapshot
     if (!current || state.busy) return
     const workspace = sdk()
-    const api = serverSDK().currentApi
     const id = current.resource.id
-    const resourcesKey = architectureResourcesQueryKey(workspace.url, workspace.directory)
-    const instanceKey = architectureResourceInstanceQueryKey(workspace.url, workspace.directory, id)
+    const scope = { api: serverSDK().currentApi, server: workspace.url, directory: workspace.directory, resourceID: id }
     confirm(language.t("architecture.confirm.deleteResource"), labels().delete, () => {
-      const previousSelectedID = persistedState.selectedID
-      const previousPending = persistedState.pendingOverlays[id]
-      const previousViewport = persistedState.viewports[id]
-      const previousLive = queryClient.getQueryData<ArchitectureLiveInstanceCache>(instanceKey)
-      batch(() => {
-        setState("busy", true)
-        setState("removedResourceIDs", id, true)
-        setArchitectureQueryData(resourcesKey, (list: ArchitectureListResourcesOutput["data"] | undefined) =>
-          removeResourceSummary(list, id),
-        )
-        setPersistedState("pendingOverlays", id, undefined)
-        setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, null)
-        setPersistedState("viewports", id, undefined)
-        setPersistedState("selectedID", undefined)
+      void removeArchitectureResourceAction({
+        snapshot: current,
+        busy: state.busy,
+        scope,
+        cache: architectureQueries,
+        getSelectedID: () => persistedState.selectedID,
+        setSelectedID: (resourceID) => setPersistedState("selectedID", resourceID),
+        getPendingOverlay: (resourceID) => persistedState.pendingOverlays[resourceID],
+        setPendingOverlay: (resourceID, pending) => setPersistedState("pendingOverlays", resourceID, pending),
+        getViewport: (resourceID) => persistedState.viewports[resourceID],
+        setViewport: (resourceID, viewport) => setPersistedState("viewports", resourceID, viewport),
+        setBusy: (busy) => setState("busy", busy),
+        setRemovedResourceID: (resourceID, removed) => setState("removedResourceIDs", resourceID, removed),
+        onError: reportResourceActionError,
       })
-      void removeArchitectureResource(api, workspace.directory, current)
-        .then(() => {
-          void queryClient.refetchQueries({ queryKey: resourcesKey, exact: true, type: "active" })
-        })
-        .catch(() => {
-          batch(() => {
-            setState("removedResourceIDs", id, undefined)
-            setArchitectureQueryData(resourcesKey, (list: ArchitectureListResourcesOutput["data"] | undefined) =>
-              updateArchitectureResourceSummaries(list, architectureResourceSummary(current)),
-            )
-            setPersistedState("pendingOverlays", id, previousPending)
-            if (previousLive !== undefined) setArchitectureQueryData<ArchitectureLiveInstanceCache>(instanceKey, previousLive)
-            setPersistedState("viewports", id, previousViewport)
-            setPersistedState("selectedID", previousSelectedID)
-          })
-          showToast({ variant: "error", title: language.t("architecture.toast.resourceDeleteFailed") })
-        })
-        .finally(() => setState("busy", false))
     })
   }
 
@@ -1052,6 +849,7 @@ function ArchitecturePanelWorkspace() {
                       onReload={reload}
                       onExport={exportPatch}
                       onExportResource={exportResource}
+                      onCanvasSourceDebug={appendDebugEvent}
                       onConfirm={confirm}
                     />
                   </Show>
@@ -1071,8 +869,4 @@ function ArchitectureMessage(props: { readonly value: string }) {
       <div class="max-w-80 text-13-regular text-v2-text-muted">{props.value}</div>
     </div>
   )
-}
-
-function removeResourceSummary(current: ArchitectureListResourcesOutput["data"] | undefined, resourceID: string) {
-  return current?.filter((item) => item.id !== resourceID)
 }

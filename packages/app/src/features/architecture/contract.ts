@@ -41,7 +41,7 @@ export type ArchitectureRuntimeSyncStatus =
   | "local-pending"
   | "conflicted"
   | "pending-covered"
-export type ArchitectureRuntimeDebugEventType = "journal" | "sync" | "server-event" | "save" | "reload"
+export type ArchitectureRuntimeDebugEventType = "journal" | "sync" | "server-event" | "save" | "reload" | "canvas-source"
 export type ArchitectureRuntimeDebugEventStatus = "recorded" | "received" | "started" | "succeeded" | "failed"
 
 export type ArchitectureRuntimeDebugEvent = {
@@ -55,6 +55,7 @@ export type ArchitectureRuntimeDebugEvent = {
   readonly conflictCount?: number
   readonly revision?: number
   readonly digest?: string
+  readonly details?: ReadonlyArray<{ readonly key: string; readonly value: string | number | boolean }>
 }
 
 export type ArchitectureConflictExplanation = {
@@ -233,5 +234,6 @@ export type ArchitecturePanelProps = {
   readonly onReload: () => void
   readonly onExport: (operations: ReadonlyArray<ArchitectureOperation>) => void
   readonly onExportResource: (resource: ArchitectureResource) => void
+  readonly onCanvasSourceDebug?: (event: ArchitectureRuntimeDebugEvent) => void
   readonly onConfirm: (message: string, confirmLabel: string, action: () => void) => void
 }

@@ -799,6 +799,7 @@ export const dict = {
   "architecture.debug.event.serverEvent": "Server event",
   "architecture.debug.event.save": "Save",
   "architecture.debug.event.reload": "Reload",
+  "architecture.debug.event.canvasSource": "Canvas source",
   "architecture.debug.eventStatus.recorded": "Recorded",
   "architecture.debug.eventStatus.received": "Received",
   "architecture.debug.eventStatus.started": "Started",

@@ -66,11 +66,12 @@ import {
   commitArchitectureEditorHistory,
   createArchitectureEditorHistory,
   redoArchitectureEditorHistory,
-  syncArchitectureEditorHistorySource,
   undoArchitectureEditorHistory,
 } from "./editor-state"
+import { syncArchitectureCanvasSource, type ArchitectureCanvasSourceMetadata } from "./canvas-source-sync"
 import { tagColorsKey, toReactFlow, type ArchitectureFlowEdge, type ArchitectureFlowNode } from "./model"
 import { architectureInstanceIsDirty } from "./resource-state"
+import { architectureCanvasSourceDebugEvent } from "./runtime-debug"
 import { ArchitectureEdgeView } from "./architecture-edge.react"
 import { ArchitectureNodeView } from "./architecture-node.react"
 import {
@@ -127,6 +128,7 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
   const liveInstanceKey = architectureEditorLiveInstanceKey({ base, liveInstanceVersion: props.liveInstanceVersion })
   const loadedResourceID = useRef(base.resource.id)
   const loadedLiveInstanceVersion = useRef(props.liveInstanceVersion)
+  const canvasSourceMetadata = useRef<ArchitectureCanvasSourceMetadata>()
   const canvas = useRef<HTMLDivElement>(null)
   const visibleViewport = useRef<ArchitectureViewport | undefined>(props.viewport)
   const viewportMotion = useRef<ViewportMotion>({ active: false, velocity: { x: 0, y: 0 } })
@@ -188,7 +190,17 @@ export function ArchitectureEditor(props: ArchitecturePanelProps) {
     const resetEditedHints = resourceChanged || loadedLiveInstanceVersion.current !== props.liveInstanceVersion
     loadedResourceID.current = base.resource.id
     loadedLiveInstanceVersion.current = props.liveInstanceVersion
-    const next = syncArchitectureEditorHistorySource(editor, historySource, initial)
+    const synced = syncArchitectureCanvasSource({
+      history: editor,
+      source: historySource,
+      operations: initial,
+      snapshot: props.snapshot,
+      runtimeView: props.runtimeView,
+      previous: canvasSourceMetadata.current,
+    })
+    canvasSourceMetadata.current = synced.metadata
+    if (synced.transition.action !== "unchanged") props.onCanvasSourceDebug?.(architectureCanvasSourceDebugEvent(synced.transition))
+    const next = synced.history
     const nextResourceKey = architectureResourceHintKey(next.resource)
     const locallyAuthored = locallyAuthoredResourceKeys.current.has(nextResourceKey)
     if (locallyAuthored) locallyAuthoredResourceKeys.current.delete(nextResourceKey)
@@ -1289,6 +1301,11 @@ function RuntimeDebugView(props: {
                       {props.labels.debug.visibleDigest}: <bdi>{event.digest}</bdi>
                     </span>
                   )}
+                  {event.details?.map((detail) => (
+                    <span key={detail.key}>
+                      <code>{detail.key}</code>: <bdi>{String(detail.value)}</bdi>
+                    </span>
+                  ))}
                 </small>
               </li>
             ))}

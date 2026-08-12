@@ -13,6 +13,7 @@ import { useGlobal } from "./global"
 import { ServerScope } from "@/utils/server-scope"
 import { detectServerProtocol, type ServerProtocol } from "@/utils/server-protocol"
 import { createCompatibleApi, type CompatibleApi } from "@/utils/server-compat"
+import { pathKey } from "@/utils/path-key"
 
 const isAbortError = (error: unknown) =>
   error !== null && typeof error === "object" && "name" in error && error.name === "AbortError"
@@ -66,13 +67,14 @@ const coalescedKey = (event: QueuedServerEvent) => {
 }
 
 export function enqueueServerEvent(queue: QueuedServerEvent[], event: QueuedServerEvent) {
-  const key = coalescedKey(event)
+  const normalized = { ...event, directory: pathKey(event.directory) }
+  const key = coalescedKey(normalized)
   const previous = queue[queue.length - 1]
   if (key && previous && coalescedKey(previous) === key) {
-    queue[queue.length - 1] = event
+    queue[queue.length - 1] = normalized
     return false
   }
-  queue.push(event)
+  queue.push(normalized)
   return true
 }
 
@@ -165,6 +167,7 @@ export function resumeStreamAfterPageShow(event: PageTransitionEvent, start: () 
 }
 
 type ServerEventEmitter = ReturnType<typeof createGlobalEmitter<{ [key: string]: ServerEvent }>>
+type ServerDirectoryEventListener = (directory: string, listener: (event: ServerEvent) => void) => () => void
 type ServerSDKBase = {
   server: ServerConnection.Any
   scope: ServerScope
@@ -177,7 +180,7 @@ type ServerSDKBase = {
   api: CompatibleApi
   currentApi: ServerApi
   event: {
-    on: ServerEventEmitter["on"]
+    on: ServerDirectoryEventListener
     listen: ServerEventEmitter["listen"]
     start: () => Promise<void> | undefined
   }
@@ -364,7 +367,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     api,
     currentApi,
     event: {
-      on: emitter.on.bind(emitter),
+      on: (directory, listener) => emitter.on(pathKey(directory), listener),
       listen: emitter.listen.bind(emitter),
       start,
     },

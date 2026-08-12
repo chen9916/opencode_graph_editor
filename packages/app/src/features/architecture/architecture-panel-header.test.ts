@@ -31,33 +31,37 @@ describe("architecture resource header", () => {
   test("captures the reload target before opening discard confirmation", async () => {
     const source = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
 
-    expect(source).toContain("const reloadResource = async (scope: ReturnType<typeof operationScope>)")
+    expect(source).toContain("const executeReloadResource = async (scope: ReturnType<typeof operationScope>)")
     expect(source).toContain("const scope = operationScope(id)")
-    expect(source).toContain("confirm(labels().discardConfirm, labels().reload, () => void reloadResource(scope))")
+    expect(source).toContain("confirm(labels().discardConfirm, labels().reload, () => void executeReloadResource(scope))")
   })
 
-  test("bumps the same-resource live instance after save or reload replaces the backend instance", async () => {
+  test("delegates save, reload, and resource lifecycle execution to the action boundary", async () => {
     const source = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
-    const save = source.match(
-      /const save = async \(change: ArchitectureInstanceChange\) => \{[\s\S]*?\n  const confirm = /,
-    )?.[0]
-    const reloadResource = source.match(
-      /const reloadResource = async \(scope: ReturnType<typeof operationScope>\) => \{[\s\S]*?\n  const reload = \(\) => \{/,
-    )?.[0]
 
-    if (!save) throw new Error("Save handler was not found")
-    if (!reloadResource) throw new Error("Reload resource handler was not found")
+    expect(source).toContain("saveArchitectureResourceAction")
+    expect(source).toContain("reloadArchitectureResourceAction")
+    expect(source).toContain("createArchitectureResourceAction")
+    expect(source).toContain("duplicateArchitectureResourceAction")
+    expect(source).toContain("removeArchitectureResourceAction")
+    expect(source).not.toContain("commitArchitectureResourceInstance")
+    expect(source).not.toContain("reloadArchitectureResourceInstance")
+    expect(source).not.toContain("removeArchitectureResource(")
+  })
+
+  test("keeps live instance version bump callbacks wired into delegated save and reload actions", async () => {
+    const source = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
+
     expect(source).toContain("liveInstanceVersions")
-    expect(save).toContain('setPersistedState("pendingOverlays", id, undefined)')
-    expect(save).toContain('setState("liveInstanceVersions", id, (current) => (current ?? 0) + 1)')
-    expect(reloadResource).toContain('setState("liveInstanceVersions", id, (current) => (current ?? 0) + 1)')
+    expect(source.match(/bumpLiveInstanceVersion: \(resourceID\) => setState\("liveInstanceVersions", resourceID, \(current\) => \(current \?\? 0\) \+ 1\)/g)?.length).toBe(2)
     expect(source).toContain("liveInstanceVersion={liveInstanceVersion()}")
   })
 
-  test("applies live instance event payloads as authoritative live instance updates", async () => {
-    const source = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
+  test("delegates server event synchronization out of the panel", async () => {
+    const panel = await Bun.file(new URL("./architecture-panel.tsx", import.meta.url)).text()
+    const sync = await Bun.file(new URL("./server-event-sync.ts", import.meta.url)).text()
 
-    expect(source).toContain("adoptArchitectureLiveInstanceCache")
-    expect(source).toContain("adoptArchitectureLiveInstanceCache(current, plan.cache)")
+    expect(panel).toContain("syncArchitectureServerEvent")
+    expect(sync).toContain("adoptArchitectureLiveInstanceCache(current, plan.cache)")
   })
 })

@@ -1,0 +1,689 @@
+{
+  "version": 2,
+  "revision": 5,
+  "id": "design_ff684205f001f2bkgGKMdC6nAb",
+  "name": "Graph Debugging Demo",
+  "tagColors": {
+    "ai": "#a855f7",
+    "backend": "#10b981",
+    "boundary": "#0ea5e9",
+    "debug": "#f97316",
+    "debug-injection": "#f97316",
+    "decision": "#f59e0b",
+    "fix": "#22c55e",
+    "flow": "#64748b",
+    "implemented": "#22c55e",
+    "module": "#0ea5e9",
+    "runtime": "#14b8a6",
+    "signal": "#eab308",
+    "state": "#14b8a6",
+    "test": "#64748b",
+    "ui": "#3b82f6",
+    "user": "#8b5cf6"
+  },
+  "nodes": [
+    {
+      "id": "ai_tool_edit",
+      "text": "2. React canvas\narchitecture-editor.react.tsx owns React Flow gestures, selection, inspector controls, undo and redo commands, viewport behavior, and editor callbacks. It never calls the backend directly.",
+      "tags": [
+        "flow",
+        "module",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 340,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "architecture_island_module",
+      "text": "14. Solid-to-React bridge\narchitecture-island.tsx lazy-loads React, React DOM, and the editor, then forwards the visible snapshot, runtime view, pending overlay, viewport, action, labels, and callbacks into ArchitectureEditor.",
+      "tags": [
+        "flow",
+        "module",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 1360,
+          "y": 440
+        }
+      }
+    },
+    {
+      "id": "backend_event",
+      "text": "7A. Live-instance synchronizer\nlive-instance.ts reconciles the current backend instance with the editor target, serializes typed patches, authoritatively adopts external instances, and invalidates in-flight work before save, reload, or resource switching.",
+      "tags": [
+        "flow",
+        "module",
+        "runtime"
+      ],
+      "layout": {
+        "position": {
+          "x": 2040,
+          "y": -240
+        }
+      }
+    },
+    {
+      "id": "canvas_debug_injection",
+      "text": "Debug injection D: React source acceptance\nAfter canvas-source-sync.ts accepts a visible source, architecture-editor.react.tsx emits a canvas-source event with action, source, reason, previous revision and digest, and accepted revision and digest.",
+      "tags": [
+        "debug",
+        "debug-injection",
+        "implemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 1020,
+          "y": 820
+        }
+      }
+    },
+    {
+      "id": "canvas_source_boundary",
+      "text": "15. React canvas source acceptance\ncanvas-source-sync.ts reconciles incoming visible state with editor history and classifies initial, replace, rebase, or unchanged transitions for resource switches, revisions, digest changes, source changes, and pending operations.",
+      "tags": [
+        "boundary",
+        "debug-injection",
+        "flow",
+        "implemented",
+        "module"
+      ],
+      "layout": {
+        "position": {
+          "x": 1020,
+          "y": 440
+        }
+      }
+    },
+    {
+      "id": "debug_trace",
+      "text": "13. Visible runtime derivation\nruntime-view.ts selects one visible snapshot from saved cache, live instance, and pending overlay. runtime-controller.ts adds selector state and bounded debug history while deriving dirty reasons, conflicts, revisions, digests, and sync status.",
+      "tags": [
+        "flow",
+        "module",
+        "runtime",
+        "state"
+      ],
+      "layout": {
+        "position": {
+          "x": 1700,
+          "y": 440
+        }
+      }
+    },
+    {
+      "id": "editor_commands_module",
+      "text": "3. Typed editor intent\neditor-commands.ts converts each gesture into typed resource.update, tag.color, node.*, or edge.* operations. The React editor dispatches intent instead of constructing ad hoc mutation payloads.",
+      "tags": [
+        "flow",
+        "module"
+      ],
+      "layout": {
+        "position": {
+          "x": 680,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "editor_state_module",
+      "text": "4. Local history state\neditor-state.ts applies operation batches, tracks source, resource, past, future, and pending state, preserves undo and redo, and creates ArchitectureInstanceChange values for journal, save, and duplicate callbacks.",
+      "tags": [
+        "flow",
+        "module",
+        "state"
+      ],
+      "layout": {
+        "position": {
+          "x": 1020,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "event_debug_injection",
+      "text": "Debug injection C: backend event and decision\nserver-event-sync.ts records the received event and chosen plan. live-instance-event-sync.ts adds metadata-only refetch started and finished events with adoption, mismatch, stale, or request-failed reasons.",
+      "tags": [
+        "debug",
+        "debug-injection",
+        "implemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 2040,
+          "y": 820
+        }
+      }
+    },
+    {
+      "id": "event_sync",
+      "text": "10. Workspace event delivery\ncontext/server-sdk.tsx receives backend events and routes them to the active directory subscription. pathKey normalization makes equivalent Windows slash forms reach the same Graph listener.",
+      "tags": [
+        "flow",
+        "module",
+        "signal"
+      ],
+      "layout": {
+        "position": {
+          "x": 2720,
+          "y": 440
+        }
+      }
+    },
+    {
+      "id": "human_next_step",
+      "text": "16. React Flow projection\nmodel.ts and toReactFlow project the accepted resource into custom architecture nodes and edges. architecture-editor.react.tsx replaces flow elements while preserving selection, filters, edited hints, and local interaction history.",
+      "tags": [
+        "flow",
+        "module",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 680,
+          "y": 440
+        }
+      }
+    },
+    {
+      "id": "journal_debug_injection",
+      "text": "Debug injection A: local journal\narchitecture-panel.tsx emits architectureJournalDebugEvent when React reports a change. It records operation count and types, conflict count, resource ID, and revision without graph content.",
+      "tags": [
+        "debug",
+        "debug-injection",
+        "implemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 1360,
+          "y": 820
+        }
+      }
+    },
+    {
+      "id": "local_journal_module",
+      "text": "6. Persisted pending overlay\nThe panel records local operations and conflicts in persisted pendingOverlays, then asks the per-resource synchronizer to mirror the target into the backend live instance. This bridges crash recovery and unacknowledged UI edits.",
+      "tags": [
+        "flow",
+        "runtime",
+        "state"
+      ],
+      "layout": {
+        "position": {
+          "x": 1700,
+          "y": -240
+        }
+      }
+    },
+    {
+      "id": "query_cache_boundary",
+      "text": "8. HTTP client boundary\napi.ts converts typed Graph operations and resource actions into ServerApi calls for list, get, create, patch, commit, reload, and remove. It is transport-facing and does not choose visible editor state.",
+      "tags": [
+        "flow",
+        "module",
+        "signal"
+      ],
+      "layout": {
+        "position": {
+          "x": 2380,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "resource_action_boundary",
+      "text": "7B. Resource action execution\narchitecture-resource-actions.ts sequences Save, Reload, Create, Duplicate, and Delete: invalidate, authoritative sync, commit, cache replacement, overlay cleanup, version bump, optimistic removal, refetch, and rollback.",
+      "tags": [
+        "boundary",
+        "flow",
+        "implemented",
+        "module"
+      ],
+      "layout": {
+        "position": {
+          "x": 2040,
+          "y": 240
+        }
+      }
+    },
+    {
+      "id": "runtime_snapshot",
+      "text": "9. Protocol, Server, and Core\nProtocol routes and server handlers invoke the Core architecture service. Core checks revision and digest conflicts, locks storage, applies typed operations, persists saved or live instances, and emits resource or instance events.",
+      "tags": [
+        "backend",
+        "flow",
+        "runtime"
+      ],
+      "layout": {
+        "position": {
+          "x": 2720,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "sync_debug_ui",
+      "text": "Collapsed Sync debug UI\nRuntimeDebugView in architecture-editor.react.tsx renders dirty reasons, pending and conflict counts, live-instance state, saved and visible revisions and digests, plus the newest journal, sync, server, save, reload, and canvas-source activities.",
+      "tags": [
+        "debug",
+        "implemented",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 340,
+          "y": 1040
+        }
+      }
+    },
+    {
+      "id": "sync_decision",
+      "text": "11. Event planning and orchestration\nserver-event-sync.ts parses and orchestrates events. sync-events.ts makes pure stale, adopt, refetch, remove, and local-dirty decisions. live-instance-event-sync.ts validates metadata-only refetch results before adoption.",
+      "tags": [
+        "debug-injection",
+        "decision",
+        "flow",
+        "module"
+      ],
+      "layout": {
+        "position": {
+          "x": 2380,
+          "y": 440
+        }
+      }
+    },
+    {
+      "id": "trace_coverage",
+      "text": "Debug injection B: synchronization and actions\nlive-instance.ts callbacks emit sync snapshots. architecture-resource-actions.ts emits save and reload started, succeeded, and failed events. Payloads are limited to identifiers, operation summaries, revisions, digests, type, and status.",
+      "tags": [
+        "debug",
+        "debug-injection",
+        "implemented"
+      ],
+      "layout": {
+        "position": {
+          "x": 1700,
+          "y": 820
+        }
+      }
+    },
+    {
+      "id": "ui_debug_panel",
+      "text": "5. Solid orchestration shell\narchitecture-panel.tsx owns selected resource, persisted pending overlays and viewports, command routing, dialogs, labels, toasts, runtime composition, and per-resource synchronizers. Execution is delegated to narrow modules.",
+      "tags": [
+        "flow",
+        "module",
+        "runtime",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 1360,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "user_observes_module",
+      "text": "18. User observes and continues\nThe user sees the result, checks Sync debug when behavior is unexpected, then continues editing, saves, reloads, switches resources, or reports a specific failing stage.",
+      "tags": [
+        "flow",
+        "ui",
+        "user"
+      ],
+      "layout": {
+        "position": {
+          "x": 0,
+          "y": 440
+        }
+      }
+    },
+    {
+      "id": "user_reports_issue",
+      "text": "1. UI user input\nThe user edits text or tags, moves nodes, creates wires, changes properties, selects a resource, or invokes Save, Reload, Create, Duplicate, or Delete. AI Graph tool edits enter as external backend changes rather than local gestures.",
+      "tags": [
+        "flow",
+        "ui",
+        "user"
+      ],
+      "layout": {
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": "verification",
+      "text": "Debug collection\narchitecture-panel.tsx appends all runtime debug events through prependArchitectureRuntimeDebugEvent, bounded to the newest 8 per resource. runtime-controller.ts combines that history with current visible runtime state.",
+      "tags": [
+        "debug",
+        "implemented",
+        "state"
+      ],
+      "layout": {
+        "position": {
+          "x": 680,
+          "y": 1040
+        }
+      }
+    },
+    {
+      "id": "visible_canvas_module",
+      "text": "17. Visible canvas result\nThe canvas shows accepted backend and local state without a manual reload when adoption is safe. Remote edited-node hints can identify externally changed nodes.",
+      "tags": [
+        "fix",
+        "flow",
+        "ui"
+      ],
+      "layout": {
+        "position": {
+          "x": 340,
+          "y": 440
+        }
+      }
+    },
+    {
+      "id": "visible_result",
+      "text": "12. Typed query and cache authority\narchitecture-resource-queries.ts owns Graph query keys, availability guards, polling, guarded stale responses, saved and live reconciliation, authoritative adoption, scoped cache reads and writes, and active refetches.",
+      "tags": [
+        "boundary",
+        "flow",
+        "implemented",
+        "state"
+      ],
+      "layout": {
+        "position": {
+          "x": 2040,
+          "y": 440
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "backend_to_query_boundary",
+      "source": "ui_debug_panel",
+      "target": "resource_action_boundary",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "canvas_debug_collect",
+      "source": "canvas_debug_injection",
+      "target": "verification",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "canvas_source_debug_tap",
+      "source": "canvas_source_boundary",
+      "target": "canvas_debug_injection",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "canvas_source_to_trace",
+      "source": "visible_canvas_module",
+      "target": "user_observes_module",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "canvas_source_to_verification",
+      "source": "sync_decision",
+      "target": "visible_result",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "debug_trace_to_coverage",
+      "source": "human_next_step",
+      "target": "visible_canvas_module",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "debug_ui_to_observer",
+      "source": "sync_debug_ui",
+      "target": "user_observes_module",
+      "sourceHandle": "left",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "decision_to_canvas_source",
+      "source": "event_sync",
+      "target": "sync_decision",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_ai_to_backend",
+      "source": "ui_debug_panel",
+      "target": "local_journal_module",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_backend_to_runtime_snapshot",
+      "source": "debug_trace",
+      "target": "architecture_island_module",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_backend_to_sync",
+      "source": "backend_event",
+      "target": "query_cache_boundary",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_decision_to_result",
+      "source": "query_cache_boundary",
+      "target": "runtime_snapshot",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_decision_to_trace",
+      "source": "canvas_source_boundary",
+      "target": "human_next_step",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_next_to_report",
+      "source": "visible_result",
+      "target": "debug_trace",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_panel_to_ai",
+      "source": "ai_tool_edit",
+      "target": "editor_commands_module",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_panel_to_runtime_snapshot",
+      "source": "editor_commands_module",
+      "target": "editor_state_module",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_report_to_panel",
+      "source": "user_reports_issue",
+      "target": "ai_tool_edit",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_result_to_trace",
+      "source": "architecture_island_module",
+      "target": "canvas_source_boundary",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "e_runtime_snapshot_to_sync",
+      "source": "user_observes_module",
+      "target": "user_reports_issue",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "style": "curved"
+    },
+    {
+      "id": "e_sync_to_decision",
+      "source": "resource_action_boundary",
+      "target": "query_cache_boundary",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "e_sync_to_result",
+      "source": "backend_event",
+      "target": "visible_result",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "e_trace_to_next",
+      "source": "resource_action_boundary",
+      "target": "visible_result",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "e_trace_to_panel",
+      "source": "ui_debug_panel",
+      "target": "journal_debug_injection",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "event_debug_collect",
+      "source": "event_debug_injection",
+      "target": "verification",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "event_decision_debug_tap",
+      "source": "sync_decision",
+      "target": "event_debug_injection",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "event_refetch_debug_tap",
+      "source": "visible_result",
+      "target": "event_debug_injection",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "history_to_debug_ui",
+      "source": "verification",
+      "target": "sync_debug_ui",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "journal_debug_collect",
+      "source": "journal_debug_injection",
+      "target": "verification",
+      "sourceHandle": "left",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "query_boundary_to_runtime",
+      "source": "runtime_snapshot",
+      "target": "event_sync",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "resource_action_debug_tap",
+      "source": "resource_action_boundary",
+      "target": "trace_coverage",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    },
+    {
+      "id": "resource_actions_to_verification",
+      "source": "local_journal_module",
+      "target": "backend_event",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "runtime_to_debug_ui",
+      "source": "debug_trace",
+      "target": "sync_debug_ui",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "curved"
+    },
+    {
+      "id": "runtime_to_resource_actions",
+      "source": "editor_state_module",
+      "target": "ui_debug_panel",
+      "sourceHandle": "right",
+      "targetHandle": "left",
+      "style": "curved"
+    },
+    {
+      "id": "sync_debug_collect",
+      "source": "trace_coverage",
+      "target": "verification",
+      "sourceHandle": "left",
+      "targetHandle": "right",
+      "style": "rectangular"
+    },
+    {
+      "id": "synchronizer_debug_tap",
+      "source": "backend_event",
+      "target": "trace_coverage",
+      "sourceHandle": "bottom",
+      "targetHandle": "top",
+      "style": "rectangular"
+    }
+  ]
+}

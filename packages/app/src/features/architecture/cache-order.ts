@@ -15,6 +15,8 @@ export function createArchitectureCacheOrder() {
   }
 }
 
+export type ArchitectureCacheOrder = ReturnType<typeof createArchitectureCacheOrder>
+
 export async function guardedArchitectureCacheResponse<T>(input: {
   readonly cacheOrder: ReturnType<typeof createArchitectureCacheOrder>
   readonly key: readonly unknown[]
