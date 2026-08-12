@@ -1,6 +1,4 @@
 import type { ArchitectureListResourcesOutput } from "@opencode-ai/client/promise"
-import { architectureResourceInstanceQueryKey } from "./api"
-import type { ArchitectureCacheOrder } from "./cache-order"
 import type { ArchitectureLiveInstanceCache, ArchitectureRuntimeDebugEvent, ArchitectureSnapshot } from "./contract"
 import {
   architectureResourceEventInfo,
@@ -15,13 +13,10 @@ import { architectureResourceServerDebugEvent, architectureSyncDecisionDebugEven
 import { architectureLiveInstanceEventPlan, architectureResourceEventRefreshPlan } from "./sync-events"
 
 export function syncArchitectureServerEvent(input: {
-  readonly server: string
-  readonly directory: string
   readonly selectedResourceID: string | undefined
   readonly localDirty: boolean
   readonly resources: ArchitectureListResourcesOutput["data"] | undefined
   readonly event: ArchitectureResourceEvent
-  readonly cacheOrder: ArchitectureCacheOrder
   readonly snapshot: (resourceID: string) => ArchitectureSnapshot | undefined
   readonly currentInstance: (resourceID: string) => ArchitectureLiveInstanceCache | undefined
   readonly loadInstance: (resourceID: string) => Promise<ArchitectureLiveInstanceCache>
@@ -46,7 +41,6 @@ function syncArchitectureInstanceServerEvent(
   event: ArchitectureResourceInstanceEventInfo,
 ) {
   input.debug(architectureResourceServerDebugEvent(event))
-  const instanceKey = architectureResourceInstanceQueryKey(input.server, input.directory, event.resourceID)
   const plan = architectureLiveInstanceEventPlan({ snapshot: input.snapshot(event.resourceID), event })
   if (plan.action === "ignore-stale") {
     input.debug(
@@ -81,8 +75,6 @@ function syncArchitectureInstanceServerEvent(
     return
   }
   return syncArchitectureLiveInstanceEventRefetch({
-    cacheOrder: input.cacheOrder,
-    key: instanceKey,
     event,
     current: () => input.currentInstance(event.resourceID),
     observe: () => input.loadInstance(event.resourceID),

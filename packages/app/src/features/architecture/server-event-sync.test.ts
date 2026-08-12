@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test"
 import type { ArchitectureListResourcesOutput } from "@opencode-ai/client/promise"
-import { createArchitectureCacheOrder } from "./cache-order"
 import type { ArchitectureLiveInstance, ArchitectureLiveInstanceCache, ArchitectureRuntimeDebugEvent, ArchitectureSnapshot } from "./contract"
 import { syncArchitectureServerEvent } from "./server-event-sync"
 
@@ -90,12 +89,9 @@ describe("architecture server event sync", () => {
 
 function baseInput(calls: ReturnType<typeof recorder>) {
   return {
-    server: "http://localhost:4096",
-    directory: "/repo",
     selectedResourceID: "design",
     localDirty: false,
     resources: [] as ArchitectureListResourcesOutput["data"],
-    cacheOrder: createArchitectureCacheOrder(),
     snapshot: () => snapshot(0, "saved"),
     currentInstance: () => undefined,
     loadInstance: async () => live("external"),

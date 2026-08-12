@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { createArchitectureCacheOrder } from "./cache-order"
 import type { ArchitectureLiveInstance, ArchitectureLiveInstanceCache, ArchitectureRuntimeDebugEvent } from "./contract"
 import { syncArchitectureLiveInstanceEventRefetch } from "./live-instance-event-sync"
 
@@ -9,8 +8,6 @@ describe("architecture live instance event sync", () => {
     const events: ArchitectureRuntimeDebugEvent[] = []
 
     await syncArchitectureLiveInstanceEventRefetch({
-      cacheOrder: createArchitectureCacheOrder(),
-      key: ["architecture-resource-instance", "server", "/repo", "design"],
       event: { resourceID: "design", action: "updated", revision: 1, digest: "external" },
       current: () => current,
       observe: async () => live("external"),
@@ -30,8 +27,6 @@ describe("architecture live instance event sync", () => {
     const events: ArchitectureRuntimeDebugEvent[] = []
 
     await syncArchitectureLiveInstanceEventRefetch({
-      cacheOrder: createArchitectureCacheOrder(),
-      key: ["architecture-resource-instance", "server", "/repo", "design"],
       event: { resourceID: "design", action: "updated", revision: 1, digest: "external" },
       current: () => current,
       observe: async () => live("stale"),

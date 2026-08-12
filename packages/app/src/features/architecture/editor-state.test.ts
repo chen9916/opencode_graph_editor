@@ -76,12 +76,14 @@ describe("architecture editor live instance state", () => {
 
   test("mounted editor should reset from the live graph instance source", async () => {
     const source = await Bun.file(new URL("./architecture-editor.react.tsx", import.meta.url)).text()
+    const sync = await Bun.file(new URL("./canvas-source-sync.ts", import.meta.url)).text()
 
     expect(source).not.toContain("architectureEditorLoadPlan")
     expect(source).not.toContain("setFlowReloadKey")
     expect(source).toContain("liveInstanceKey")
     expect(source).toContain("[liveInstanceKey]")
-    expect(source).toContain("syncArchitectureEditorHistorySource")
+    expect(source).toContain("syncArchitectureCanvasSource")
+    expect(sync).toContain("syncArchitectureEditorHistorySource")
   })
 
   test("manual patch acknowledgement adopts the live source and keeps undo as interaction history", () => {

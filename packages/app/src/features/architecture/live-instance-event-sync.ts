@@ -1,5 +1,3 @@
-import type { ArchitectureCacheOrder } from "./cache-order"
-import { guardedArchitectureCacheResponse } from "./cache-order"
 import type { ArchitectureLiveInstanceCache, ArchitectureRuntimeDebugEvent } from "./contract"
 import type { ArchitectureResourceInstanceEventInfo } from "./event"
 import { adoptArchitectureLiveInstanceCache } from "./live-instance"
@@ -10,8 +8,6 @@ import {
 import { architectureFetchedLiveInstanceEventPlan } from "./sync-events"
 
 export function syncArchitectureLiveInstanceEventRefetch(input: {
-  readonly cacheOrder: ArchitectureCacheOrder
-  readonly key: readonly unknown[]
   readonly event: ArchitectureResourceInstanceEventInfo
   readonly current: () => ArchitectureLiveInstanceCache | undefined
   readonly observe: () => Promise<ArchitectureLiveInstanceCache>
@@ -21,12 +17,8 @@ export function syncArchitectureLiveInstanceEventRefetch(input: {
   readonly debug: (event: ArchitectureRuntimeDebugEvent) => void
 }) {
   input.debug(architectureInstanceRefetchStartedDebugEvent(input.event))
-  return guardedArchitectureCacheResponse<ArchitectureLiveInstanceCache>({
-    cacheOrder: input.cacheOrder,
-    key: input.key,
-    current: input.current,
-    observe: input.observe,
-  })
+  return input
+    .observe()
     .then((cache) => {
       const plan = architectureFetchedLiveInstanceEventPlan({ event: input.event, cache })
       const adopted = plan.action === "adopt-cache" ? plan.cache : undefined

@@ -6,6 +6,7 @@ import type {
   ArchitectureRuntimeDebugEventType,
   ArchitectureSnapshot,
 } from "./contract"
+import type { ArchitectureCanvasSourceTransition } from "./canvas-source-sync"
 import type { ArchitectureResourceEventInfo, ArchitectureResourceInstanceEventInfo } from "./event"
 import { architectureInstanceResourceID } from "./resource-state"
 
@@ -176,6 +177,26 @@ export function architectureSyncDecisionDebugEvent(input: {
     revision: input.revision,
     digest: input.digest,
     details: details(input.details),
+  })
+}
+
+export function architectureCanvasSourceDebugEvent(transition: ArchitectureCanvasSourceTransition) {
+  return createArchitectureRuntimeDebugEvent({
+    resourceID: transition.resourceID,
+    type: "canvas-source",
+    status: "received",
+    revision: transition.to.revision,
+    digest: transition.to.digest,
+    details: details({
+      action: transition.action,
+      source: transition.source,
+      reason: transition.reason,
+      resourceID: transition.resourceID,
+      fromRevision: transition.from?.revision,
+      fromDigest: transition.from?.digest,
+      toRevision: transition.to.revision,
+      toDigest: transition.to.digest,
+    }),
   })
 }
 

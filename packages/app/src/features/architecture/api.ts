@@ -3,15 +3,6 @@ import type { ServerApi } from "@/utils/server"
 import type { ArchitectureOperation } from "./contract"
 import { architectureLiveInstanceCache } from "./live-instance"
 
-export const architectureResourcesQueryKey = (server: string, directory: string) =>
-  ["architecture-resources", server, directory] as const
-
-export const architectureResourceQueryKey = (server: string, directory: string, resourceID: string) =>
-  ["architecture-resource", server, directory, resourceID] as const
-
-export const architectureResourceInstanceQueryKey = (server: string, directory: string, resourceID: string) =>
-  ["architecture-resource-instance", server, directory, resourceID] as const
-
 export function listArchitectureResources(api: ServerApi, directory: string, signal?: AbortSignal) {
   return api.architecture.listResources({ location: { directory } }, { signal }).then((result) => result.data)
 }
