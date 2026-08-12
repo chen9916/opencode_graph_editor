@@ -62,6 +62,7 @@ import { shouldMarkBoundaryGesture, normalizeWheelDelta } from "@/pages/session/
 import { SessionContextUsage } from "@/components/session-context-usage"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
+import { useLayout } from "@/context/layout"
 import { useSessionKey } from "@/pages/session/session-layout"
 import { useServerSDK } from "@/context/server-sdk"
 import { usePlatform } from "@/context/platform"
@@ -88,6 +89,7 @@ type FramedTimelineRow = Exclude<TimelineRow.TimelineRow, { _tag: "TurnGap" }>
 type TimelineRowByTag<T extends TimelineRow.TimelineRow["_tag"]> = Extract<TimelineRow.TimelineRow, { _tag: T }>
 
 const timelineFallbackItemSize = 60
+const timelineScrollTab = "session"
 const timelineCache = new Map<string, { measurements: VirtualItem[]; toolOpen: Record<string, boolean | undefined> }>()
 
 const taskDescription = (part: PartType, sessionID: string) => {
@@ -266,12 +268,20 @@ export function MessageTimeline(props: {
   const tabs = useTabs()
   const dialog = useDialog()
   const language = useLanguage()
+  const layout = useLayout()
   const { params, sessionKey } = useSessionKey()
   const ownerSessionKey = sessionKey()
+  const sessionView = layout.view(ownerSessionKey)
   const cached = timelineCache.get(ownerSessionKey)
   const initialMeasurements = cached?.measurements
   const coldBottomMount = !initialMeasurements?.length && props.shouldAnchorBottom()
   const platform = usePlatform()
+  const initialScrollOffset = () =>
+    sessionView.scroll(timelineScrollTab)?.y ?? (props.shouldAnchorBottom() ? Number.MAX_SAFE_INTEGER : 0)
+  const rememberSessionScroll = (root: HTMLDivElement | undefined) => {
+    if (!root) return
+    sessionView.setScroll(timelineScrollTab, { x: root.scrollLeft, y: root.scrollTop })
+  }
 
   const [listRoot, setListRoot] = createSignal<HTMLDivElement>()
   const sessionID = createMemo(() => params.id)
@@ -419,7 +429,7 @@ export function MessageTimeline(props: {
     },
     getScrollElement: () => listRoot() ?? null,
     observeElementOffset: observeElementOffsetReconnectAware,
-    initialOffset: () => (props.shouldAnchorBottom() ? Number.MAX_SAFE_INTEGER : 0),
+    initialOffset: initialScrollOffset,
     initialMeasurementsCache: initialMeasurements,
     estimateSize: () => timelineFallbackItemSize,
     scrollToFn: (offset, options, instance) => {
@@ -540,6 +550,7 @@ export function MessageTimeline(props: {
   })
 
   onCleanup(() => {
+    rememberSessionScroll(listRoot())
     clearPrependAnchor()
     timelineCache.delete(ownerSessionKey)
     timelineCache.set(ownerSessionKey, { measurements: virtualizer.takeSnapshot(), toolOpen: { ...toolOpen } })
@@ -631,6 +642,7 @@ export function MessageTimeline(props: {
 
   const handleListScroll = (event: Event & { currentTarget: HTMLDivElement }) => {
     if (prependLoading) updatePrependAnchor()
+    rememberSessionScroll(event.currentTarget)
     props.onScheduleScrollState(event.currentTarget)
     props.onHistoryScroll()
     if (!props.hasScrollGesture()) return
